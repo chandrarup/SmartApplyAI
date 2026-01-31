@@ -1,0 +1,17 @@
+# Python temporary files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments (if you use them later)
+venv/
+env/
+.env
+
+# OS System files
+.DS_Store
+Thumbs.db
+
+# IDE settings (VS Code, JetBrains)
+.vscode/
+.idea/
