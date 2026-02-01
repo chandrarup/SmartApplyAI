@@ -2,20 +2,27 @@
 <html>
 <head>
   <style>
-    body { width: 300px; padding: 15px; font-family: sans-serif; }
+    body { width: 320px; padding: 15px; font-family: sans-serif; }
     button { 
         width: 100%; padding: 10px; background: #007bff; 
-        color: white; border: none; border-radius: 5px; cursor: pointer; 
+        color: white; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 10px;
     }
     button:hover { background: #0056b3; }
-    #status { margin-top: 15px; font-weight: bold; text-align: center; }
+    #result { 
+        background: #f4f4f4; padding: 10px; border-radius: 5px; 
+        font-size: 13px; min-height: 50px; margin-top: 10px;
+    }
+    .hidden { display: none; }
+    .loading { color: #666; font-style: italic; text-align: center;}
   </style>
 </head>
 <body>
   <h3>LocalHire Agent</h3>
-  <p>Connect to local Python server:</p>
-  <button id="testBtn">Test Connection</button>
-  <div id="status">Waiting...</div>
+  <button id="analyzeBtn">Analyze Job Description</button>
+
+  <div id="loading" class="hidden loading">Reading page & Thinking...<br>(5-10 seconds)</div>
+  <div id="result" class="hidden"></div>
+
   <script src="popup.js"></script>
 </body>
 </html>
