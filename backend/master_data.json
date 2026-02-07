@@ -18,7 +18,7 @@
     {
       "degree": "B.Tech in Computer Science and Engineering (Specialization in Artificial Intelligence)",
       "university": "Amrita Vishwa Vidyapeetham",
-      "graduation_date": "2023",
+      "graduation_date": "2019 - 2023",
       "details": "Specialized in AI with comprehensive coursework in Deep Learning, NLP, Computer Vision, Speech Processing, Reinforcement Learning, and Robotics. Published 2 conference papers."
     }
   ],
@@ -26,20 +26,34 @@
     {
       "role": "Advanced App Engineering Analyst - GenAI Specialist",
       "company": "Accenture (GenWizard Platform)",
-      "duration": "August 2023 - August 2025",
-      "details": "Architected production-grade LLM solutions for reverse engineering SDLC workflows. Achieved 89% coverage in Technical Analysis with 9% efficiency improvement. Designed custom RAG pipelines using LangChain and AutoGen. Mentored 30+ engineers. Recognized with Wall of Fame Award (Q4 FY24) and Client Recognition Award."
+      "duration": "Aug 2023 - Aug 2025",
+      "location": "India",
+      "details": [
+        "Architected production-grade LLM solutions for reverse engineering SDLC workflows.",
+        "Achieved 89% coverage in Technical Analysis with 9% efficiency improvement.",
+        "Designed custom RAG pipelines using LangChain and AutoGen.",
+        "Mentored 30+ engineers and recognized with Wall of Fame Award (Q4 FY24)."
+      ]
     },
     {
       "role": "Undergraduate Research Assistant",
       "company": "Amrita Vishwa Vidyapeetham",
-      "duration": "January 2023 - May 2023",
-      "details": "Developed deep learning framework for deepfake video detection achieving 96% accuracy. Published in GCAT 2024. Conducted comprehensive literature review on AI-generated media forensics."
+      "duration": "Jan 2023 - May 2023",
+      "location": "India",
+      "details": [
+        "Developed deep learning framework for deepfake video detection achieving 96% accuracy.",
+        "Published in GCAT 2024. Conducted comprehensive literature review on AI forensics."
+      ]
     },
     {
       "role": "Technical Mentor and Trainer",
       "company": "Accenture",
-      "duration": "January 2024 - August 2025",
-      "details": "Conducted training sessions on Python, agentic AI frameworks (LangChain, AutoGen, CrewAI), and GenAI best practices for 30+ junior engineers. Developed structured curriculum and provided hands-on mentorship."
+      "duration": "Jan 2024 - Aug 2025",
+      "location": "India",
+      "details": [
+        "Conducted training sessions on Python, LangChain, AutoGen, and CrewAI for 30+ junior engineers.",
+        "Developed structured curriculum and provided hands-on mentorship."
+      ]
     }
   ],
   "projects": [

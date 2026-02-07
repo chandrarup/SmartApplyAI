@@ -1,7 +1,11 @@
 %-------------------------
-% Dynamic Template: LocalHire Agent
+% Final LaTeX Resume: Chandra Rup Daka
+% Role: AI/ML/GenAI Engineer
+% Type: HYBRID (Static Layout + Dynamic AI Content)
 %------------------------
+
 \documentclass[letterpaper,11pt]{article}
+
 \usepackage{latexsym}
 \usepackage[empty]{fullpage}
 \usepackage{titlesec}
@@ -21,6 +25,7 @@
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\footrulewidth}{0pt}
 
+% Margins (Your Exact Settings)
 \addtolength{\oddsidemargin}{-0.6in}
 \addtolength{\textwidth}{1.2in}
 \addtolength{\topmargin}{-0.5in}
@@ -59,68 +64,125 @@
 
 \begin{document}
 
-%----------HEADER----------
+%----------HEADER (Dynamic Data)----------
 \begin{center}
-    {\Huge \scshape \VAR{ contact_info.name } } \\[4pt]
-    \small
-    \underline{\VAR{ contact_info.phone | latex }} ~
-    \href{mailto:\VAR{ contact_info.email }}{\underline{\VAR{ contact_info.email | latex }}} ~
-    \href{https://\VAR{ contact_info.linkedin }}{\underline{\VAR{ contact_info.linkedin | latex }}} ~
-    \href{https://\VAR{ contact_info.github }}{\underline{\VAR{ contact_info.github | latex }}}
+  {\Huge \scshape \VAR{ contact_info.name } } \\[4pt]
+  \small
+  \underline{\VAR{ contact_info.phone | latex }} ~
+  \href{mailto:\VAR{ contact_info.email }}{\underline{\VAR{ contact_info.email | latex }}} ~
+  \href{https://\VAR{ contact_info.linkedin }}{\underline{\VAR{ contact_info.linkedin | latex }}} ~
+  \href{https://\VAR{ contact_info.github }}{\underline{\VAR{ contact_info.github | latex }}}
 \end{center}
 \vspace{-6mm}
 
-%----------SUMMARY----------
+
+%----------SUMMARY (AI Tailored)----------
 \vspace{-4mm}
 \section{Professional Summary}
 \VAR{ summary | latex }
 \vspace{-7mm}
 
-%----------EDUCATION----------
+%----------EDUCATION (Static - Preserving your layout)----------
 \section{Education}
 \resumeSubHeadingListStart
-\BLOCK{ for edu in education }
-    \resumeSubheading
-    {\VAR{ edu.university | latex }}{\VAR{ edu.graduation_date | latex }}
-    {\VAR{ edu.degree | latex }}{}
-    \vspace{-2mm}
-\BLOCK{ endfor }
-\resumeSubHeadingListEnd
-\vspace{-5mm}
+\resumeSubheading
+{University Of Houston}{Aug 2025 -- May 2027}
+{Master of Science in Engineering Data Science and Artificial Intelligence}{}
 
-%----------EXPERIENCE----------
+\vspace{-6mm}
+\resumeSubheading
+  {Amrita Vishwa Vidyapeetham}{Jun 2019 -- May 2023}
+  {B.Tech in Computer Science and Engineering (Artificial Intelligence)}{}
+
+\resumeSubHeadingListEnd
+\vspace{-13mm}
+
+%----------EXPERIENCE (Static - Preserving your bullets)----------
 \section{Experience}
 \vspace{-1mm}
 \resumeSubHeadingListStart
-\BLOCK{ for job in experience }
-    \resumeSubheading{\VAR{ job.company | latex }}{\VAR{ job.duration | latex }}{\VAR{ job.role | latex }}{\VAR{ job.details | latex }}
-\BLOCK{ endfor }
-\resumeSubHeadingListEnd
-\vspace{-5mm}
+\resumeSubheading{Accenture}{Aug 2023 -- Aug 2025}{Advanced App Engineering Analyst}{Chennai, India}
+\resumeItemListStart
+  \resumeItem{Delivered GenAI solutions for Reverse Engineering SDLC use cases to production: Change Impact Analysis, Code Translation, Code Dependency Graphs, and automated User Stories \& Test Case Generation.}
+  \resumeItem{Achieved 89\% coverage in Technical Analysis phase and 9\% efficiency at 46\% code coverage.}
+  \resumeItem{Architected LLM workflows using LangChain, AutoGen with prompt tuning, few-shot learning, reranking, and tool execution. Customized LLM auth via certs, custom tokens, APIM endpoints for diverse client needs}
+  \resumeItem{Recognized with Wall of Fame (Q4 FY24) and Client Recognition Award for successful delivery.}
+\resumeItemListEnd
 
-%-----------PROJECTS-----------
+\resumeSubHeadingListEnd
+\vspace{-11mm}
+
+%-----------RESEARCH PUBLICATIONS (Static)-----------
+\section{Research Publications}
+\vspace{-5pt}
+\resumeSubHeadingListStart
+
+  \resumeProjectHeading
+    {\textbf{Detection of Real and Manipulated Videos using Transfer Learning} $|$ (GCAT Conference)}{\textbf {Oct 2024}}
+    \resumeItemListStart
+      \resumeItem{Proposed a \textbf{deep learning framework} to detect fake and manipulated video content, contributing to digital media integrity and AI-assisted misinformation detection.}
+    \resumeItemListEnd
+  \vspace{-6mm}
+
+  \resumeProjectHeading
+    {\textbf{Indian Sign Language Generation from Live Audio/Text (Tamil)} $|$ (ICACCS)}{\textbf {Mar 2023}}
+    \resumeItemListStart
+      \resumeItem{Developed a real-time \textbf{speech-to-sign translation pipeline} integrating NLP and computer vision, enhancing accessibility for Tamil-speaking hearing-impaired users.}
+    \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+\vspace{-8mm}
+
+%-----------PROJECTS (Dynamic - AI Selects Top 3)-----------
 \vspace{-3mm}
 \section{Projects}
 \resumeSubHeadingListStart
 \vspace{-2mm}
 \BLOCK{ for proj in projects }
-    \resumeProjectHeading{\textbf{\VAR{ proj.title | latex }} | \emph{\VAR{ proj.tech_stack|join(', ') | latex }}}{}
+    \resumeProjectHeading{\VAR{ proj.title | latex }}{\textbf {\VAR{ proj.date | latex }}}
     \resumeItemListStart
         \resumeItem{\VAR{ proj.description | latex }}
     \resumeItemListEnd
-    \vspace{-2mm}
+    \vspace{-6mm}
 \BLOCK{ endfor }
 \resumeSubHeadingListEnd
 
-%-----------SKILLS-----------
-\vspace{-5mm}
+%-----------CERTIFICATIONS (Static - Your Custom Spacing)-----------
+% Note: The vspace here is very specific to your original file
+\vspace{-5mm} 
+\section{Certifications}
+\vspace{-5pt}
+\resumeSubHeadingListStart
+
+  \resumeProjectHeading
+    {AWS Certified Cloud Practitioner}{\textbf{(06/2024 -- 06/2027)}}
+    \vspace{-11mm}
+
+  \resumeProjectHeading
+    {Azure AI Fundamentals}{\textbf{(03/2025)}}
+    \vspace{-11mm}
+
+  \resumeProjectHeading
+    {Azure AI Engineer Associate}{\textbf{(04/2025 -- 04/2026)}}
+    \vspace{-10mm}
+    \resumeProjectHeading
+    {NVIDIA Building Transformer-Based Natural Language Processing Applications}{\textbf{(11/2025)}}
+
+\resumeSubHeadingListEnd
+
+
+%-----------SKILLS (Dynamic - Mapped to JSON)-----------
+\vspace{-14mm}
 \section{Skills}
 \vspace{-2pt}
 \small
-\textbf{Languages:} \VAR{ skills.languages|join(', ') | latex } \\[3pt]
+\textbf{AI/ML:} \VAR{ skills.domains | join(', ') | latex } \\[3pt]
 \vspace{-0.5mm}
-\textbf{Tools:} \VAR{ skills.tools|join(', ') | latex } \\[3pt]
+\textbf{Data Science:} \VAR{ skills.data_science | join(', ') | latex } \\[3pt]
 \vspace{-0.5mm}
-\textbf{Frameworks:} \VAR{ skills.frameworks|join(', ') | latex }
+\textbf{Tools \& Frameworks:} \VAR{ skills.tools | join(', ') | latex }, \VAR{ skills.frameworks | join(', ') | latex } \\[3pt]
+\vspace{-1mm}
+\textbf{Languages:} \VAR{ skills.languages | join(', ') | latex }
+\vspace{-10pt}
 
 \end{document}

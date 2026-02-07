@@ -76,6 +76,11 @@ async def analyze_job(request: JobRequest):
         3. List at least 1 missing skill (gap).
         4. Calculate a Match Score (0-100%).
         5. Write a tailored summary (2-3 sentences) for the resume that emphasizes skills from the JD that the candidate has.
+            - CRITICAL: Write in IMPLIED FIRST PERSON (e.g., "Generative AI Engineer with 2+ years...").
+            - DO NOT use the candidate's name.
+            - DO NOT use pronouns like "He" or "She".
+            - Focus on the skills relevant to the JD.   
+
         6. Select the 3 most relevant projects from the candidate's list. Return their exact "title" from the profile.
         
         OUTPUT JSON ONLY: {{ "role": "...", "skills_matched": [], "missing_skill": "...", "score": "...", "tailored_summary": "...", "selected_projects": [] }}
