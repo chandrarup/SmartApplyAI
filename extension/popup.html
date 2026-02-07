@@ -3,27 +3,78 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body { width: 320px; padding: 15px; font-family: sans-serif; }
-    button { 
-        width: 100%; padding: 10px; background: #007bff; 
-        color: white; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 10px;
-    }
-    button:hover { background: #0056b3; }
-    #result { 
-        background: #f4f4f4; padding: 10px; border-radius: 5px; 
-        font-size: 13px; min-height: 50px; margin-top: 10px;
-    }
+    body { width: 350px; padding: 0; margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 500px; }
+    
+    /* Header & Tabs */
+    .header { background: #007bff; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .tabs { display: flex; background: #f1f1f1; border-bottom: 1px solid #ccc; }
+    .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; background: #e0e0e0; border: none; }
+    .tab.active { background: white; font-weight: bold; border-bottom: 2px solid #007bff; }
+    
+    /* Content Areas */
+    .content { padding: 15px; flex: 1; overflow-y: auto; display: none; }
+    .content.active { display: block; }
+    
+    /* Chat Styling */
+    #chat-history { height: 250px; overflow-y: auto; border: 1px solid #eee; padding: 5px; margin-bottom: 10px; }
+    .msg { padding: 8px; margin: 5px 0; border-radius: 5px; font-size: 13px; max-width: 80%; }
+    .msg.user { background: #dcf8c6; align-self: flex-end; margin-left: auto; text-align: right; }
+    .msg.bot { background: #f1f0f0; align-self: flex-start; }
+    
+    /* FAQ Buttons */
+    .faq-btn { display: block; width: 100%; padding: 5px; margin: 3px 0; background: #e9ecef; border: none; text-align: left; cursor: pointer; font-size: 12px; border-radius: 3px; }
+    .faq-btn:hover { background: #dde2e6; }
+    
+    /* Controls */
+    .input-group { display: flex; margin-top: auto; }
+    input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px 0 0 4px; }
+    button.send { padding: 8px 15px; background: #007bff; color: white; border: none; border-radius: 0 4px 4px 0; cursor: pointer; }
+    
+    /* Hidden/Utility */
     .hidden { display: none; }
-    .loading { color: #666; font-style: italic; text-align: center;}
+    .loading { color: #666; font-style: italic; text-align: center; margin-top: 10px;}
+    button.action-btn { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; margin-top: 10px; cursor: pointer; }
   </style>
 </head>
 <body>
-  <h3>LocalHire Agent</h3>
-  <button id="analyzeBtn">Analyze Job Description</button>
 
-  <div id="loading" class="hidden loading">Reading page & Thinking...<br>(5-10 seconds)</div>
-  <div id="result" class="hidden"></div>
-  <button id="pdfBtn" class="hidden" style="background: green; margin-top: 10px;">Download Tailored PDF</button>
+  <div class="header">
+    <strong>LocalHire Agent</strong>
+    <button id="refreshBtn" style="background:none; border:none; color:white; cursor:pointer;" title="Rescrape Page">🔄</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-target="tab-match">Resume Match</div>
+    <div class="tab" data-target="tab-chat">Chat with Page</div>
+  </div>
+
+  <div id="tab-match" class="content active">
+    <button id="analyzeBtn" class="action-btn" style="background: #007bff;">Analyze Job Description</button>
+    <div id="loading-match" class="hidden loading">Reading page & Thinking...</div>
+    
+    <div id="match-result" class="hidden" style="margin-top:15px; font-size:13px;"></div>
+    
+    <button id="pdfBtn" class="hidden action-btn">Generate & Download PDF</button>
+  </div>
+
+  <div id="tab-chat" class="content">
+    <div id="faq-section">
+        <div style="font-size:12px; font-weight:bold; margin-bottom:5px;">Suggested Questions:</div>
+        <div id="faq-list">Loading FAQs...</div>
+    </div>
+    
+    <hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;">
+    
+    <div id="chat-history">
+        <div class="msg bot">I have read the page. What would you like to know?</div>
+    </div>
+
+    <div class="input-group">
+        <input type="text" id="chatInput" placeholder="Ask about salary, stack..." />
+        <button id="sendChatBtn" class="send">➤</button>
+    </div>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>
