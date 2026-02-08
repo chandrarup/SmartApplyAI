@@ -66,15 +66,15 @@
 
 %----------HEADER (Dynamic Data)----------
 \begin{center}
-  {\Huge \scshape \VAR{ contact_info.name } } \\[4pt]
-  \small
-  \underline{\VAR{ contact_info.phone | latex }} ~
-  \href{mailto:\VAR{ contact_info.email }}{\underline{\VAR{ contact_info.email | latex }}} ~
-  \href{https://\VAR{ contact_info.linkedin }}{\underline{\VAR{ contact_info.linkedin | latex }}} ~
-  \href{https://\VAR{ contact_info.github }}{\underline{\VAR{ contact_info.github | latex }}}
+    {\Huge \scshape \VAR{ contact_info.name } } \\[4pt]
+    \small
+    \underline{\VAR{ contact_info.phone | latex }} ~
+    \href{mailto:\VAR{ contact_info.email }}{\underline{\VAR{ contact_info.email | latex }}} ~
+    % Link uses raw variable (has https), Display strips it
+    \href{\VAR{ contact_info.linkedin }}{\underline{\VAR{ contact_info.linkedin | replace('https://', '') | replace('www.', '') | latex }}} ~
+    \href{\VAR{ contact_info.github }}{\underline{\VAR{ contact_info.github | replace('https://', '') | replace('www.', '') | latex }}}
 \end{center}
 \vspace{-6mm}
-
 
 %----------SUMMARY (AI Tailored)----------
 \vspace{-4mm}
@@ -171,18 +171,17 @@
 \resumeSubHeadingListEnd
 
 
-%-----------SKILLS (Dynamic - Mapped to JSON)-----------
+%-----------SKILLS (Fixed: TabularX for Overflow Protection)-----------
 \vspace{-14mm}
 \section{Skills}
 \vspace{-2pt}
 \small
-\textbf{AI/ML:} \VAR{ skills.domains | join(', ') | latex } \\[3pt]
-\vspace{-0.5mm}
-\textbf{Data Science:} \VAR{ skills.data_science | join(', ') | latex } \\[3pt]
-\vspace{-0.5mm}
-\textbf{Tools \& Frameworks:} \VAR{ skills.tools | join(', ') | latex }, \VAR{ skills.frameworks | join(', ') | latex } \\[3pt]
-\vspace{-1mm}
-\textbf{Languages:} \VAR{ skills.languages | join(', ') | latex }
+% Table with 2 columns: Left (bold label) is minimal width, Right (X) fills space & wraps
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\textbf{AI/ML:} & \VAR{ skills.domains | join(', ') | latex } \\
+\textbf{Data Science:} & \VAR{ skills.data_science | join(', ') | latex } \\
+\textbf{Tools \& Frameworks:} & \VAR{ skills.tools | join(', ') | latex }, \VAR{ skills.frameworks | join(', ') | latex } \\
+\textbf{Languages:} & \VAR{ skills.languages | join(', ') | latex } \\
+\end{tabularx}
 \vspace{-10pt}
-
 \end{document}

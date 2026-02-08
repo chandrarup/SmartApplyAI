@@ -1,230 +1,355 @@
 {
-  "contact_info": {
-    "name": "Chandra Rup Daka",
-    "email": "chandrarupdaka@gmail.com",
-    "phone": "+1 253-632-3181",
-    "linkedin": "https://www.linkedin.com/in/chandra-rup-daka/",
-    "github": "https://github.com/chandrarup",
-    "location": "Houston, TX"
-  },
-  "summary": "Generative AI Engineer with 2+ years of experience designing and deploying production-grade LLM and agentic solutions across enterprise environments. Passionate about solving real-world problems at scale through intelligent systems.",
-  "education": [
-    {
-      "degree": "M.S. in Engineering Data Science and Artificial Intelligence",
-      "university": "University of Houston",
-      "graduation_date": "Expected 2027",
-      "details": "Focus on AI/ML, Advanced NLP, Deep Learning, and Large Language Models."
+    "contact_info": {
+        "name": "Chandra Rup Daka",
+        "email": "chandrarupdaka@gmail.com",
+        "phone": "+1 253-632-3181",
+        "linkedin": "https://www.linkedin.com/in/chandra-rup-daka/",
+        "github": "https://github.com/chandrarup",
+        "location": "Houston, TX"
     },
-    {
-      "degree": "B.Tech in Computer Science and Engineering (Specialization in Artificial Intelligence)",
-      "university": "Amrita Vishwa Vidyapeetham",
-      "graduation_date": "2019 - 2023",
-      "details": "Specialized in AI with comprehensive coursework in Deep Learning, NLP, Computer Vision, Speech Processing, Reinforcement Learning, and Robotics. Published 2 conference papers."
-    }
-  ],
-  "experience": [
-    {
-      "role": "Advanced App Engineering Analyst - GenAI Specialist",
-      "company": "Accenture (GenWizard Platform)",
-      "duration": "Aug 2023 - Aug 2025",
-      "location": "India",
-      "details": [
-        "Architected production-grade LLM solutions for reverse engineering SDLC workflows.",
-        "Achieved 89% coverage in Technical Analysis with 9% efficiency improvement.",
-        "Designed custom RAG pipelines using LangChain and AutoGen.",
-        "Mentored 30+ engineers and recognized with Wall of Fame Award (Q4 FY24)."
-      ]
-    },
-    {
-      "role": "Undergraduate Research Assistant",
-      "company": "Amrita Vishwa Vidyapeetham",
-      "duration": "Jan 2023 - May 2023",
-      "location": "India",
-      "details": [
-        "Developed deep learning framework for deepfake video detection achieving 96% accuracy.",
-        "Published in GCAT 2024. Conducted comprehensive literature review on AI forensics."
-      ]
-    },
-    {
-      "role": "Technical Mentor and Trainer",
-      "company": "Accenture",
-      "duration": "Jan 2024 - Aug 2025",
-      "location": "India",
-      "details": [
-        "Conducted training sessions on Python, LangChain, AutoGen, and CrewAI for 30+ junior engineers.",
-        "Developed structured curriculum and provided hands-on mentorship."
-      ]
-    }
-  ],
-  "projects": [
-    {
-      "title": "Detection of Real and Manipulated Videos using Transfer Learning",
-      "tech_stack": ["Python", "TensorFlow", "ResNet", "XceptionNet", "VGG16", "LSTM", "Bi-LSTM"],
-      "description": "Developed deep learning framework for deepfake detection achieving 96% accuracy on 6,500-video dataset. Published in GCAT October 2024."
-    },
-    {
-      "title": "Indian Sign Language Generation from Live Audio/Text (Tamil)",
-      "tech_stack": ["Python", "NLP", "Computer Vision", "BiLSTM", "Transformers", "Google Translate API"],
-      "description": "Real-time speech-to-sign translation system for Tamil-speaking hearing-impaired community. Published in ICACCS March 2023."
-    },
-    {
-      "title": "Multi-Agent Deep Reinforcement Learning for Highway Merging",
-      "tech_stack": ["Python", "Keras", "DQN", "DDQN", "CNN", "Multi-Agent RL"],
-      "description": "Autonomous vehicle on-ramp merging solution using DQN/DDQN with CNN-based policy network, Experience Replay buffers, and complex reward function balancing safety and efficiency."
-    },
-    {
-      "title": "Stock Price Prediction Using Deep Q-Learning",
-      "tech_stack": ["Python", "Deep Reinforcement Learning", "DQN", "TensorFlow"],
-      "description": "Automated trading system learning optimal policies (Buy, Sell, Hold) using DQN with Experience Replay and dual-network architecture. Tested on Adani Enterprises stock data."
-    },
-    {
-      "title": "Speech Emotion Recognition System",
-      "tech_stack": ["Python", "CNN", "librosa", "RAVDESS Dataset"],
-      "description": "CNN-based emotion recognition achieving 81.11% accuracy. Implemented acoustic feature extraction (MFCCs, chroma, mel-spectrograms, tonnetz)."
-    },
-    {
-      "title": "Telugu News Article Classification",
-      "tech_stack": ["Python", "Word2Vec", "LSTM", "RNN", "Bi-LSTM", "NLP"],
-      "description": "Low-resource NLP solution with custom Word2Vec embeddings for Telugu corpus. Achieved 82% accuracy with Bi-LSTM model."
-    },
-    {
-      "title": "Social Distance Monitoring System",
-      "tech_stack": ["Python", "YOLOv3", "OpenCV", "COCO Dataset"],
-      "description": "Real-time social distance violation detection using YOLOv3 with Euclidean distance computation and automated CCTV monitoring pipeline."
-    },
-    {
-      "title": "Hand Gesture Controlled Robotic Arm",
-      "tech_stack": ["Arduino", "Bluetooth (HC-05)", "Flex Sensors", "MPU6050", "PCA9685"],
-      "description": "Gesture-based human-machine interface with Master-Slave control system. Wireless robotic arm control using natural hand movements."
-    },
-    {
-      "title": "Handwritten Character Recognition using HMM",
-      "tech_stack": ["Python", "Hidden Markov Models", "Viterbi Algorithm", "Computer Vision"],
-      "description": "Machine learning model translating scanned handwritten documents to digital text. Achieved 99.9% accuracy using Viterbi algorithm."
-    },
-    {
-      "title": "Real-Time Ball Tracking and Trajectory Analysis",
-      "tech_stack": ["Python", "OpenCV", "Computer Vision", "Deque"],
-      "description": "Automated object tracking for sports analytics with HSV color space conversion. Achieved 32+ FPS with 3D trajectory visualization."
-    },
-    {
-      "title": "Number Writing Robotic Manipulator",
-      "tech_stack": ["Python", "ROS", "MoveIt!", "URDF", "RViz"],
-      "description": "Robotic manipulator performing precision writing tasks using ROS and MoveIt! framework with custom URDF model."
-    },
-    {
-      "title": "Operating Systems Chat Room Application",
-      "tech_stack": ["C", "IPC", "Semaphores", "Multithreading", "Shared Memory"],
-      "description": "Real-time messaging application implementing OS concepts: IPC, process synchronization, and mutex locks for race condition prevention."
-    },
-    {
-      "title": "Predictive Text Generator using Markov Chains",
-      "tech_stack": ["Python", "Markov Chains", "NLP", "Probability Models"],
-      "description": "Predictive text application using Markov Chain theory for stochastic text generation. Evaluated trade-offs with LSTM-based approaches."
-    }
-  ],
-  "skills": {
-    "languages": ["Python", "SQL", "Java", "C++", "C"],
-    "frameworks": ["TensorFlow", "PyTorch", "Keras", "LangChain", "AutoGen", "CrewAI", "FastAPI", "Flask", "Hugging Face Transformers", "Scikit-learn"],
-    "tools": ["Docker", "Git", "ROS", "OpenCV", "Arduino IDE", "Jupyter", "VS Code", "MoveIt!", "RViz", "Gazebo"],
-    "databases": ["ChromaDB", "Pinecone", "PostgreSQL", "Neo4j", "MongoDB"],
-    "apis": ["OpenAI API", "Anthropic API", "Google Generative AI", "REST APIs"],
-    "domains": [
-      "Large Language Models (LLMs)",
-      "Agentic AI Systems",
-      "Natural Language Processing",
-      "Retrieval-Augmented Generation (RAG)",
-      "Deep Learning",
-      "Reinforcement Learning",
-      "Computer Vision",
-      "Speech Processing",
-      "Robotics",
-      "Multi-Agent Systems",
-      "Prompt Engineering",
-      "Transfer Learning",
-      "Low-Resource Language Technologies"
+    "summary": "Generative AI Engineer with 2+ years of experience designing and deploying production-grade LLM and agentic solutions across enterprise environments. Passionate about solving real-world problems at scale through intelligent systems.",
+    "education": [
+        {
+            "degree": "M.S. in Engineering Data Science and Artificial Intelligence",
+            "university": "University of Houston",
+            "graduation_date": "Expected 2027",
+            "details": "Focus on AI/ML, Advanced NLP, Deep Learning, and Large Language Models."
+        },
+        {
+            "degree": "B.Tech in Computer Science and Engineering (Specialization in Artificial Intelligence)",
+            "university": "Amrita Vishwa Vidyapeetham",
+            "graduation_date": "2019 - 2023",
+            "details": "Specialized in AI with comprehensive coursework in Deep Learning, NLP, Computer Vision, Speech Processing, Reinforcement Learning, and Robotics. Published 2 conference papers."
+        }
     ],
-    "specialized_libraries": ["librosa", "spaCy", "NLTK", "Gensim", "Pandas", "NumPy", "Matplotlib", "Seaborn"]
-  },
-  "publications": [
-    {
-      "title": "Detection of Real and Manipulated Videos using Transfer Learning",
-      "conference": "Global Conference for Advancement in Technology (GCAT)",
-      "date": "October 2024",
-      "description": "Proposed deep learning framework combining transfer learning architectures with temporal models for deepfake detection."
+    "experience": [
+        {
+            "role": "Advanced App Engineering Analyst - GenAI Specialist",
+            "company": "Accenture (GenWizard Platform)",
+            "duration": "Aug 2023 - Aug 2025",
+            "location": "India",
+            "details": [
+                "Architected production-grade LLM solutions for reverse engineering SDLC workflows.",
+                "Achieved 89% coverage in Technical Analysis with 9% efficiency improvement.",
+                "Designed custom RAG pipelines using LangChain and AutoGen.",
+                "Mentored 30+ engineers and recognized with Wall of Fame Award (Q4 FY24)."
+            ]
+        },
+        {
+            "role": "Undergraduate Research Assistant",
+            "company": "Amrita Vishwa Vidyapeetham",
+            "duration": "Jan 2023 - May 2023",
+            "location": "India",
+            "details": [
+                "Developed deep learning framework for deepfake video detection achieving 96% accuracy.",
+                "Published in GCAT 2024. Conducted comprehensive literature review on AI forensics."
+            ]
+        },
+        {
+            "role": "Technical Mentor and Trainer",
+            "company": "Accenture",
+            "duration": "Jan 2024 - Aug 2025",
+            "location": "India",
+            "details": [
+                "Conducted training sessions on Python, LangChain, AutoGen, and CrewAI for 30+ junior engineers.",
+                "Developed structured curriculum and provided hands-on mentorship."
+            ]
+        }
+    ],
+    "projects": [
+        {
+            "title": "Detection of Real and Manipulated Videos using Transfer Learning",
+            "tech_stack": [
+                "Python",
+                "TensorFlow",
+                "ResNet",
+                "XceptionNet",
+                "VGG16",
+                "LSTM",
+                "Bi-LSTM"
+            ],
+            "description": "Developed deep learning framework for deepfake detection achieving 96% accuracy on 6,500-video dataset. Published in GCAT October 2024."
+        },
+        {
+            "title": "Indian Sign Language Generation from Live Audio/Text (Tamil)",
+            "tech_stack": [
+                "Python",
+                "NLP",
+                "Computer Vision",
+                "BiLSTM",
+                "Transformers",
+                "Google Translate API"
+            ],
+            "description": "Real-time speech-to-sign translation system for Tamil-speaking hearing-impaired community. Published in ICACCS March 2023."
+        },
+        {
+            "title": "Multi-Agent Deep Reinforcement Learning for Highway Merging",
+            "tech_stack": [
+                "Python",
+                "Keras",
+                "DQN",
+                "DDQN",
+                "CNN",
+                "Multi-Agent RL"
+            ],
+            "description": "Autonomous vehicle on-ramp merging solution using DQN/DDQN with CNN-based policy network, Experience Replay buffers, and complex reward function balancing safety and efficiency."
+        },
+        {
+            "title": "Stock Price Prediction Using Deep Q-Learning",
+            "tech_stack": [
+                "Python",
+                "Deep Reinforcement Learning",
+                "DQN",
+                "TensorFlow"
+            ],
+            "description": "Automated trading system learning optimal policies (Buy, Sell, Hold) using DQN with Experience Replay and dual-network architecture. Tested on Adani Enterprises stock data."
+        },
+        {
+            "title": "Speech Emotion Recognition System",
+            "tech_stack": [
+                "Python",
+                "CNN",
+                "librosa",
+                "RAVDESS Dataset"
+            ],
+            "description": "CNN-based emotion recognition achieving 81.11% accuracy. Implemented acoustic feature extraction (MFCCs, chroma, mel-spectrograms, tonnetz)."
+        },
+        {
+            "title": "Telugu News Article Classification",
+            "tech_stack": [
+                "Python",
+                "Word2Vec",
+                "LSTM",
+                "RNN",
+                "Bi-LSTM",
+                "NLP"
+            ],
+            "description": "Low-resource NLP solution with custom Word2Vec embeddings for Telugu corpus. Achieved 82% accuracy with Bi-LSTM model."
+        },
+        {
+            "title": "Social Distance Monitoring System",
+            "tech_stack": [
+                "Python",
+                "YOLOv3",
+                "OpenCV",
+                "COCO Dataset"
+            ],
+            "description": "Real-time social distance violation detection using YOLOv3 with Euclidean distance computation and automated CCTV monitoring pipeline."
+        },
+        {
+            "title": "Hand Gesture Controlled Robotic Arm",
+            "tech_stack": [
+                "Arduino",
+                "Bluetooth (HC-05)",
+                "Flex Sensors",
+                "MPU6050",
+                "PCA9685"
+            ],
+            "description": "Gesture-based human-machine interface with Master-Slave control system. Wireless robotic arm control using natural hand movements."
+        },
+        {
+            "title": "Handwritten Character Recognition using HMM",
+            "tech_stack": [
+                "Python",
+                "Hidden Markov Models",
+                "Viterbi Algorithm",
+                "Computer Vision"
+            ],
+            "description": "Machine learning model translating scanned handwritten documents to digital text. Achieved 99.9% accuracy using Viterbi algorithm."
+        },
+        {
+            "title": "Real-Time Ball Tracking and Trajectory Analysis",
+            "tech_stack": [
+                "Python",
+                "OpenCV",
+                "Computer Vision",
+                "Deque"
+            ],
+            "description": "Automated object tracking for sports analytics with HSV color space conversion. Achieved 32+ FPS with 3D trajectory visualization."
+        },
+        {
+            "title": "Number Writing Robotic Manipulator",
+            "tech_stack": [
+                "Python",
+                "ROS",
+                "MoveIt!",
+                "URDF",
+                "RViz"
+            ],
+            "description": "Robotic manipulator performing precision writing tasks using ROS and MoveIt! framework with custom URDF model."
+        },
+        {
+            "title": "Operating Systems Chat Room Application",
+            "tech_stack": [
+                "C",
+                "IPC",
+                "Semaphores",
+                "Multithreading",
+                "Shared Memory"
+            ],
+            "description": "Real-time messaging application implementing OS concepts: IPC, process synchronization, and mutex locks for race condition prevention."
+        },
+        {
+            "title": "Predictive Text Generator using Markov Chains",
+            "tech_stack": [
+                "Python",
+                "Markov Chains",
+                "NLP",
+                "Probability Models"
+            ],
+            "description": "Predictive text application using Markov Chain theory for stochastic text generation. Evaluated trade-offs with LSTM-based approaches."
+        }
+    ],
+    "skills": {
+        "languages": [
+            "Python",
+            "SQL",
+            "Java",
+            "C++",
+            "C"
+        ],
+        "frameworks": [
+            "TensorFlow",
+            "PyTorch",
+            "Keras",
+            "LangChain",
+            "AutoGen",
+            "CrewAI",
+            "FastAPI",
+            "Flask",
+            "Hugging Face Transformers",
+            "Scikit-learn"
+        ],
+        "tools": [
+            "Docker",
+            "Git",
+            "ROS",
+            "OpenCV",
+            "Arduino IDE",
+            "Jupyter",
+            "VS Code",
+            "MoveIt!",
+            "RViz",
+            "Gazebo"
+        ],
+        "databases": [
+            "ChromaDB",
+            "Pinecone",
+            "PostgreSQL",
+            "Neo4j",
+            "MongoDB"
+        ],
+        "apis": [
+            "OpenAI API",
+            "Anthropic API",
+            "Google Generative AI",
+            "REST APIs"
+        ],
+        "domains": [
+            "Large Language Models (LLMs)",
+            "Agentic AI Systems",
+            "Natural Language Processing",
+            "Retrieval-Augmented Generation (RAG)",
+            "Deep Learning",
+            "Reinforcement Learning",
+            "Computer Vision",
+            "Speech Processing",
+            "Robotics",
+            "Multi-Agent Systems",
+            "Prompt Engineering",
+            "Transfer Learning",
+            "Low-Resource Language Technologies"
+        ],
+        "specialized_libraries": [
+            "librosa",
+            "spaCy",
+            "NLTK",
+            "Gensim",
+            "Pandas",
+            "NumPy",
+            "Matplotlib",
+            "Seaborn"
+        ]
     },
-    {
-      "title": "Indian Sign Language Generation from Live Audio/Text (Tamil)",
-      "conference": "International Conference on Advanced Computing and Communication Systems (ICACCS)",
-      "date": "March 2023",
-      "description": "Developed real-time speech-to-sign translation pipeline integrating NLP and computer vision for accessibility."
-    }
-  ],
-  "certifications": [
-    {
-      "name": "Building Transformer-Based Natural Language Processing Applications",
-      "issuer": "NVIDIA Deep Learning Institute",
-      "date": "November 2025"
-    },
-    {
-      "name": "Azure AI Engineer Associate",
-      "issuer": "Microsoft",
-      "date": "April 2025",
-      "expiry": "April 2026"
-    },
-    {
-      "name": "Azure AI Fundamentals",
-      "issuer": "Microsoft",
-      "date": "March 2025"
-    },
-    {
-      "name": "AWS Certified Cloud Practitioner",
-      "issuer": "Amazon Web Services",
-      "date": "June 2024",
-      "expiry": "June 2027"
-    }
-  ],
-  "awards": [
-    {
-      "title": "Wall of Fame Award (Q4 FY24)",
-      "organization": "Accenture",
-      "description": "Exceptional contribution to GenAI platform development"
-    },
-    {
-      "title": "Client Recognition Award",
-      "organization": "Accenture",
-      "description": "Successful delivery of production-grade GenAI solutions meeting client requirements"
-    },
-    {
-      "title": "Best Team Award (FY24 Q4)",
-      "organization": "Accenture",
-      "description": "Collaborative excellence in delivering complex AI projects"
-    }
-  ],
-  "leadership": [
-    {
-      "role": "Active Member",
-      "organization": "Art Club 'Kala' and Photography Club 'Smriti'",
-      "university": "Amrita Vishwa Vidyapeetham",
-      "activities": "Organized workshops and cultural events. Coordinated monthly photography competitions during COVID-19."
-    },
-    {
-      "role": "Volunteer",
-      "organization": "Prakruthi Nature Club",
-      "university": "Amrita Vishwa Vidyapeetham",
-      "activities": "Participated in campus cleanliness drives and promoted organic farming awareness."
-    }
-  ],
-  "research_interests": [
-    "Natural Language Processing",
-    "Large Language Models",
-    "Agentic AI Systems",
-    "Retrieval-Augmented Generation",
-    "Deep Learning",
-    "Computer Vision",
-    "Speech Processing",
-    "Low-Resource Language Technologies",
-    "AI for Social Impact",
-    "Multi-Agent Reinforcement Learning"
-  ]
+    "publications": [
+        {
+            "title": "Detection of Real and Manipulated Videos using Transfer Learning",
+            "conference": "Global Conference for Advancement in Technology (GCAT)",
+            "date": "October 2024",
+            "description": "Proposed deep learning framework combining transfer learning architectures with temporal models for deepfake detection."
+        },
+        {
+            "title": "Indian Sign Language Generation from Live Audio/Text (Tamil)",
+            "conference": "International Conference on Advanced Computing and Communication Systems (ICACCS)",
+            "date": "March 2023",
+            "description": "Developed real-time speech-to-sign translation pipeline integrating NLP and computer vision for accessibility."
+        }
+    ],
+    "certifications": [
+        {
+            "name": "Building Transformer-Based Natural Language Processing Applications",
+            "issuer": "NVIDIA Deep Learning Institute",
+            "date": "November 2025"
+        },
+        {
+            "name": "Azure AI Engineer Associate",
+            "issuer": "Microsoft",
+            "date": "April 2025",
+            "expiry": "April 2026"
+        },
+        {
+            "name": "Azure AI Fundamentals",
+            "issuer": "Microsoft",
+            "date": "March 2025"
+        },
+        {
+            "name": "AWS Certified Cloud Practitioner",
+            "issuer": "Amazon Web Services",
+            "date": "June 2024",
+            "expiry": "June 2027"
+        }
+    ],
+    "awards": [
+        {
+            "title": "Wall of Fame Award (Q4 FY24)",
+            "organization": "Accenture",
+            "description": "Exceptional contribution to GenAI platform development"
+        },
+        {
+            "title": "Client Recognition Award",
+            "organization": "Accenture",
+            "description": "Successful delivery of production-grade GenAI solutions meeting client requirements"
+        },
+        {
+            "title": "Best Team Award (FY24 Q4)",
+            "organization": "Accenture",
+            "description": "Collaborative excellence in delivering complex AI projects"
+        }
+    ],
+    "leadership": [
+        {
+            "role": "Active Member",
+            "organization": "Art Club 'Kala' and Photography Club 'Smriti'",
+            "university": "Amrita Vishwa Vidyapeetham",
+            "activities": "Organized workshops and cultural events. Coordinated monthly photography competitions during COVID-19."
+        },
+        {
+            "role": "Volunteer",
+            "organization": "Prakruthi Nature Club",
+            "university": "Amrita Vishwa Vidyapeetham",
+            "activities": "Participated in campus cleanliness drives and promoted organic farming awareness."
+        }
+    ],
+    "research_interests": [
+        "Natural Language Processing",
+        "Large Language Models",
+        "Agentic AI Systems",
+        "Retrieval-Augmented Generation",
+        "Deep Learning",
+        "Computer Vision",
+        "Speech Processing",
+        "Low-Resource Language Technologies",
+        "AI for Social Impact",
+        "Multi-Agent Reinforcement Learning"
+    ]
 }

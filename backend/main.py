@@ -164,7 +164,16 @@ async def generate_pdf(data: dict):
             if "projects" in master:
                 filtered = [p for p in master["projects"] if p.get("title", "").lower().strip() in target_titles]
                 if filtered: master["projects"] = filtered
-
+        # --- NEW: DEDUPLICATION LOGIC ---
+        # Remove projects that are already listed in Publications to avoid double counting
+        if "publications" in master and "projects" in master:
+            pub_titles = {pub["title"].lower().strip() for pub in master["publications"]}
+            # Keep project ONLY if its title is NOT in publications
+            master["projects"] = [
+                p for p in master["projects"] 
+                if p["title"].lower().strip() not in pub_titles
+            ]
+        # --------------------------------
         try:
             with open("resume_template.tex", "r") as f: template_str = f.read()
             env = Environment(block_start_string='\\BLOCK{', block_end_string='}', variable_start_string='\\VAR{', variable_end_string='}', comment_start_string='\\#{', comment_end_string='}', loader=BaseLoader())
