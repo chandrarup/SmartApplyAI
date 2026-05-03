@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 import requests
 import json
@@ -57,6 +57,22 @@ def escape_latex_chars(text):
 @app.get("/health")
 def health_check():
     return {"message": "Server is Online"}
+
+@app.get("/profile")
+def get_profile():
+    data = load_master_data()
+    skills_count = len(data.get("skills", []))
+    projects_count = len(data.get("projects", []))
+    return {
+        "contact_info": data.get("contact_info", {}),
+        "skills_count": skills_count,
+        "projects_count": projects_count,
+    }
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard():
+    with open(os.path.join(os.path.dirname(__file__), "dashboard.html"), "r") as f:
+        return f.read()
 
 # --- ENDPOINT 1: ANALYZE (Resume Logic) ---
 @app.post("/analyze")
