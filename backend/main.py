@@ -84,31 +84,61 @@ def get_pid(request: Request) -> str:
     return _safe_pid(request.headers.get("X-Profile-ID", "default"))
 
 def migrate_to_profiles():
-    """One-time migration of existing master_data.json → profiles/default/"""
-    if load_profiles_meta():
-        return
-    pid = "default"
-    d = _profile_dir(pid)
+    """Idempotent migration: ensure a 'default' profile exists with master_data.json."""
+    BASE = os.path.dirname(__file__)
+    legacy_src = os.path.join(BASE, "master_data.json")
+    legacy_apps = os.path.join(BASE, "applications.json")
+
+    meta = load_profiles_meta()
+
+    # Ensure there is at least one profile and it includes 'default'
+    default_entry = next((p for p in meta if p["id"] == "default"), None)
+
+    if not default_entry:
+        # Load legacy data to get the user's real name
+        data = {}
+        if os.path.exists(legacy_src):
+            try:
+                with open(legacy_src) as f:
+                    data = json.load(f)
+            except Exception:
+                pass
+        name = data.get("contact_info", {}).get("name", "My Profile") or "My Profile"
+        default_entry = {"id": "default", "name": name, "color": PROFILE_COLORS[0],
+                         "created_at": str(_date.today()), "pin_hash": ""}
+        # Prepend default so it's first in the list
+        meta = [default_entry] + [p for p in meta if p["id"] != "default"]
+        save_profiles_meta(meta)
+
+    # Always ensure profiles/default/ directory exists
+    d = _profile_dir("default")
     os.makedirs(d, exist_ok=True)
-    src = os.path.join(os.path.dirname(__file__), "master_data.json")
+
+    # Ensure master_data.json exists in the default profile directory
     dst = os.path.join(d, "master_data.json")
-    data = {}
-    if os.path.exists(src):
-        with open(src) as f:
-            data = json.load(f)
-        if not os.path.exists(dst):
-            with open(dst, "w") as f:
-                json.dump(data, f, indent=4)
-    asrc = os.path.join(os.path.dirname(__file__), "applications.json")
+    if not os.path.exists(dst):
+        data = {}
+        if os.path.exists(legacy_src):
+            try:
+                with open(legacy_src) as f:
+                    data = json.load(f)
+            except Exception:
+                pass
+        with open(dst, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    # Ensure applications.json exists in the default profile directory
     adst = os.path.join(d, "applications.json")
-    if os.path.exists(asrc) and not os.path.exists(adst):
-        with open(asrc) as f:
-            apps = json.load(f)
-        with open(adst, "w") as f:
+    if not os.path.exists(adst):
+        apps = []
+        if os.path.exists(legacy_apps):
+            try:
+                with open(legacy_apps) as f:
+                    apps = json.load(f)
+            except Exception:
+                pass
+        with open(adst, "w", encoding="utf-8") as f:
             json.dump(apps, f, indent=2)
-    name = data.get("contact_info", {}).get("name", "My Profile") or "My Profile"
-    save_profiles_meta([{"id": pid, "name": name, "color": PROFILE_COLORS[0],
-                         "created_at": str(_date.today()), "pin_hash": ""}])
 
 migrate_to_profiles()
 
@@ -352,14 +382,6 @@ def escape_latex_chars(text):
 @app.get("/health")
 def health_check():
     return {"message": "Server is Online"}
-
-@app.get("/profile")
-def get_profile():
-    return load_master_data()
-
-def save_master_data(data: dict):
-    with open("master_data.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
 
 class ClaudeKeyRequest(BaseModel):
     key: str
