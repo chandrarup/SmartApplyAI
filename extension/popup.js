@@ -1,4 +1,4 @@
-// LocalHire Agent — Popup Script v2.0
+// LocalHire Agent — Popup Script v2.1
 
 // ─────────────────────────────────────────────
 // STATE
@@ -7,16 +7,15 @@ let pageContext = null;
 let analysisData = null;
 let chatHistory = [];
 let fillLogEntries = [];
+let currentLlm = "ollama"; // "ollama" | "claude"
 
 // ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-  loadApiUrl();
+  await loadSettings();
   detectPlatform();
-  scrapePageContext(() => {
-    loadFAQs();
-  });
+  scrapePageContext(() => loadFAQs());
 
   // Listen for autofill progress from content script
   chrome.runtime.onMessage.addListener((msg) => {
@@ -53,11 +52,92 @@ function getApiUrl() {
   return document.getElementById("apiUrlInput").value.trim() || "http://127.0.0.1:8000";
 }
 
-function loadApiUrl() {
-  chrome.runtime.sendMessage({ action: "get_api_url" }, res => {
-    if (res?.url) document.getElementById("apiUrlInput").value = res.url;
+function getLlm() {
+  return document.getElementById("llmSelect").value || currentLlm;
+}
+
+async function loadSettings() {
+  return new Promise(resolve => {
+    chrome.runtime.sendMessage({ action: "get_settings" }, res => {
+      if (res?.url) document.getElementById("apiUrlInput").value = res.url;
+      if (res?.llm) {
+        document.getElementById("llmSelect").value = res.llm;
+        currentLlm = res.llm;
+        updateModelPill(res.llm);
+        toggleClaudeKeyRow(res.llm);
+      }
+      if (res?.claudeKey) document.getElementById("claudeKeyInput").value = res.claudeKey;
+      resolve();
+    });
   });
 }
+
+function updateModelPill(llm) {
+  const pill = document.getElementById("modelPill");
+  if (!pill) return;
+  if (llm === "claude") {
+    pill.textContent = "Claude";
+    pill.className = "model-pill claude";
+  } else {
+    pill.textContent = "Ollama";
+    pill.className = "model-pill";
+  }
+}
+
+function toggleClaudeKeyRow(llm) {
+  if (llm === "claude") {
+    showEl("claudeKeyRow");
+  } else {
+    hideEl("claudeKeyRow");
+  }
+}
+
+// ─────────────────────────────────────────────
+// LLM SELECTOR LISTENER
+// ─────────────────────────────────────────────
+document.getElementById("llmSelect").addEventListener("change", (e) => {
+  currentLlm = e.target.value;
+  toggleClaudeKeyRow(currentLlm);
+  updateModelPill(currentLlm);
+});
+
+// ─────────────────────────────────────────────
+// SAVE SETTINGS
+// ─────────────────────────────────────────────
+document.getElementById("saveSettingsBtn").addEventListener("click", () => {
+  const url = document.getElementById("apiUrlInput").value.trim();
+  const llm = document.getElementById("llmSelect").value;
+  const claudeKey = document.getElementById("claudeKeyInput").value.trim();
+
+  chrome.runtime.sendMessage({
+    action: "save_settings",
+    url: url || "http://127.0.0.1:8000",
+    llm,
+    claudeKey
+  }, () => {
+    currentLlm = llm;
+    updateModelPill(llm);
+
+    // Also persist Claude key to backend if set
+    if (llm === "claude" && claudeKey) {
+      fetch(`${getApiUrl()}/set-claude-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: claudeKey })
+      }).catch(() => {});
+    }
+
+    const btn = document.getElementById("saveSettingsBtn");
+    const orig = btn.textContent;
+    btn.textContent = "Saved ✓";
+    btn.style.background = "#dcfce7";
+    btn.style.color = "#166534";
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style = "";
+    }, 2000);
+  });
+});
 
 function scrapePageContext(callback) {
   if (pageContext) { if (callback) callback(pageContext); return; }
@@ -75,8 +155,6 @@ function detectPlatform() {
     chrome.tabs.sendMessage(tabs[0].id, { action: "get_platform" }, response => {
       if (chrome.runtime.lastError || !response) return;
       document.getElementById("platformBadge").textContent = response.platform;
-      // Auto-detect company for cover letter
-      const url = tabs[0].url || "";
       const title = tabs[0].title || "";
       const companyMatch = title.match(/(?:at|@)\s+(.+?)(?:\s*[-–|]|$)/i);
       if (companyMatch) document.getElementById("companyInput").value = companyMatch[1].trim();
@@ -99,9 +177,10 @@ document.getElementById("analyzeBtn").addEventListener("click", () => {
       const res = await fetch(`${getApiUrl()}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jd_text: text })
+        body: JSON.stringify({ jd_text: text, llm: getLlm() })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Analyze failed");
       analysisData = data;
 
       document.getElementById("matchScore").textContent = data.score || "—";
@@ -122,7 +201,6 @@ document.getElementById("analyzeBtn").addEventListener("click", () => {
         skillList.appendChild(tag);
       }
 
-      // Auto-fill role for cover letter
       if (data.role) document.getElementById("roleInput").value = data.role;
 
       hideEl("matchStatus");
@@ -154,7 +232,7 @@ document.getElementById("pdfBtn").addEventListener("click", async () => {
       btn.textContent = "Downloaded ✓";
       setTimeout(() => { btn.disabled = false; btn.textContent = "Generate Tailored PDF Resume"; }, 3000);
     } else {
-      btn.textContent = "PDF Failed"; btn.disabled = false;
+      btn.textContent = "PDF Failed (Docker required)"; btn.disabled = false;
     }
   } catch (e) {
     btn.textContent = "Error: " + e.message; btn.disabled = false;
@@ -172,27 +250,29 @@ document.getElementById("autofillBtn").addEventListener("click", () => {
   hideEl("autofillStatus");
   showEl("progressWrap");
   document.getElementById("progressBar").style.width = "0%";
+  document.getElementById("progressBar").style.background = "#007bff";
   document.getElementById("progressLabel").textContent = "Starting...";
 
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: "start_autofill" }, response => {
-      if (chrome.runtime.lastError) {
-        showStatus("autofillStatus", "error", "Could not connect to page. Try reloading the tab.");
-        btn.disabled = false; btn.textContent = "Auto-Fill This Application";
-        hideEl("progressWrap");
+    chrome.tabs.sendMessage(tabs[0].id,
+      { action: "start_autofill", llm: getLlm() },
+      response => {
+        if (chrome.runtime.lastError) {
+          showStatus("autofillStatus", "error", "Could not connect to page. Try reloading the tab.");
+          btn.disabled = false; btn.textContent = "Auto-Fill This Application";
+          hideEl("progressWrap");
+        }
       }
-    });
+    );
   });
 });
 
 function handleFillProgress(data) {
-  const statusEl = document.getElementById("autofillStatus");
   const progressBar = document.getElementById("progressBar");
   const progressLabel = document.getElementById("progressLabel");
   const btn = document.getElementById("autofillBtn");
 
   if (data.status === "done") {
-    showEl("progressWrap");
     progressBar.style.width = "100%";
     progressBar.style.background = "#28a745";
     progressLabel.textContent = data.message;
@@ -220,16 +300,6 @@ function handleFillProgress(data) {
   }
 }
 
-document.getElementById("saveApiBtn").addEventListener("click", () => {
-  const url = document.getElementById("apiUrlInput").value.trim();
-  if (!url) return;
-  chrome.runtime.sendMessage({ action: "save_api_url", url }, () => {
-    const btn = document.getElementById("saveApiBtn");
-    btn.textContent = "Saved ✓"; btn.style.background = "#dcfce7"; btn.style.color = "#166534";
-    setTimeout(() => { btn.textContent = "Save API URL"; btn.style = ""; }, 2000);
-  });
-});
-
 // ─────────────────────────────────────────────
 // COVER LETTER TAB
 // ─────────────────────────────────────────────
@@ -240,16 +310,17 @@ document.getElementById("coverBtn").addEventListener("click", () => {
 
   btn.disabled = true; btn.textContent = "Generating...";
   hideEl("coverResult");
-  showStatus("coverStatus", "loading", "Writing your cover letter...", true);
+  showStatus("coverStatus", "loading", `Generating cover letter via ${getLlm() === "claude" ? "Claude" : "Ollama"}...`, true);
 
   scrapePageContext(async text => {
     try {
       const res = await fetch(`${getApiUrl()}/cover-letter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company, role, jd_text: text })
+        body: JSON.stringify({ company, role, jd_text: text, llm: getLlm() })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Generation failed");
       document.getElementById("coverText").textContent = data.cover_letter || data.text || "";
       hideEl("coverStatus");
       showEl("coverResult");
@@ -280,7 +351,7 @@ async function loadFAQs() {
     const res = await fetch(`${getApiUrl()}/suggest-questions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jd_text: pageContext })
+      body: JSON.stringify({ jd_text: pageContext, llm: getLlm() })
     });
     const questions = await res.json();
     faqDiv.innerHTML = "";
@@ -308,7 +379,7 @@ async function sendChat(msg = null) {
     const res = await fetch(`${getApiUrl()}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ context: pageContext, question, history: chatHistory })
+      body: JSON.stringify({ context: pageContext, question, history: chatHistory, llm: getLlm() })
     });
     const data = await res.json();
     addBubble(data.answer || "No response.", "bot");
@@ -343,5 +414,5 @@ document.getElementById("settingsBtn").addEventListener("click", () => {
   const tabs = document.querySelectorAll(".tab");
   const autofillTab = Array.from(tabs).find(t => t.dataset.panel === "panel-autofill");
   if (autofillTab) autofillTab.click();
-  document.getElementById("apiUrlInput").focus();
+  setTimeout(() => document.getElementById("llmSelect").focus(), 100);
 });

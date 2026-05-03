@@ -2,9 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
-import requests
+import requests as http_requests
 import json
 import os
+import re
 import subprocess
 import asyncio
 from jinja2 import Environment, BaseLoader
@@ -12,14 +13,17 @@ from jinja2 import Environment, BaseLoader
 app = FastAPI()
 
 # --- CONFIGURATION ---
-OLLAMA_MODEL = "ai/qwen3-coder" 
+OLLAMA_MODEL = "ai/qwen3-coder"
 OLLAMA_API_URL = "http://localhost:12434/engines/llama.cpp/v1/chat/completions"
 PDF_OUTPUT_DIR = os.path.join(os.getcwd(), "generated_resumes")
 os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
 
+# Claude / Anthropic config — read from env at request time so hot-reload works
+def get_anthropic_key():
+    return os.environ.get("ANTHROPIC_API_KEY", "")
+
 # GLOBAL LOCK (The "Traffic Light")
 processing_lock = asyncio.Lock()
-# ---------------------
 
 # Security
 origins = ["chrome-extension://*", "http://localhost", "http://127.0.0.1", "*"]
@@ -34,43 +38,183 @@ app.add_middleware(
 # --- DATA MODELS ---
 class JobRequest(BaseModel):
     jd_text: str
+    llm: str = "ollama"  # "ollama" | "claude"
 
 class ChatRequest(BaseModel):
     context: str
     question: str
     history: list = []
+    llm: str = "ollama"
 
 class AutofillRequest(BaseModel):
     fields: list
     jd_text: str = ""
     company: str = ""
+    llm: str = "ollama"
 
 class QuestionRequest(BaseModel):
     question: str
     jd_text: str = ""
     company: str = ""
     word_limit: int = 150
+    llm: str = "ollama"
 
 class CoverLetterRequest(BaseModel):
     company: str
     role: str
     jd_text: str = ""
     hiring_manager: str = ""
+    llm: str = "ollama"
 
+# ─────────────────────────────────────────────────────────────────
+# LLM ABSTRACTION — try Ollama; fall back to Claude; raise if both fail
+# ─────────────────────────────────────────────────────────────────
+def call_ollama(messages: list, temperature: float = 0.3, timeout: int = 60) -> str:
+    data = {"model": OLLAMA_MODEL, "messages": messages, "stream": False, "temperature": temperature}
+    response = http_requests.post(OLLAMA_API_URL, json=data, timeout=timeout)
+    return response.json()["choices"][0]["message"]["content"]
+
+def call_claude(messages: list, temperature: float = 0.3, system: str = "") -> str:
+    import anthropic
+    api_key = get_anthropic_key()
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set")
+    client = anthropic.Anthropic(api_key=api_key)
+    # Convert OpenAI-format messages; extract system if present
+    claude_messages = []
+    sys_content = system
+    for m in messages:
+        if m["role"] == "system":
+            sys_content = (sys_content + "\n" + m["content"]).strip()
+        else:
+            claude_messages.append({"role": m["role"], "content": m["content"]})
+    kwargs = {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 2048,
+        "messages": claude_messages,
+    }
+    if sys_content:
+        kwargs["system"] = sys_content
+    message = client.messages.create(**kwargs)
+    return message.content[0].text
+
+def call_llm(messages: list, temperature: float = 0.3, system: str = "",
+             prefer: str = "ollama", timeout: int = 60) -> str:
+    """Try preferred provider first, auto-fallback to the other."""
+    providers = ["claude", "ollama"] if prefer == "claude" else ["ollama", "claude"]
+    last_err = None
+    for provider in providers:
+        try:
+            if provider == "ollama":
+                return call_ollama(messages, temperature, timeout)
+            else:
+                return call_claude(messages, temperature, system)
+        except Exception as e:
+            last_err = e
+            print(f"[LLM] {provider} failed: {e}. Trying next...")
+    raise RuntimeError(f"All LLM providers failed. Last error: {last_err}")
+
+def clean_json(raw: str) -> str:
+    """Strip markdown fences from LLM JSON output."""
+    if "```json" in raw:
+        raw = raw.split("```json")[1].split("```")[0]
+    elif "```" in raw:
+        raw = raw.split("```")[1].split("```")[0]
+    return raw.strip()
+
+# ─────────────────────────────────────────────────────────────────
+# RULE-BASED AUTOFILL FALLBACK (no LLM needed)
+# ─────────────────────────────────────────────────────────────────
+def build_rule_based_answers(fields, autofill, user_data):
+    answers = {}
+    contact = user_data.get("contact_info", {})
+    name = contact.get("name", "")
+
+    # Use autofill section's first/last name directly (avoids middle-name split)
+    first_name = autofill.get("first_name") or (name.split()[0] if name else "")
+    last_name = autofill.get("last_name") or (name.split()[-1] if name else "")
+
+    # Order matters — more specific patterns FIRST to prevent false matches
+    RULES = [
+        # Identity — must come before generic "name" match
+        (r"first\s*name|given\s*name|forename", first_name),
+        (r"last\s*name|family\s*name|surname", last_name),
+        (r"^(full\s*)?name$|^your\s*name$|^name\b", name),
+        # Contact
+        (r"e[\s-]?mail", contact.get("email", "")),
+        (r"phone|mobile|cell|telephone", contact.get("phone", "")),
+        (r"linkedin", contact.get("linkedin", "")),
+        (r"github", contact.get("github", "")),
+        (r"website|portfolio", contact.get("github", "")),
+        # Work authorization — MUST be before state/country patterns
+        (r"work\s*auth|legally\s*(authorized|eligible)|authorized\s*to\s*work|authorized.*work",
+         autofill.get("work_authorization", "Yes")),
+        (r"require.*sponsor|need.*sponsor|sponsor.*required|visa\s*sponsor",
+         autofill.get("requires_sponsorship", "Yes")),
+        (r"\bsponsor\b", autofill.get("requires_sponsorship", "Yes")),
+        # Location — use word boundaries to avoid matching "United States"
+        (r"\bcity\b|\blocality\b", autofill.get("city", "Houston")),
+        (r"^state$|^province$|\bstate\s*/\s*province\b|\bstate\b.*\bprovince\b",
+         autofill.get("state", "TX")),
+        (r"\bzip\b|\bpostal\b", autofill.get("zip", "77001")),
+        (r"\bcountry\b", autofill.get("country", "United States")),
+        # Compensation & logistics
+        (r"salary|compensation|pay\b|desired\s*pay", autofill.get("salary_expectation", "120000")),
+        (r"years.*(of\s*)?experience|experience.*years", autofill.get("years_of_experience", "2")),
+        (r"start\s*date|when.*available|available.*start", autofill.get("start_date", "Immediately")),
+        (r"relocat", autofill.get("willing_to_relocate", "Yes")),
+        (r"remote|hybrid|work.*arrangement", "Open to remote or hybrid"),
+        (r"notice\s*period|notice\b", autofill.get("notice_period", "2 weeks")),
+        # Current employment
+        (r"current\s*(company|employer|organization)", autofill.get("current_company", "Accenture")),
+        (r"current\s*(job\s*)?(title|position|role)|job\s*title|position\s*title",
+         autofill.get("current_title", "Advanced App Engineering Analyst")),
+        # EEO & demographic
+        (r"\bgender\b|\bsex\b", autofill.get("gender", "Male")),
+        (r"veteran|military\s*status", autofill.get("veteran_status", "I am not a protected veteran")),
+        (r"disability", autofill.get("disability_status", "I don't wish to answer")),
+        (r"ethnic|race\b|racial", autofill.get("ethnicity", "Asian")),
+        # Open-ended
+        (r"summary|tell us about|about yourself|introduce yourself|background",
+         user_data.get("summary", "")),
+        (r"cover\s*letter", user_data.get("summary", "")),
+        # Source / referral
+        (r"referral|how did you hear|source|where did you|how did you find|how did you learn|how did you know", "LinkedIn"),
+        (r"pronouns", "He/Him"),
+    ]
+
+    for field in fields:
+        label = field.get("label", "")
+        if not label:
+            continue
+        for pattern, value in RULES:
+            if re.search(pattern, label, re.I) and value:
+                answers[label] = str(value)
+                break
+
+    return answers
+
+# ─────────────────────────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────────────────────────
 def load_master_data():
     try:
         with open("master_data.json", "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except Exception:
         return {}
 
 def escape_latex_chars(text):
-    if not isinstance(text, str): return text
+    if not isinstance(text, str):
+        return text
     chars = {"&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_", "{": r"\{", "}": r"\}"}
     for char, replacement in chars.items():
         text = text.replace(char, replacement)
     return text
 
+# ─────────────────────────────────────────────────────────────────
+# STATIC ROUTES
+# ─────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health_check():
     return {"message": "Server is Online"}
@@ -78,122 +222,138 @@ def health_check():
 @app.get("/profile")
 def get_profile():
     data = load_master_data()
-    skills_count = len(data.get("skills", []))
-    projects_count = len(data.get("projects", []))
     return {
         "contact_info": data.get("contact_info", {}),
-        "skills_count": skills_count,
-        "projects_count": projects_count,
+        "skills_count": len(data.get("skills", [])),
+        "projects_count": len(data.get("projects", [])),
     }
+
+class ClaudeKeyRequest(BaseModel):
+    key: str
+
+@app.post("/set-claude-key")
+def set_claude_key(req: ClaudeKeyRequest):
+    """Allow the extension to push a Claude API key at runtime (stored in env)."""
+    if not req.key or not req.key.startswith("sk-"):
+        raise HTTPException(status_code=400, detail="Invalid API key format. Must start with 'sk-'.")
+    os.environ["ANTHROPIC_API_KEY"] = req.key
+    return {"message": "Claude API key set. Claude is now active as a fallback."}
+
+@app.get("/llm-status")
+def llm_status():
+    """Return which LLM providers are available."""
+    ollama_ok = False
+    claude_ok = bool(get_anthropic_key())
+    try:
+        r = http_requests.get("http://localhost:12434/health", timeout=2)
+        ollama_ok = r.status_code == 200
+    except Exception:
+        pass
+    return {"ollama": ollama_ok, "claude": claude_ok, "claude_key_set": claude_ok}
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard():
     with open(os.path.join(os.path.dirname(__file__), "dashboard.html"), "r") as f:
         return f.read()
 
-# --- ENDPOINT 1: ANALYZE (Resume Logic) ---
+@app.get("/test/greenhouse", response_class=HTMLResponse)
+def test_greenhouse():
+    with open(os.path.join(os.path.dirname(__file__), "test_greenhouse.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/workday", response_class=HTMLResponse)
+def test_workday():
+    with open(os.path.join(os.path.dirname(__file__), "test_workday.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/generic", response_class=HTMLResponse)
+def test_generic():
+    with open(os.path.join(os.path.dirname(__file__), "test_generic.html"), "r") as f:
+        return f.read()
+
+# ─────────────────────────────────────────────────────────────────
+# ENDPOINT 1: ANALYZE
+# ─────────────────────────────────────────────────────────────────
 @app.post("/analyze")
 async def analyze_job(request: JobRequest):
     print("Request Received: Analyze Job")
     async with processing_lock:
-        print("Lock Acquired. Analyzing...")
         user_data = load_master_data()
-        prompt = f"""
-        You are a Career Strategist.
-        CANDIDATE PROFILE: {json.dumps(user_data)}
-        JOB DESCRIPTION: "{request.jd_text[:7000]}..." 
-        
-        TASK:
-        1. Identify the Job Role.
-        2. List at least 3 key skills from the JD that the candidate matches.
-        3. List at least 1 missing skill (gap).
-        4. Calculate a Match Score (0-100%).
-        5. Write a tailored summary (2-3 sentences) for the resume that emphasizes skills from the JD that the candidate has.
-            - CRITICAL: Write in IMPLIED FIRST PERSON (e.g., "Generative AI Engineer with 2+ years...").
-            - DO NOT use the candidate's name.
-            - DO NOT use pronouns like "He" or "She".
-            - Focus on the skills relevant to the JD.   
+        prompt = f"""You are a Career Strategist.
+CANDIDATE PROFILE: {json.dumps(user_data)}
+JOB DESCRIPTION: "{request.jd_text[:7000]}"
 
-        6. Select the 3 most relevant projects from the candidate's list. Return their exact "title" from the profile.
-        
-        OUTPUT JSON ONLY: {{ "role": "...", "skills_matched": [], "missing_skill": "...", "score": "...", "tailored_summary": "...", "selected_projects": [] }}
-        """
-        
-        data = { "model": OLLAMA_MODEL, "messages": [{ "role": "user", "content": prompt }], "temperature": 0.2 }
-        
+TASK:
+1. Identify the Job Role.
+2. List at least 3 key skills from the JD that the candidate matches.
+3. List at least 1 missing skill (gap).
+4. Calculate a Match Score (0-100%).
+5. Write a tailored summary (2-3 sentences) in IMPLIED FIRST PERSON (no pronouns, no name).
+6. Select the 3 most relevant projects from the candidate's list (exact titles).
+
+OUTPUT JSON ONLY:
+{{"role":"...","skills_matched":[],"missing_skill":"...","score":"...","tailored_summary":"...","selected_projects":[]}}"""
         try:
-            response = requests.post(OLLAMA_API_URL, json=data)
-            content = response.json()["choices"][0]["message"]["content"]
-            if "```json" in content: content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content: content = content.split("```")[1].strip()
-            return json.loads(content)
+            content = call_llm([{"role": "user", "content": prompt}],
+                               temperature=0.2, prefer=request.llm)
+            return json.loads(clean_json(content))
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Analyze error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-# --- ENDPOINT 2: SUGGEST QUESTIONS (FAQ) ---
+# ─────────────────────────────────────────────────────────────────
+# ENDPOINT 2: SUGGEST QUESTIONS
+# ─────────────────────────────────────────────────────────────────
 @app.post("/suggest-questions")
 async def suggest_questions(request: JobRequest):
     print("Request Received: Suggest Questions")
     async with processing_lock:
-        prompt = f"""
-        Analyze this webpage text: "{request.jd_text[:7000]}..."
-        
-        Generate 3 short, specific questions a candidate should ask about this job/page.
-        Examples: "What is the tech stack?", "Is visa sponsorship available?", "What is the salary range?"
-        
-        OUTPUT JSON LIST ONLY: ["Question 1", "Question 2", "Question 3"]
-        """
-        data = { "model": OLLAMA_MODEL, "messages": [{ "role": "user", "content": prompt }], "temperature": 0.4 }
-        
-        try:
-            response = requests.post(OLLAMA_API_URL, json=data)
-            content = response.json()["choices"][0]["message"]["content"]
-            if "```json" in content: content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content: content = content.split("```")[1].strip()
-            return json.loads(content)
-        except Exception as e:
-             # Fallback if AI fails
-            return ["What are the key requirements?", "Is this a remote role?", "What is the company culture?"]
+        prompt = f"""Analyze this job posting:
+"{request.jd_text[:7000]}"
 
-# --- ENDPOINT 3: CHAT ---
+Generate 3 short, specific questions a candidate should ask about this role.
+OUTPUT JSON LIST ONLY: ["Question 1", "Question 2", "Question 3"]"""
+        try:
+            content = call_llm([{"role": "user", "content": prompt}],
+                               temperature=0.4, prefer=request.llm)
+            return json.loads(clean_json(content))
+        except Exception:
+            return ["What is the expected tech stack?", "Is sponsorship available?", "What is the salary range?"]
+
+# ─────────────────────────────────────────────────────────────────
+# ENDPOINT 3: CHAT
+# ─────────────────────────────────────────────────────────────────
 @app.post("/chat")
 async def chat_with_page(request: ChatRequest):
     print("Request Received: Chat")
     async with processing_lock:
-        # Build context-aware system prompt
-        system_msg = f"""You are a helpful assistant. Answer the user's question based ONLY on the following webpage context. If the answer isn't in the context, say "I couldn't find that info on this page."
-        
-        WEBPAGE CONTEXT:
-        {request.context[:3000]}
-        """
-        
-        messages = [{"role": "system", "content": system_msg}]
+        system = f"""You are a helpful assistant. Answer the user's question based ONLY on the following webpage context. If the answer isn't in the context, say "I couldn't find that info on this page."
+
+WEBPAGE CONTEXT:
+{request.context[:3000]}"""
+        messages = []
         if request.history:
             messages.extend(request.history)
         messages.append({"role": "user", "content": request.question})
-        
-        data = { "model": OLLAMA_MODEL, "messages": messages, "stream": False }
-        
         try:
-            response = requests.post(OLLAMA_API_URL, json=data)
-            return {"answer": response.json()["choices"][0]["message"]["content"]}
+            answer = call_llm(messages, temperature=0.3, system=system, prefer=request.llm)
+            return {"answer": answer}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-# --- ENDPOINT 4: AUTOFILL ---
+# ─────────────────────────────────────────────────────────────────
+# ENDPOINT 4: AUTOFILL
+# ─────────────────────────────────────────────────────────────────
 @app.post("/autofill")
 async def autofill_fields(request: AutofillRequest):
     print("Request Received: Autofill")
     async with processing_lock:
         user_data = load_master_data()
         autofill = user_data.get("autofill", {})
-        common_answers = user_data.get("common_answers", {})
 
         field_list = json.dumps(request.fields[:40], indent=2)
 
-        prompt = f"""
-You are an expert job application assistant filling out a form on behalf of a candidate.
+        prompt = f"""You are an expert job application assistant filling out a form on behalf of a candidate.
 
 CANDIDATE PROFILE:
 {json.dumps(user_data, indent=2)[:6000]}
@@ -201,127 +361,70 @@ CANDIDATE PROFILE:
 AUTOFILL QUICK REFERENCE:
 {json.dumps(autofill, indent=2)}
 
-JOB DESCRIPTION (for context):
-{request.jd_text[:3000]}
-
+JOB DESCRIPTION: {request.jd_text[:2000]}
 COMPANY: {request.company}
 
 FORM FIELDS TO FILL:
 {field_list}
 
-TASK:
-For EACH field in the list above, provide the best answer based on the candidate's profile.
-- For simple fields (name, email, phone, address, etc.): use exact values from the profile.
-- For dropdowns with options: pick the best matching option from the "options" list.
-- For "work authorization": answer "Yes" if authorized.
-- For "sponsorship": answer "No".
-- For "years of experience": answer based on profile (2 years).
-- For "willing to relocate", "remote work": answer "Yes".
-- For "salary": use the autofill salary_expectation.
-- For open-ended questions (summary, cover letter, why this company, etc.): write a concise, compelling answer in 2-3 sentences using the candidate's actual experience.
-- For EEO/demographic questions (gender, ethnicity, veteran, disability): use values from autofill.
-- If you cannot determine a good answer, return "SKIP".
+TASK: For EACH field, provide the best answer.
+- Name fields: use exact values from profile.
+- Dropdowns (options list present): pick ONLY from the provided options.
+- Work authorization: "Yes". Sponsorship required: "Yes".
+- Years of experience: {autofill.get("years_of_experience", "2")}
+- Salary: {autofill.get("salary_expectation", "120000")}
+- Open-ended questions: 2-3 concise sentences using real candidate experience.
+- EEO fields: use autofill values.
+- If unknown: "SKIP".
 
-OUTPUT: A JSON object where keys are EXACTLY the "label" value from each field, and values are the answers.
-Example: {{"First Name": "Chandra Rup", "Email": "chandrarupdaka@gmail.com", "Tell us about yourself": "Generative AI Engineer with..."}}
+OUTPUT: JSON object where keys are EXACTLY the "label" values from above.
+Example: {{"First Name": "{autofill.get("first_name","Chandra Rup")}", "Email": "{user_data.get("contact_info",{}).get("email","")}"}}
 
-OUTPUT JSON ONLY, no explanation.
-        """
+OUTPUT JSON ONLY."""
 
-        data = {"model": OLLAMA_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1}
         try:
-            response = requests.post(OLLAMA_API_URL, json=data, timeout=60)
-            content = response.json()["choices"][0]["message"]["content"]
-            if "```json" in content: content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content: content = content.split("```")[1].strip()
-            return json.loads(content)
+            content = call_llm([{"role": "user", "content": prompt}],
+                               temperature=0.1, prefer=request.llm, timeout=90)
+            return json.loads(clean_json(content))
         except Exception as e:
             print(f"Autofill LLM error: {e}. Falling back to rule-based.")
             return build_rule_based_answers(request.fields, autofill, user_data)
 
-def build_rule_based_answers(fields, autofill, user_data):
-    import re
-    answers = {}
-    contact = user_data.get("contact_info", {})
-    name = contact.get("name", "")
-    parts = name.split(" ", 1)
-
-    RULES = {
-        r"first\s*name|given\s*name": parts[0] if parts else "",
-        r"last\s*name|family\s*name|surname": parts[1] if len(parts) > 1 else "",
-        r"^(full\s*)?name$|^your\s*name|^name\b": name,
-        r"e[\s-]?mail": contact.get("email", ""),
-        r"phone|mobile|cell": contact.get("phone", ""),
-        r"linkedin": contact.get("linkedin", ""),
-        r"github": contact.get("github", ""),
-        r"website|portfolio": contact.get("github", ""),
-        r"city": autofill.get("city", "Houston"),
-        r"state|province": autofill.get("state", "TX"),
-        r"zip|postal": autofill.get("zip", ""),
-        r"country": autofill.get("country", "United States"),
-        r"salary|compensation|pay": autofill.get("salary_expectation", "120000"),
-        r"years.*(of\s*)?experience": autofill.get("years_of_experience", "2"),
-        r"start\s*date|available": autofill.get("start_date", "Immediately"),
-        r"work\s*auth|legally\s*(authorized|eligible)": autofill.get("work_authorization", "Yes"),
-        r"sponsor": autofill.get("requires_sponsorship", "No"),
-        r"relocat": autofill.get("willing_to_relocate", "Yes"),
-        r"gender": autofill.get("gender", "Male"),
-        r"veteran|military": autofill.get("veteran_status", "I am not a protected veteran"),
-        r"disability": autofill.get("disability_status", "I don't wish to answer"),
-        r"ethnic|race": autofill.get("ethnicity", "Asian"),
-        r"summary|tell us about|about yourself|introduce": user_data.get("summary", ""),
-        r"current\s*(company|employer)": autofill.get("current_company", "Accenture"),
-        r"current\s*(title|position)": autofill.get("current_title", "Advanced App Engineering Analyst"),
-        r"notice\s*period": autofill.get("notice_period", "2 weeks"),
-        r"referral|how did you hear": "LinkedIn",
-    }
-
-    for field in fields:
-        label = field.get("label", "")
-        for pattern, value in RULES.items():
-            if re.search(pattern, label, re.I) and value:
-                answers[label] = value
-                break
-
-    return answers
-
-# --- ENDPOINT 5: ANSWER SINGLE QUESTION ---
+# ─────────────────────────────────────────────────────────────────
+# ENDPOINT 5: ANSWER SINGLE QUESTION
+# ─────────────────────────────────────────────────────────────────
 @app.post("/answer-question")
 async def answer_question(request: QuestionRequest):
     print("Request Received: Answer Question")
     async with processing_lock:
         user_data = load_master_data()
-        prompt = f"""
-You are an expert job application assistant. Answer the following application question on behalf of the candidate.
+        prompt = f"""You are an expert job application assistant answering a question on behalf of the candidate.
 
 CANDIDATE PROFILE:
 {json.dumps(user_data, indent=2)[:5000]}
 
-JOB DESCRIPTION CONTEXT:
-{request.jd_text[:2000]}
-
+JOB DESCRIPTION: {request.jd_text[:2000]}
 COMPANY: {request.company}
 
 QUESTION: "{request.question}"
 
 INSTRUCTIONS:
-- Write in implied first person (e.g., "Experienced in...", "Skilled at...", "With 2 years of...")
-- Do NOT use pronouns like "He", "She", "I" — implied first person only
-- Be specific and reference real details from the candidate's profile
-- Keep the answer to approximately {request.word_limit} words
-- Do NOT include any preamble — output ONLY the answer text
+- Write in implied first person (e.g. "Experienced in...", "With 2 years of...")
+- DO NOT use pronouns (I, He, She) — implied first person only
+- Reference real candidate details
+- Approximately {request.word_limit} words
+- Output ONLY the answer text, no preamble."""
 
-OUTPUT: Plain text answer only.
-        """
-        data = {"model": OLLAMA_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3}
         try:
-            response = requests.post(OLLAMA_API_URL, json=data, timeout=60)
-            content = response.json()["choices"][0]["message"]["content"].strip()
-            return {"answer": content}
+            content = call_llm([{"role": "user", "content": prompt}],
+                               temperature=0.3, prefer=request.llm)
+            return {"answer": content.strip()}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-# --- ENDPOINT 6: COVER LETTER ---
+# ─────────────────────────────────────────────────────────────────
+# ENDPOINT 6: COVER LETTER
+# ─────────────────────────────────────────────────────────────────
 @app.post("/cover-letter")
 async def generate_cover_letter(request: CoverLetterRequest):
     print("Request Received: Cover Letter")
@@ -330,8 +433,7 @@ async def generate_cover_letter(request: CoverLetterRequest):
         contact = user_data.get("contact_info", {})
         today = __import__("datetime").date.today().strftime("%B %d, %Y")
 
-        prompt = f"""
-You are an expert career coach writing a compelling, personalized cover letter.
+        prompt = f"""You are an expert career coach writing a compelling cover letter.
 
 CANDIDATE PROFILE:
 {json.dumps(user_data, indent=2)[:5000]}
@@ -343,27 +445,21 @@ JOB DESCRIPTION:
 {request.jd_text[:3000]}
 
 INSTRUCTIONS:
-- Write a complete, professional cover letter (3-4 paragraphs)
-- Opening: Express genuine interest in the specific role and company
-- Body paragraph 1: Highlight 2-3 most relevant technical skills/experiences that match the JD
-- Body paragraph 2: Mention a specific project or achievement that shows impact
-- Closing: Express enthusiasm and call to action
-- Tone: Professional but personable, confident without being arrogant
-- Length: 280-350 words
+- Write 3-4 paragraphs, 280-350 words total
+- Opening: Engaging first line (no "I am writing to express...")
+- Body 1: 2-3 most relevant technical skills/experiences
+- Body 2: Specific project or measurable achievement
+- Closing: Enthusiasm + call to action
+- Tone: Professional but personable
+- Reference what makes {request.company} specifically interesting
 - Use the candidate's REAL name, contact info, and experiences
-- Make it feel personal to THIS company — reference what makes {request.company} interesting
-- Do NOT use clichés like "I am writing to express my interest" or "To Whom It May Concern"
-- Start directly with an engaging opening line
+- Output ONLY the cover letter text, no explanation."""
 
-OUTPUT: The complete cover letter text only. No explanation, no markdown.
-        """
-
-        data = {"model": OLLAMA_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.5}
         try:
-            response = requests.post(OLLAMA_API_URL, json=data, timeout=90)
-            letter = response.json()["choices"][0]["message"]["content"].strip()
+            letter = call_llm([{"role": "user", "content": prompt}],
+                              temperature=0.5, prefer=request.llm, timeout=90)
             return {
-                "cover_letter": letter,
+                "cover_letter": letter.strip(),
                 "metadata": {
                     "company": request.company,
                     "role": request.role,
@@ -374,45 +470,51 @@ OUTPUT: The complete cover letter text only. No explanation, no markdown.
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-# --- ENDPOINT 7: PDF GENERATION ---
+# ─────────────────────────────────────────────────────────────────
+# ENDPOINT 7: PDF GENERATION
+# ─────────────────────────────────────────────────────────────────
 @app.post("/generate-pdf")
 async def generate_pdf(data: dict):
     print("Request Received: PDF Generation")
     async with processing_lock:
-        # ... (PASTE YOUR EXISTING PDF LOGIC HERE - IT WAS CORRECT) ...
-        # (I am omitting it to save space, but keep your existing logic!)
-        # Ensure you use the 'env' with custom delimiters from the previous step.
         master = load_master_data()
         master["summary"] = data.get("tailored_summary", master.get("summary", ""))
-        
+
         if "selected_projects" in data and data["selected_projects"]:
             target_titles = [t.lower().strip() for t in data["selected_projects"]]
             if "projects" in master:
-                filtered = [p for p in master["projects"] if p.get("title", "").lower().strip() in target_titles]
-                if filtered: master["projects"] = filtered
-        # --- NEW: DEDUPLICATION LOGIC ---
-        # Remove projects that are already listed in Publications to avoid double counting
+                filtered = [p for p in master["projects"]
+                            if p.get("title", "").lower().strip() in target_titles]
+                if filtered:
+                    master["projects"] = filtered
+
         if "publications" in master and "projects" in master:
             pub_titles = {pub["title"].lower().strip() for pub in master["publications"]}
-            # Keep project ONLY if its title is NOT in publications
-            master["projects"] = [
-                p for p in master["projects"] 
-                if p["title"].lower().strip() not in pub_titles
-            ]
-        # --------------------------------
+            master["projects"] = [p for p in master["projects"]
+                                  if p["title"].lower().strip() not in pub_titles]
         try:
-            with open("resume_template.tex", "r") as f: template_str = f.read()
-            env = Environment(block_start_string='\\BLOCK{', block_end_string='}', variable_start_string='\\VAR{', variable_end_string='}', comment_start_string='\\#{', comment_end_string='}', loader=BaseLoader())
+            with open("resume_template.tex", "r") as f:
+                template_str = f.read()
+            env = Environment(
+                block_start_string='\\BLOCK{', block_end_string='}',
+                variable_start_string='\\VAR{', variable_end_string='}',
+                comment_start_string='\\#{', comment_end_string='}',
+                loader=BaseLoader()
+            )
             env.filters['latex'] = escape_latex_chars
-            
             template = env.from_string(template_str)
             rendered_tex = template.render(**master)
-            
-            with open("tailored_resume.tex", "w", encoding="utf-8") as f: f.write(rendered_tex)
-            
+
+            with open("tailored_resume.tex", "w", encoding="utf-8") as f:
+                f.write(rendered_tex)
+
             cwd = os.getcwd()
-            cmd = ["docker", "run", "--rm", "-v", f"{cwd}:/data", "-w", "/data", "texlive/texlive:latest", "pdflatex", "-interaction=nonstopmode", "tailored_resume.tex"]
+            cmd = ["docker", "run", "--rm", "-v", f"{cwd}:/data", "-w", "/data",
+                   "texlive/texlive:latest", "pdflatex", "-interaction=nonstopmode",
+                   "tailored_resume.tex"]
             subprocess.run(cmd, check=True)
-            return FileResponse("tailored_resume.pdf", media_type="application/pdf", filename="tailored_resume.pdf")
+            return FileResponse("tailored_resume.pdf",
+                                media_type="application/pdf",
+                                filename="tailored_resume.pdf")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"PDF Failed: {str(e)}")
