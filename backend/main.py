@@ -634,13 +634,13 @@ def test_taleo():
 # ENDPOINT 1: ANALYZE
 # ─────────────────────────────────────────────────────────────────
 @app.post("/analyze")
-async def analyze_job(request: JobRequest):
+async def analyze_job(req: JobRequest, request: Request):
     print("Request Received: Analyze Job")
     async with processing_lock:
-        user_data = load_master_data()
+        user_data = load_pdata(get_pid(request))
         prompt = f"""You are a Career Strategist.
 CANDIDATE PROFILE: {json.dumps(user_data)}
-JOB DESCRIPTION: "{request.jd_text[:7000]}"
+JOB DESCRIPTION: "{req.jd_text[:7000]}"
 
 TASK:
 1. Identify the Job Role.
@@ -654,7 +654,7 @@ OUTPUT JSON ONLY:
 {{"role":"...","skills_matched":[],"missing_skill":"...","score":"...","tailored_summary":"...","selected_projects":[]}}"""
         try:
             content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.2, prefer=request.llm)
+                               temperature=0.2, prefer=req.llm)
             return json.loads(clean_json(content))
         except Exception as e:
             print(f"Analyze error: {e}")
@@ -664,17 +664,17 @@ OUTPUT JSON ONLY:
 # ENDPOINT 2: SUGGEST QUESTIONS
 # ─────────────────────────────────────────────────────────────────
 @app.post("/suggest-questions")
-async def suggest_questions(request: JobRequest):
+async def suggest_questions(req: JobRequest, request: Request):
     print("Request Received: Suggest Questions")
     async with processing_lock:
         prompt = f"""Analyze this job posting:
-"{request.jd_text[:7000]}"
+"{req.jd_text[:7000]}"
 
 Generate 3 short, specific questions a candidate should ask about this role.
 OUTPUT JSON LIST ONLY: ["Question 1", "Question 2", "Question 3"]"""
         try:
             content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.4, prefer=request.llm)
+                               temperature=0.4, prefer=req.llm)
             return json.loads(clean_json(content))
         except Exception:
             return ["What is the expected tech stack?", "Is sponsorship available?", "What is the salary range?"]
@@ -704,13 +704,13 @@ WEBPAGE CONTEXT:
 # ENDPOINT 4: AUTOFILL
 # ─────────────────────────────────────────────────────────────────
 @app.post("/autofill")
-async def autofill_fields(request: AutofillRequest):
+async def autofill_fields(req: AutofillRequest, request: Request):
     print("Request Received: Autofill")
     async with processing_lock:
-        user_data = load_master_data()
+        user_data = load_pdata(get_pid(request))
         autofill = user_data.get("autofill", {})
 
-        field_list = json.dumps(request.fields[:40], indent=2)
+        field_list = json.dumps(req.fields[:40], indent=2)
 
         prompt = f"""You are an expert job application assistant filling out a form on behalf of a candidate.
 
@@ -720,8 +720,8 @@ CANDIDATE PROFILE:
 AUTOFILL QUICK REFERENCE:
 {json.dumps(autofill, indent=2)}
 
-JOB DESCRIPTION: {request.jd_text[:2000]}
-COMPANY: {request.company}
+JOB DESCRIPTION: {req.jd_text[:2000]}
+COMPANY: {req.company}
 
 FORM FIELDS TO FILL:
 {field_list}
@@ -743,40 +743,40 @@ OUTPUT JSON ONLY."""
 
         try:
             content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.1, prefer=request.llm, timeout=90)
+                               temperature=0.1, prefer=req.llm, timeout=90)
             return json.loads(clean_json(content))
         except Exception as e:
             print(f"Autofill LLM error: {e}. Falling back to rule-based.")
-            return build_rule_based_answers(request.fields, autofill, user_data)
+            return build_rule_based_answers(req.fields, autofill, user_data)
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 5: ANSWER SINGLE QUESTION
 # ─────────────────────────────────────────────────────────────────
 @app.post("/answer-question")
-async def answer_question(request: QuestionRequest):
+async def answer_question(req: QuestionRequest, request: Request):
     print("Request Received: Answer Question")
     async with processing_lock:
-        user_data = load_master_data()
+        user_data = load_pdata(get_pid(request))
         prompt = f"""You are an expert job application assistant answering a question on behalf of the candidate.
 
 CANDIDATE PROFILE:
 {json.dumps(user_data, indent=2)[:5000]}
 
-JOB DESCRIPTION: {request.jd_text[:2000]}
-COMPANY: {request.company}
+JOB DESCRIPTION: {req.jd_text[:2000]}
+COMPANY: {req.company}
 
-QUESTION: "{request.question}"
+QUESTION: "{req.question}"
 
 INSTRUCTIONS:
 - Write in implied first person (e.g. "Experienced in...", "With 2 years of...")
 - DO NOT use pronouns (I, He, She) — implied first person only
 - Reference real candidate details
-- Approximately {request.word_limit} words
+- Approximately {req.word_limit} words
 - Output ONLY the answer text, no preamble."""
 
         try:
             content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.3, prefer=request.llm)
+                               temperature=0.3, prefer=req.llm)
             return {"answer": content.strip()}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -785,10 +785,10 @@ INSTRUCTIONS:
 # ENDPOINT 6: COVER LETTER
 # ─────────────────────────────────────────────────────────────────
 @app.post("/cover-letter")
-async def generate_cover_letter(request: CoverLetterRequest):
+async def generate_cover_letter(req: CoverLetterRequest, request: Request):
     print("Request Received: Cover Letter")
     async with processing_lock:
-        user_data = load_master_data()
+        user_data = load_pdata(get_pid(request))
         contact = user_data.get("contact_info", {})
         today = __import__("datetime").date.today().strftime("%B %d, %Y")
 
@@ -797,11 +797,11 @@ async def generate_cover_letter(request: CoverLetterRequest):
 CANDIDATE PROFILE:
 {json.dumps(user_data, indent=2)[:5000]}
 
-TARGET COMPANY: {request.company}
-TARGET ROLE: {request.role}
-HIRING MANAGER: {request.hiring_manager or "Hiring Manager"}
+TARGET COMPANY: {req.company}
+TARGET ROLE: {req.role}
+HIRING MANAGER: {req.hiring_manager or "Hiring Manager"}
 JOB DESCRIPTION:
-{request.jd_text[:3000]}
+{req.jd_text[:3000]}
 
 INSTRUCTIONS:
 - Write 3-4 paragraphs, 280-350 words total
@@ -810,18 +810,18 @@ INSTRUCTIONS:
 - Body 2: Specific project or measurable achievement
 - Closing: Enthusiasm + call to action
 - Tone: Professional but personable
-- Reference what makes {request.company} specifically interesting
+- Reference what makes {req.company} specifically interesting
 - Use the candidate's REAL name, contact info, and experiences
 - Output ONLY the cover letter text, no explanation."""
 
         try:
             letter = call_llm([{"role": "user", "content": prompt}],
-                              temperature=0.5, prefer=request.llm, timeout=90)
+                              temperature=0.5, prefer=req.llm, timeout=90)
             return {
                 "cover_letter": letter.strip(),
                 "metadata": {
-                    "company": request.company,
-                    "role": request.role,
+                    "company": req.company,
+                    "role": req.role,
                     "candidate": contact.get("name", ""),
                     "generated_date": today
                 }
@@ -833,10 +833,10 @@ INSTRUCTIONS:
 # ENDPOINT 7: PDF GENERATION
 # ─────────────────────────────────────────────────────────────────
 @app.post("/generate-pdf")
-async def generate_pdf(data: dict):
+async def generate_pdf(data: dict, request: Request):
     print("Request Received: PDF Generation")
     async with processing_lock:
-        master = load_master_data()
+        master = load_pdata(get_pid(request))
         master["summary"] = data.get("tailored_summary", master.get("summary", ""))
 
         if "selected_projects" in data and data["selected_projects"]:
