@@ -136,51 +136,91 @@ def build_rule_based_answers(fields, autofill, user_data):
 
     # Order matters — more specific patterns FIRST to prevent false matches
     RULES = [
-        # Identity — must come before generic "name" match
-        (r"first\s*name|given\s*name|forename", first_name),
-        (r"last\s*name|family\s*name|surname", last_name),
-        (r"^(full\s*)?name$|^your\s*name$|^name\b", name),
-        # Contact
+        # ── Identity ────────────────────────────────────────────────────────
+        (r"first\s*name|given\s*name|forename|^first$", first_name),
+        (r"last\s*name|family\s*name|surname|^last$", last_name),
+        (r"preferred\s*(first\s*)?name|nickname", first_name),
+        (r"^(full\s*)?name$|^your\s*name$|^name\b|applicant\s*name", name),
+
+        # ── Contact ─────────────────────────────────────────────────────────
         (r"e[\s-]?mail", contact.get("email", "")),
         (r"phone|mobile|cell|telephone", contact.get("phone", "")),
         (r"linkedin", contact.get("linkedin", "")),
         (r"github", contact.get("github", "")),
-        (r"website|portfolio", contact.get("github", "")),
-        # Work authorization — MUST be before state/country patterns
-        (r"work\s*auth|legally\s*(authorized|eligible)|authorized\s*to\s*work|authorized.*work",
+        (r"website|portfolio|personal\s*(url|site)", contact.get("website", contact.get("github", ""))),
+
+        # ── Work authorization BEFORE location to prevent "United States" false match ──
+        (r"currently\s*eligible\s*to\s*work|eligible\s*to\s*work.*without.*sponsor|"
+         r"authorized.*without.*visa|work\s*auth|legally\s*(authorized|eligible)|"
+         r"authorized\s*to\s*work",
          autofill.get("work_authorization", "Yes")),
-        (r"require.*sponsor|need.*sponsor|sponsor.*required|visa\s*sponsor",
-         autofill.get("requires_sponsorship", "Yes")),
-        (r"\bsponsor\b", autofill.get("requires_sponsorship", "Yes")),
-        # Location — use word boundaries to avoid matching "United States"
-        (r"\bcity\b|\blocality\b", autofill.get("city", "Houston")),
+
+        # Sponsorship — multiple real phrasings
+        (r"require.*sponsor.*now\s*or.*future|now\s*or.*future.*require.*sponsor|"
+         r"will\s*you.*require.*sponsor|require.*employer.*sponsor|"
+         r"do\s*you.*require.*visa|do\s*you\s*now|future.*require.*sponsor|"
+         r"require.*sponsor|need.*sponsor|sponsor.*required|visa\s*sponsor",
+         autofill.get("requires_sponsorship", "No")),
+
+        # ── Location ────────────────────────────────────────────────────────
+        # candidate-location / Location (City) — Greenhouse specific
+        (r"location.*city|city.*state.*zip|candidate.?location|^location$",
+         autofill.get("city", "Houston")),
+        (r"\bcity\b|\blocality\b|\btown\b", autofill.get("city", "Houston")),
         (r"^state$|^province$|\bstate\s*/\s*province\b|\bstate\b.*\bprovince\b",
          autofill.get("state", "TX")),
         (r"\bzip\b|\bpostal\b", autofill.get("zip", "77001")),
         (r"\bcountry\b", autofill.get("country", "United States")),
-        # Compensation & logistics
-        (r"salary|compensation|pay\b|desired\s*pay", autofill.get("salary_expectation", "120000")),
-        (r"years.*(of\s*)?experience|experience.*years", autofill.get("years_of_experience", "2")),
-        (r"start\s*date|when.*available|available.*start", autofill.get("start_date", "Immediately")),
-        (r"relocat", autofill.get("willing_to_relocate", "Yes")),
+        (r"address\s*line\s*1|street\s*address|mailing\s*address",
+         autofill.get("address", "123 Main St")),
+
+        # ── Compensation & logistics ─────────────────────────────────────────
+        (r"salary|compensation|desired\s*pay|expected\s*salary|pay\s*expect|wage",
+         autofill.get("salary_expectation", "120000")),
+        (r"years.*(of\s*)?experience|experience.*years|years\s*relevant",
+         autofill.get("years_of_experience", "2")),
+        (r"start\s*date|when.*available|available.*start|earliest\s*start",
+         autofill.get("start_date", "Immediately")),
+        (r"relocat|willing\s*to\s*move", autofill.get("willing_to_relocate", "Yes")),
         (r"remote|hybrid|work.*arrangement", "Open to remote or hybrid"),
-        (r"notice\s*period|notice\b", autofill.get("notice_period", "2 weeks")),
-        # Current employment
-        (r"current\s*(company|employer|organization)", autofill.get("current_company", "Accenture")),
-        (r"current\s*(job\s*)?(title|position|role)|job\s*title|position\s*title",
+        (r"notice\s*period|weeks?\s*notice", autofill.get("notice_period", "2 weeks")),
+
+        # ── Current employment ───────────────────────────────────────────────
+        (r"current\s*(company|employer|organization)|present\s*employer",
+         autofill.get("current_company", "Accenture")),
+        (r"current\s*(job\s*)?(title|position|role)|present\s*title|job\s*title",
          autofill.get("current_title", "Advanced App Engineering Analyst")),
-        # EEO & demographic
-        (r"\bgender\b|\bsex\b", autofill.get("gender", "Male")),
+
+        # ── Greenhouse-specific custom question labels ───────────────────────
+        (r"have you been referred|referred by.*employee", "No"),
+        (r"have you worked at", "No"),
+        (r"what year will you graduate|graduation year", "2025"),
+
+        # ── EEO & demographic ────────────────────────────────────────────────
+        # "I identify my gender as:" — real Greenhouse/general phrasing
+        (r"i\s*identify\s*my\s*gender|gender\s*identity|\bgender\b|\bsex\b",
+         autofill.get("gender", "Male")),
+        (r"i\s*identify\s*my\s*ethnicity|ethnic|race\b|racial",
+         autofill.get("ethnicity", "Asian")),
         (r"veteran|military\s*status", autofill.get("veteran_status", "I am not a protected veteran")),
         (r"disability", autofill.get("disability_status", "I don't wish to answer")),
-        (r"ethnic|race\b|racial", autofill.get("ethnicity", "Asian")),
-        # Open-ended
-        (r"summary|tell us about|about yourself|introduce yourself|background",
+
+        # ── Open-ended ────────────────────────────────────────────────────────
+        (r"summary|tell\s*us\s*about|about\s*yourself|introduce\s*yourself|background",
          user_data.get("summary", "")),
-        (r"cover\s*letter", user_data.get("summary", "")),
-        # Source / referral
-        (r"referral|how did you hear|source|where did you|how did you find|how did you learn|how did you know", "LinkedIn"),
+        (r"cover\s*letter|cover letter", user_data.get("summary", "")),
+        (r"please\s*introduce\s*yourself|why.*great\s*fit|explain.*why.*fit",
+         user_data.get("summary", "")),
+
+        # ── Source / referral ────────────────────────────────────────────────
+        (r"referral|how\s*did\s*you\s*(hear|find|learn|know)|referred\s*by|"
+         r"source\s*of\s*hire|where\s*did\s*you|how\s*did\s*(techflow|acme|corp|company)",
+         "LinkedIn"),
+
+        # ── Misc ─────────────────────────────────────────────────────────────
         (r"pronouns", "He/Him"),
+        (r"additional\s*information|anything\s*else|additional\s*comments",
+         user_data.get("summary", "")),
     ]
 
     for field in fields:
@@ -269,6 +309,41 @@ def test_workday():
 @app.get("/test/generic", response_class=HTMLResponse)
 def test_generic():
     with open(os.path.join(os.path.dirname(__file__), "test_generic.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/greenhouse-real", response_class=HTMLResponse)
+def test_greenhouse_real():
+    with open(os.path.join(os.path.dirname(__file__), "test_greenhouse_real.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/lever", response_class=HTMLResponse)
+def test_lever():
+    with open(os.path.join(os.path.dirname(__file__), "test_lever.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/bamboohr", response_class=HTMLResponse)
+def test_bamboohr():
+    with open(os.path.join(os.path.dirname(__file__), "test_bamboohr.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/icims", response_class=HTMLResponse)
+def test_icims():
+    with open(os.path.join(os.path.dirname(__file__), "test_icims.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/smartrecruiters", response_class=HTMLResponse)
+def test_smartrecruiters():
+    with open(os.path.join(os.path.dirname(__file__), "test_smartrecruiters.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/linkedin", response_class=HTMLResponse)
+def test_linkedin():
+    with open(os.path.join(os.path.dirname(__file__), "test_linkedin.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/taleo", response_class=HTMLResponse)
+def test_taleo():
+    with open(os.path.join(os.path.dirname(__file__), "test_taleo.html"), "r") as f:
         return f.read()
 
 # ─────────────────────────────────────────────────────────────────

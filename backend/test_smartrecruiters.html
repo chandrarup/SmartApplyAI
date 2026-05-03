@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Engineer at TechFlow | SmartRecruiters</title>
+<style>
+  body { font-family: 'Open Sans', Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 28px 20px; background: #f4f4f4; color: #1c1c1c; }
+  .sr-header { background: #0033a0; color: white; padding: 20px 24px; border-radius: 4px; margin-bottom: 16px; }
+  .sr-header h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; }
+  .sr-header p { margin: 0; font-size: 13px; opacity: 0.85; }
+  .badge { background: #e6ebf5; color: #0033a0; padding: 3px 10px; border-radius: 3px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 14px; }
+  .sr-section { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 20px; margin-bottom: 14px; }
+  .sr-section-title { font-size: 13px; font-weight: 700; color: #0033a0; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 14px; }
+  .sr-field { margin-bottom: 14px; }
+  .sr-field label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; }
+  .required-mark { color: #c00; }
+  /* SmartRecruiters uses data-test-id attributes */
+  input[type=text], input[type=email], input[type=tel], input[type=url], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #bbb; border-radius: 3px; font-size: 14px; box-sizing: border-box; font-family: inherit; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #0033a0; box-shadow: 0 0 0 2px rgba(0,51,160,0.1); }
+  textarea { resize: vertical; min-height: 80px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .sr-btn { background: #0033a0; color: white; border: none; padding: 11px 28px; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .result-overlay { display: none; position: fixed; top: 16px; right: 16px; background: white; border: 2px solid #0033a0; border-radius: 6px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 320px; z-index: 9999; font-size: 12.5px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 8px; color: #0033a0; }
+  .ri { padding: 2px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .close-btn { float: right; background: none; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="sr-header">
+  <h1>Senior AI / ML Engineer</h1>
+  <p>TechFlow · San Francisco, CA · Full-time · Remote OK</p>
+</div>
+<div class="badge">Real SmartRecruiters HTML Patterns — LocalHire Agent Test</div>
+
+<form id="sr-form">
+
+  <div class="sr-section">
+    <div class="sr-section-title">Personal Information</div>
+    <div class="two-col">
+      <div class="sr-field">
+        <!-- REAL SmartRecruiters: data-test-id=first-name-input -->
+        <label for="sr_first">First Name <span class="required-mark">*</span></label>
+        <input type="text" id="sr_first" data-test-id="first-name-input" aria-label="First Name" autocomplete="off">
+      </div>
+      <div class="sr-field">
+        <!-- REAL SmartRecruiters: data-test-id=last-name-input -->
+        <label for="sr_last">Last Name <span class="required-mark">*</span></label>
+        <input type="text" id="sr_last" data-test-id="last-name-input" aria-label="Last Name" autocomplete="off">
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="sr-field">
+        <!-- REAL SmartRecruiters: data-test-id=email-input -->
+        <label for="sr_email">Email <span class="required-mark">*</span></label>
+        <input type="email" id="sr_email" data-test-id="email-input" aria-label="Email" autocomplete="off">
+      </div>
+      <div class="sr-field">
+        <!-- REAL SmartRecruiters: data-test-id=phone-input -->
+        <label for="sr_phone">Phone Number</label>
+        <input type="tel" id="sr_phone" data-test-id="phone-input" aria-label="Phone Number" autocomplete="off">
+      </div>
+    </div>
+    <div class="two-col">
+      <!-- REAL SmartRecruiters: data-test-id=city-input, zip-code-input -->
+      <div class="sr-field">
+        <label for="sr_city">City</label>
+        <input type="text" id="sr_city" data-test-id="city-input" aria-label="City" autocomplete="off">
+      </div>
+      <div class="sr-field">
+        <label for="sr_zip">Zip Code</label>
+        <input type="text" id="sr_zip" data-test-id="zip-code-input" aria-label="Zip Code" autocomplete="off">
+      </div>
+    </div>
+    <div class="sr-field">
+      <!-- REAL SmartRecruiters: data-test-id=linkedin-input -->
+      <label for="sr_linkedin">LinkedIn Profile URL</label>
+      <input type="url" id="sr_linkedin" data-test-id="linkedin-input" aria-label="LinkedIn Profile URL" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="sr-section">
+    <div class="sr-section-title">Your Experience</div>
+    <div class="two-col">
+      <div class="sr-field">
+        <label for="sr_company">Current Employer</label>
+        <input type="text" id="sr_company" data-test-id="current-employer-input" aria-label="Current Employer" autocomplete="off">
+      </div>
+      <div class="sr-field">
+        <label for="sr_title">Current Job Title</label>
+        <input type="text" id="sr_title" data-test-id="current-title-input" aria-label="Current Job Title" autocomplete="off">
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="sr-field">
+        <label for="sr_exp">Years of Experience</label>
+        <select id="sr_exp" data-test-id="experience-input" aria-label="Years of Experience">
+          <option value="">Select...</option>
+          <option value="0-1">Less than 1</option>
+          <option value="1-2">1-2 years</option>
+          <option value="2-4">2-4 years</option>
+          <option value="4-6">4-6 years</option>
+          <option value="6+">6+ years</option>
+        </select>
+      </div>
+      <div class="sr-field">
+        <label for="sr_salary">Expected Salary</label>
+        <input type="text" id="sr_salary" data-test-id="salary-input" aria-label="Expected Salary" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div class="sr-section">
+    <div class="sr-section-title">Eligibility</div>
+    <div class="sr-field">
+      <!-- REAL SmartRecruiters: data-test-id=authorized-select -->
+      <label for="sr_wa">Are you legally authorized to work in the United States? <span class="required-mark">*</span></label>
+      <select id="sr_wa" data-test-id="authorized-select" aria-label="Are you legally authorized to work in the United States?">
+        <option value="">Select...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="sr-field">
+      <!-- REAL SmartRecruiters: data-test-id=require-sponsorship-select -->
+      <label for="sr_visa">Will you require employer sponsorship now or in the future? <span class="required-mark">*</span></label>
+      <select id="sr_visa" data-test-id="require-sponsorship-select" aria-label="Will you require employer sponsorship now or in the future?">
+        <option value="">Select...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="sr-field">
+      <label for="sr_relocate">Willing to relocate?</label>
+      <select id="sr_relocate" data-test-id="relocate-select" aria-label="Willing to relocate?">
+        <option value="">Select...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="Maybe">Open to discussion</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="sr-section">
+    <div class="sr-section-title">Cover Letter &amp; Additional Information</div>
+    <div class="sr-field">
+      <label for="sr_cover">Please introduce yourself and explain why you're a great fit for this role</label>
+      <textarea id="sr_cover" data-test-id="cover-letter-textarea" aria-label="Please introduce yourself and explain why you're a great fit for this role"></textarea>
+    </div>
+    <div class="sr-field">
+      <label for="sr_referral">How did you hear about TechFlow?</label>
+      <select id="sr_referral" data-test-id="referral-select" aria-label="How did you hear about TechFlow?">
+        <option value="">Select...</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="Indeed">Indeed</option>
+        <option value="Glassdoor">Glassdoor</option>
+        <option value="Referral">Employee Referral</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+  </div>
+
+  <button type="submit" class="sr-btn">Submit Application</button>
+</form>
+
+<div class="result-overlay" id="ro">
+  <button class="close-btn" onclick="document.getElementById('ro').style.display='none'">✕</button>
+  <h3>Fields Filled</h3><div id="rl"></div>
+</div>
+<script>
+document.getElementById("sr-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const rl = document.getElementById("rl"); rl.innerHTML = "";
+  let filled = 0, total = 0;
+  document.querySelectorAll("input:not([type=submit]),select,textarea").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const lbl = document.querySelector('label[for="'+f.id+'"]');
+      const name = lbl?.textContent?.replace('*','').trim() || f.getAttribute('aria-label') || f.id;
+      const d = document.createElement("div"); d.className="ri";
+      d.innerHTML = `<b>${name.substring(0,40)}:</b> ${f.value.substring(0,50)}`;
+      rl.appendChild(d);
+    }
+  });
+  const s = document.createElement("div");
+  s.style = "margin-top:6px;padding-top:6px;border-top:2px solid #e6ebf5;font-weight:700;color:#0033a0";
+  s.textContent = `${filled}/${total} filled`; rl.appendChild(s);
+  document.getElementById("ro").style.display="block";
+});
+</script>
+</body>
+</html>

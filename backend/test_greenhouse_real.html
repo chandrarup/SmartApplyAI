@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Software Engineer - AI Platform at G-P | Greenhouse</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 680px; margin: 0 auto; padding: 24px; background: #f9fafb; color: #1a1a2e; }
+  .gh-header { background: #24a047; color: white; padding: 18px 24px; border-radius: 8px; margin-bottom: 20px; }
+  .gh-header h1 { margin: 0 0 4px; font-size: 20px; }
+  .gh-header p { margin: 0; font-size: 13px; opacity: 0.85; }
+  .badge { background: #e8f5ec; color: #166534; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; margin-bottom: 14px; }
+  .section { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+  .section-title { font-size: 13px; font-weight: 700; color: #24a047; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid #e8f5ec; }
+  .field { margin-bottom: 14px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+  label span[aria-hidden] { color: #dc2626; }
+  .input, input[type=text], input[type=email], input[type=tel], input[type=url], select, textarea {
+    width: 100%; padding: 8px 12px; border: 1.5px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: inherit; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #24a047; }
+  textarea { resize: vertical; min-height: 80px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .eeo-note { background: #f8faff; border: 1px solid #e0e7ff; border-radius: 6px; padding: 10px 14px; font-size: 12.5px; color: #555; margin-bottom: 14px; }
+  .submit-btn { background: #24a047; color: white; border: none; padding: 11px 28px; border-radius: 7px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .result-overlay { display: none; position: fixed; top: 16px; right: 16px; background: white; border: 2px solid #24a047; border-radius: 8px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 320px; z-index: 9999; font-size: 12.5px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 8px; color: #24a047; font-size: 13px; }
+  .ri { padding: 2px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .close-btn { float: right; background: none; border: none; cursor: pointer; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="gh-header">
+  <h1>Software Engineer — AI Platform</h1>
+  <p>G-P (Globalization Partners) · Remote · Full-time</p>
+</div>
+<div class="badge">Real Greenhouse HTML — LocalHire Agent Test</div>
+
+<form id="gh-form">
+
+  <!-- Personal Info — EXACT real Greenhouse field IDs -->
+  <div class="section">
+    <div class="section-title">Your Information</div>
+    <div class="two-col">
+      <div class="field">
+        <!-- REAL Greenhouse: id=first_name -->
+        <label for="first_name">First Name <span aria-hidden="true">*</span></label>
+        <input class="input input__single-line" id="first_name" name="first_name" type="text" aria-label="First Name" autocomplete="off">
+      </div>
+      <div class="field">
+        <!-- REAL Greenhouse: id=last_name -->
+        <label for="last_name">Last Name <span aria-hidden="true">*</span></label>
+        <input class="input input__single-line" id="last_name" name="last_name" type="text" aria-label="Last Name" autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <!-- REAL Greenhouse: id=preferred_name -->
+      <label for="preferred_name">Preferred First Name</label>
+      <input class="input input__single-line" id="preferred_name" name="preferred_name" type="text" aria-label="Preferred First Name" autocomplete="off">
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <!-- REAL Greenhouse: id=email -->
+        <label for="email">Email <span aria-hidden="true">*</span></label>
+        <input class="input input__single-line" id="email" name="email" type="email" aria-label="Email" autocomplete="off">
+      </div>
+      <div class="field">
+        <!-- REAL Greenhouse: id=phone -->
+        <label for="phone">Phone</label>
+        <input class="input input__single-line" id="phone" name="phone" type="tel" aria-label="Phone" autocomplete="off">
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <!-- REAL Greenhouse: id=candidate-location (label says "Location (City)") -->
+        <label for="candidate-location">Location (City) <span aria-hidden="true">*</span></label>
+        <input class="input input__single-line" id="candidate-location" name="candidate-location" type="text" aria-label="Location (City)" autocomplete="off">
+      </div>
+      <div class="field">
+        <!-- REAL Greenhouse: id=country (select) -->
+        <label for="country">Country</label>
+        <select id="country" name="country" aria-label="Country">
+          <option value="">Select...</option>
+          <option value="US">United States</option>
+          <option value="CA">Canada</option>
+          <option value="IN">India</option>
+          <option value="GB">United Kingdom</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Links — real Greenhouse question IDs -->
+  <div class="section">
+    <div class="section-title">Links</div>
+    <div class="field">
+      <!-- REAL: id=question_30609906003 label="LinkedIn Profile" -->
+      <label for="question_30609906003">LinkedIn Profile</label>
+      <input class="input input__single-line" id="question_30609906003" name="question_30609906003" type="url" placeholder="https://linkedin.com/in/..." autocomplete="off">
+    </div>
+    <div class="field">
+      <!-- REAL: id=question_30609907003 label="Website" -->
+      <label for="question_30609907003">Website</label>
+      <input class="input input__single-line" id="question_30609907003" name="question_30609907003" type="url" placeholder="https://..." autocomplete="off">
+    </div>
+  </div>
+
+  <!-- Eligibility — real Greenhouse question phrasing -->
+  <div class="section">
+    <div class="section-title">Eligibility</div>
+    <div class="field">
+      <!-- REAL: id=question_30609908003 -->
+      <label for="question_30609908003">Are you currently eligible to work in the country where this role is posted without visa sponsorship? <span aria-hidden="true">*</span></label>
+      <select id="question_30609908003" name="question_30609908003">
+        <option value="">Select an option...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="field">
+      <!-- REAL: id=question_30609909003 -->
+      <label for="question_30609909003">Do you now or in the future require visa sponsorship to continue working in the country where this role is posted? <span aria-hidden="true">*</span></label>
+      <select id="question_30609909003" name="question_30609909003">
+        <option value="">Select an option...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="field">
+      <!-- REAL: id=question_30609910003 -->
+      <label for="question_30609910003">Have you been referred by another G-P employee within the last 12 months? <span aria-hidden="true">*</span></label>
+      <select id="question_30609910003" name="question_30609910003">
+        <option value="">Select an option...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="field">
+      <!-- REAL: id=question_30610342003 -->
+      <label for="question_30610342003">What year will you graduate from university? <span aria-hidden="true">*</span></label>
+      <input class="input input__single-line" id="question_30610342003" name="question_30610342003" type="text" placeholder="e.g. 2025" autocomplete="off">
+    </div>
+  </div>
+
+  <!-- EEO — real Greenhouse EEO IDs -->
+  <div class="section">
+    <div class="section-title">Voluntary EEO Questions</div>
+    <div class="eeo-note">Completion of this section is entirely voluntary. Your answers will not affect your application.</div>
+    <div class="field">
+      <!-- REAL: id=4000994003 label="I identify my gender as:" -->
+      <label for="4000994003">I identify my gender as: <span aria-hidden="true">*</span></label>
+      <select id="4000994003" name="4000994003">
+        <option value="">Select...</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Non-binary">Non-binary / third gender</option>
+        <option value="Prefer not to disclose">Prefer not to disclose</option>
+      </select>
+    </div>
+    <div class="field">
+      <!-- REAL: id=4017696003 label="I identify my ethnicity as (mark all that apply)" -->
+      <label for="4017696003">I identify my ethnicity as (mark all that apply) <span aria-hidden="true">*</span></label>
+      <select id="4017696003" name="4017696003">
+        <option value="">Select...</option>
+        <option value="Asian">Asian</option>
+        <option value="Black or African American">Black or African American</option>
+        <option value="Hispanic or Latino">Hispanic or Latino</option>
+        <option value="White">White</option>
+        <option value="Two or more races">Two or more races</option>
+        <option value="Prefer not to disclose">Prefer not to disclose</option>
+      </select>
+    </div>
+  </div>
+
+  <button type="submit" class="submit-btn">Submit Application</button>
+</form>
+
+<div class="result-overlay" id="ro">
+  <button class="close-btn" onclick="document.getElementById('ro').style.display='none'">✕</button>
+  <h3>Fields Filled</h3>
+  <div id="rl"></div>
+</div>
+<script>
+document.getElementById("gh-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const rl = document.getElementById("rl"); rl.innerHTML = "";
+  let filled = 0, total = 0;
+  document.querySelectorAll("input:not([type=submit]):not([type=button]):not([type=file]),select,textarea").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const lbl = document.querySelector('label[for="'+CSS.escape(f.id)+'"]');
+      const name = lbl ? lbl.textContent.replace('*','').trim() : (f.name||f.id);
+      const d = document.createElement("div"); d.className="ri";
+      d.innerHTML = `<b>${name}:</b> ${f.value.substring(0,50)}`;
+      rl.appendChild(d);
+    }
+  });
+  const s = document.createElement("div");
+  s.style = "margin-top:6px;padding-top:6px;border-top:2px solid #e8f5ec;font-weight:700;color:#24a047";
+  s.textContent = `${filled}/${total} filled`; rl.appendChild(s);
+  document.getElementById("ro").style.display="block";
+});
+document.querySelectorAll("input,select,textarea").forEach(el => {
+  el.addEventListener("change",()=>console.log(`[GH] "${el.id||el.name}"="${el.value}"`));
+});
+</script>
+</body>
+</html>
