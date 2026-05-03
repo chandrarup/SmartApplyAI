@@ -1,212 +1,870 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LocalHire Agent - Dashboard</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
-    header { background: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; gap: 15px; }
-    header h1 { font-size: 1.5rem; }
-    header .badge { background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; }
-    .container { max-width: 960px; margin: 30px auto; padding: 0 20px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .card { background: white; border-radius: 10px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
-    .card h2 { font-size: 1rem; color: #555; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
-    .status-dot.green { background: #28a745; }
-    .status-dot.red { background: #dc3545; }
-    .status-dot.yellow { background: #ffc107; animation: pulse 1s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    .status-label { font-size: 1.1rem; font-weight: 600; }
-    .endpoint { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
-    .endpoint:last-child { border-bottom: none; }
-    .method { font-size: 0.7rem; font-weight: 700; padding: 3px 7px; border-radius: 4px; color: white; min-width: 44px; text-align: center; }
-    .method.GET { background: #28a745; }
-    .method.POST { background: #007bff; }
-    .endpoint-path { font-family: monospace; font-size: 0.9rem; font-weight: 600; }
-    .endpoint-desc { font-size: 0.8rem; color: #777; margin-top: 2px; }
-    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
-    .info-row:last-child { border-bottom: none; }
-    .info-label { color: #777; }
-    .info-value { font-weight: 600; font-family: monospace; }
-    .ext-section { background: white; border-radius: 10px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
-    .ext-section h2 { font-size: 1rem; color: #555; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.05em; }
-    ol { padding-left: 20px; }
-    ol li { padding: 6px 0; font-size: 0.9rem; line-height: 1.5; }
-    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 0.85em; }
-    .alert { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 0.9rem; }
-    .alert strong { color: #856404; }
-    .test-btn { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-top: 12px; }
-    .test-btn:hover { background: #0056b3; }
-    .test-result { margin-top: 10px; font-size: 0.85rem; font-family: monospace; background: #f8f9fa; padding: 10px; border-radius: 6px; display: none; white-space: pre-wrap; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocalHire Agent — Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --brand:#2563eb;--brand-d:#1d4ed8;--brand-l:#dbeafe;
+  --green:#16a34a;--green-l:#dcfce7;
+  --red:#dc2626;--red-l:#fee2e2;
+  --yellow:#d97706;--yellow-l:#fef3c7;
+  --purple:#7c3aed;--purple-l:#ede9fe;
+  --g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;--g300:#d1d5db;
+  --g400:#9ca3af;--g500:#6b7280;--g600:#4b5563;--g700:#374151;
+  --g800:#1f2937;--g900:#111827;
+  --sw:220px;--hh:60px;--r:10px;
+  --sh:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shm:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--g50);color:var(--g800);display:flex;flex-direction:column;min-height:100vh;font-size:14px}
+
+/* HEADER */
+.hdr{height:var(--hh);background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:var(--shm)}
+.hdr-brand{display:flex;align-items:center;gap:10px}
+.hdr-brand h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.hdr-brand .ver{font-size:10px;background:rgba(255,255,255,.2);padding:2px 7px;border-radius:10px;font-weight:600}
+.hdr-actions{display:flex;align-items:center;gap:10px}
+.api-pill{display:flex;align-items:center;gap:6px;font-size:12px;background:rgba(255,255,255,.15);padding:5px 12px;border-radius:20px}
+.api-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;flex-shrink:0}
+.api-dot.off{background:#f87171}
+.hdr-btn{background:rgba(255,255,255,.15);border:none;color:#fff;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600;transition:background .15s}
+.hdr-btn:hover{background:rgba(255,255,255,.28)}
+
+/* LAYOUT */
+.body{display:flex;margin-top:var(--hh);flex:1}
+.sidebar{width:var(--sw);background:#fff;border-right:1px solid var(--g200);position:fixed;top:var(--hh);bottom:0;left:0;overflow-y:auto;padding:12px 0}
+.main{margin-left:var(--sw);flex:1;padding:28px;min-height:calc(100vh - var(--hh))}
+
+/* SIDEBAR */
+.ns{padding:4px 14px 6px;font-size:10px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.7px;margin-top:8px}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 16px;cursor:pointer;color:var(--g600);font-size:13.5px;font-weight:500;transition:all .12s;border-left:3px solid transparent;white-space:nowrap;user-select:none}
+.ni:hover{background:var(--g50);color:var(--g800)}
+.ni.active{background:var(--brand-l);color:var(--brand);border-left-color:var(--brand);font-weight:600}
+.ni .ic{font-size:15px;flex-shrink:0}
+.nbadge{margin-left:auto;background:var(--brand);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;min-width:18px;text-align:center}
+
+/* PAGE */
+.pg{display:none;animation:fi .2s ease}
+.pg.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.ph{margin-bottom:22px}
+.ph h2{font-size:22px;font-weight:700;color:var(--g900)}
+.ph p{color:var(--g500);font-size:13.5px;margin-top:3px}
+
+/* CARD */
+.card{background:#fff;border:1px solid var(--g200);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:16px}
+.ch{padding:13px 18px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between}
+.ch h3{font-size:14px;font-weight:700;color:var(--g800)}
+.cb{padding:18px}
+
+/* STATS */
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.sc{background:#fff;border:1px solid var(--g200);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh)}
+.sc .sl{font-size:11px;color:var(--g500);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.sc .sv{font-size:28px;font-weight:800;color:var(--g900);margin:4px 0 2px;line-height:1}
+.sc .ss{font-size:11px;color:var(--g400)}
+.sc.blue{border-left:4px solid var(--brand)}
+.sc.green{border-left:4px solid var(--green)}
+.sc.yellow{border-left:4px solid var(--yellow)}
+.sc.purple{border-left:4px solid var(--purple)}
+
+/* FORMS */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.ff{grid-column:1/-1}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:12.5px;font-weight:600;color:var(--g600)}
+.fld input,.fld select,.fld textarea{padding:8px 11px;border:1.5px solid var(--g200);border-radius:7px;font-size:13.5px;font-family:inherit;color:var(--g800);outline:none;transition:border-color .15s;background:#fff}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.fld textarea{resize:vertical;min-height:76px}
+.fhint{font-size:11px;color:var(--g400)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;font-family:inherit}
+.bp{background:var(--brand);color:#fff}.bp:hover{background:var(--brand-d)}
+.bg{background:var(--green);color:#fff}.bg:hover{background:#15803d}
+.bd{background:var(--red);color:#fff}.bd:hover{background:#b91c1c}
+.bo{background:transparent;color:var(--g600);border:1.5px solid var(--g200)}.bo:hover{background:var(--g50);border-color:var(--g300)}
+.bsm{padding:5px 11px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--g900);color:#fff;padding:11px 17px;border-radius:9px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;max-width:320px}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{background:var(--green)}
+#toast.err{background:var(--red)}
+
+/* ITEM CARDS (exp / edu) */
+.ic{border:1.5px solid var(--g200);border-radius:8px;padding:14px;margin-bottom:12px;background:#fff}
+.ich{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.ict{font-size:14px;font-weight:700;color:var(--g800)}
+.ics{font-size:12.5px;color:var(--g500);margin-top:2px}
+
+/* BULLET LIST */
+.bul{list-style:none}
+.bul li{display:flex;gap:7px;margin-bottom:6px;align-items:center}
+.bul li input{flex:1}
+.rmb{background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 3px;line-height:1}
+.addb{background:none;border:1.5px dashed var(--g300);color:var(--g500);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12.5px;width:100%;margin-top:4px;font-family:inherit}
+.addb:hover{border-color:var(--brand);color:var(--brand)}
+
+/* TAG INPUT */
+.tiw{border:1.5px solid var(--g200);border-radius:7px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:6px;cursor:text;min-height:42px;background:#fff}
+.tiw:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.stag{display:inline-flex;align-items:center;gap:4px;background:var(--brand-l);color:var(--brand);font-size:12px;font-weight:600;padding:3px 8px;border-radius:5px}
+.stag button{background:none;border:none;cursor:pointer;color:var(--brand);font-size:13px;line-height:1;padding:0}
+.tinput{border:none;outline:none;font-size:13px;min-width:80px;flex:1;font-family:inherit}
+
+/* APP TABLE */
+.at{width:100%;border-collapse:collapse}
+.at th{font-size:11.5px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;padding:10px 14px;border-bottom:2px solid var(--g200);text-align:left;background:var(--g50)}
+.at td{padding:12px 14px;border-bottom:1px solid var(--g100);vertical-align:middle;font-size:13px}
+.at tr:hover td{background:var(--g50)}
+.at tr:last-child td{border-bottom:none}
+
+/* STATUS BADGES */
+.sb{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.sb::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.sa{background:var(--brand-l);color:var(--brand)}
+.ss2{background:var(--yellow-l);color:var(--yellow)}
+.si{background:var(--purple-l);color:var(--purple)}
+.so{background:var(--green-l);color:var(--green)}
+.sr{background:var(--red-l);color:var(--red)}
+.sw{background:var(--g100);color:var(--g500)}
+.pc{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:var(--g100);color:var(--g600)}
+
+/* PIPELINE SUMMARY */
+.pipe{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}
+.pcol{background:#fff;border:1px solid var(--g200);border-radius:8px;padding:10px;text-align:center}
+.pcol .pl{font-size:10.5px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.4px}
+.pcol .pn{font-size:24px;font-weight:800;margin:4px 0 2px}
+.pcol.ca .pn{color:var(--brand)}.pcol.cs .pn{color:var(--yellow)}
+.pcol.ci .pn{color:var(--purple)}.pcol.co .pn{color:var(--green)}
+.pcol.cx .pn{color:var(--red)}.pcol.cw .pn{color:var(--g500)}
+
+/* TOOLBAR */
+.tb{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.tb input[type=text]{padding:7px 12px;border:1.5px solid var(--g200);border-radius:7px;font-size:13px;width:230px;outline:none;font-family:inherit}
+.tb input:focus{border-color:var(--brand)}
+.tb select{padding:7px 10px;border:1.5px solid var(--g200);border-radius:7px;font-size:13px;outline:none;font-family:inherit}
+.mla{margin-left:auto}
+
+/* Q&A GRID */
+.qag{display:grid;gap:14px}
+.qai{display:flex;flex-direction:column;gap:5px}
+.qai label{font-size:12.5px;font-weight:700;color:var(--g700)}
+.qai textarea{padding:8px 11px;border:1.5px solid var(--g200);border-radius:7px;font-size:13px;font-family:inherit;resize:vertical;min-height:72px;outline:none}
+.qai textarea:focus{border-color:var(--brand)}
+
+/* MODAL */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.md{background:#fff;border-radius:12px;width:580px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.mh{padding:18px 20px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between}
+.mh h3{font-size:16px;font-weight:700}
+.mc{font-size:20px;cursor:pointer;color:var(--g400);background:none;border:none;line-height:1}
+.mb{padding:20px;display:flex;flex-direction:column;gap:14px}
+.mf{padding:14px 20px;border-top:1px solid var(--g100);display:flex;justify-content:flex-end;gap:8px}
+
+@media(max-width:900px){
+  .sg{grid-template-columns:1fr 1fr}
+  .fg{grid-template-columns:1fr}
+  .fg3{grid-template-columns:1fr 1fr}
+  .pipe{grid-template-columns:repeat(3,1fr)}
+}
+</style>
 </head>
 <body>
-  <header>
-    <div>
-      <h1>LocalHire Agent</h1>
-      <div style="font-size:0.85rem;opacity:0.85;margin-top:2px;">AI-powered resume tailoring tool</div>
-    </div>
-    <span class="badge">v2.0</span>
-  </header>
 
-  <div class="container">
-    <div class="alert">
-      <strong>LocalHire Agent 2.0</strong> — Auto-fills Workday, Greenhouse, Lever, BambooHR, iCIMS, SmartRecruiters, LinkedIn Easy Apply, and Taleo. Generates tailored cover letters, answers custom questions, and produces matched PDF resumes. Load the <code>extension/</code> folder in Chrome Developer Mode to get started.
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h2>Backend Status</h2>
-        <div style="display:flex;align-items:center;margin-bottom:16px;">
-          <span class="status-dot yellow" id="statusDot"></span>
-          <span class="status-label" id="statusLabel">Checking...</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">API + Dashboard Port</span>
-          <span class="info-value">5000</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">LLM Model</span>
-          <span class="info-value">ai/qwen3-coder</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Ollama URL</span>
-          <span class="info-value">localhost:12434</span>
-        </div>
-        <button class="test-btn" onclick="checkHealth()">Refresh Status</button>
-        <div class="test-result" id="healthResult"></div>
-      </div>
-
-      <div class="card">
-        <h2>API Endpoints</h2>
-        <div class="endpoint">
-          <span class="method GET">GET</span>
-          <div><div class="endpoint-path">/health</div><div class="endpoint-desc">Server health check</div></div>
-        </div>
-        <div class="endpoint">
-          <span class="method POST">POST</span>
-          <div><div class="endpoint-path">/analyze</div><div class="endpoint-desc">JD → match score, skills, tailored summary, selected projects</div></div>
-        </div>
-        <div class="endpoint">
-          <span class="method POST">POST</span>
-          <div><div class="endpoint-path">/autofill</div><div class="endpoint-desc">Form field labels + JD → AI answers dict for every field</div></div>
-        </div>
-        <div class="endpoint">
-          <span class="method POST">POST</span>
-          <div><div class="endpoint-path">/answer-question</div><div class="endpoint-desc">Single open-ended question → profile-grounded AI answer</div></div>
-        </div>
-        <div class="endpoint">
-          <span class="method POST">POST</span>
-          <div><div class="endpoint-path">/cover-letter</div><div class="endpoint-desc">Company + role + JD → full personalized cover letter</div></div>
-        </div>
-        <div class="endpoint">
-          <span class="method POST">POST</span>
-          <div><div class="endpoint-path">/suggest-questions</div><div class="endpoint-desc">Generate FAQ questions for a job posting</div></div>
-        </div>
-        <div class="endpoint">
-          <span class="method POST">POST</span>
-          <div><div class="endpoint-path">/chat</div><div class="endpoint-desc">Chat with AI about the job page</div></div>
-        </div>
-        <div class="endpoint">
-          <span class="method POST">POST</span>
-          <div><div class="endpoint-path">/generate-pdf</div><div class="endpoint-desc">Render tailored LaTeX resume → PDF download</div></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Candidate Profile</h2>
-        <div class="info-row">
-          <span class="info-label">Name</span>
-          <span class="info-value" id="profileName">Loading...</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Location</span>
-          <span class="info-value" id="profileLocation">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Email</span>
-          <span class="info-value" id="profileEmail">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Skills Count</span>
-          <span class="info-value" id="profileSkills">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Projects Count</span>
-          <span class="info-value" id="profileProjects">—</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="ext-section">
-      <h2>Chrome Extension Setup (v2.0)</h2>
-      <ol>
-        <li>Make sure the backend is running (green status above) with Ollama at <code>localhost:12434</code>.</li>
-        <li>Open Chrome → <code>chrome://extensions/</code> → enable <strong>Developer mode</strong>.</li>
-        <li>Click <strong>Load unpacked</strong> → select the <code>extension/</code> folder from this project.</li>
-        <li>Go to the <strong>Auto-Fill</strong> tab in the popup and set the API URL to this server's address.</li>
-        <li>Navigate to a job posting on <strong>Workday, Greenhouse, Lever, BambooHR, iCIMS, SmartRecruiters, LinkedIn Easy Apply,</strong> or <strong>Taleo</strong>.</li>
-        <li>Click <strong>Analyze</strong> to get your match score and best-fit skills.</li>
-        <li>Click <strong>Auto-Fill</strong> — the extension detects all form fields and fills them using your profile + AI.</li>
-        <li>Click <strong>Cover Letter</strong> to generate a personalized letter for that specific company and role.</li>
-        <li>Click <strong>Generate PDF</strong> to download a tailored resume matched to the job description.</li>
-      </ol>
-      <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.85rem;">
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;">
-          <strong style="color:#166534;">Supported Platforms</strong><br>
-          Workday · Greenhouse · Lever · BambooHR · iCIMS · SmartRecruiters · LinkedIn Easy Apply · Taleo
-        </div>
-        <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:12px;">
-          <strong style="color:#854d0e;">Requirements</strong><br>
-          Ollama running locally · Docker + texlive (for PDF) · Chrome browser
-        </div>
-      </div>
-    </div>
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+    <h1>LocalHire Agent <span class="ver">v2.0</span></h1>
   </div>
+  <div class="hdr-actions">
+    <div class="api-pill"><div class="api-dot" id="apiDot"></div><span id="apiTxt">Checking…</span></div>
+    <button class="hdr-btn" id="hdrAdd">＋ Log Application</button>
+  </div>
+</header>
 
-  <script>
-    const API_BASE = window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+<!-- SIDEBAR -->
+<div class="body">
+<nav class="sidebar">
+  <div class="ns">Overview</div>
+  <div class="ni active" data-pg="pg-overview"><span class="ic">📊</span>Dashboard</div>
 
-    async function checkHealth() {
-      const dot = document.getElementById('statusDot');
-      const label = document.getElementById('statusLabel');
-      const result = document.getElementById('healthResult');
-      dot.className = 'status-dot yellow';
-      label.textContent = 'Checking...';
-      try {
-        const res = await fetch(API_BASE + '/health');
-        const data = await res.json();
-        dot.className = 'status-dot green';
-        label.textContent = 'Online';
-        result.style.display = 'block';
-        result.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        dot.className = 'status-dot red';
-        label.textContent = 'Offline';
-        result.style.display = 'block';
-        result.textContent = 'Could not reach backend at ' + API_BASE + '\n' + e.message;
-      }
+  <div class="ns">My Profile</div>
+  <div class="ni" data-pg="pg-contact"><span class="ic">👤</span>Contact Info</div>
+  <div class="ni" data-pg="pg-autofill"><span class="ic">⚡</span>Autofill Data</div>
+  <div class="ni" data-pg="pg-exp"><span class="ic">💼</span>Experience</div>
+  <div class="ni" data-pg="pg-edu"><span class="ic">🎓</span>Education</div>
+  <div class="ni" data-pg="pg-skills"><span class="ic">🛠</span>Skills</div>
+  <div class="ni" data-pg="pg-answers"><span class="ic">💬</span>Common Answers</div>
+
+  <div class="ns">Job Search</div>
+  <div class="ni" data-pg="pg-apps"><span class="ic">📋</span>Applications<span class="nbadge" id="navbadge">0</span></div>
+
+  <div class="ns">System</div>
+  <div class="ni" data-pg="pg-settings"><span class="ic">⚙️</span>Settings</div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- OVERVIEW -->
+<div id="pg-overview" class="pg active">
+  <div class="ph"><h2>Good to see you, <span id="ovName">—</span> 👋</h2><p>Your job search command center</p></div>
+  <div class="sg">
+    <div class="sc blue"><div class="sl">Total Applied</div><div class="sv" id="st-total">0</div><div class="ss">all time</div></div>
+    <div class="sc yellow"><div class="sl">In Progress</div><div class="sv" id="st-active">0</div><div class="ss">active pipeline</div></div>
+    <div class="sc green"><div class="sl">Offers</div><div class="sv" id="st-offers">0</div><div class="ss">congratulations!</div></div>
+    <div class="sc purple"><div class="sl">Response Rate</div><div class="sv" id="st-rate">—</div><div class="ss">screens + interviews</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <div class="card"><div class="ch"><h3>Pipeline Status</h3></div><div class="cb" id="ovPipe" style="display:flex;flex-direction:column;gap:8px"><p style="color:var(--g400);font-size:13px">No applications yet.</p></div></div>
+    <div class="card"><div class="ch"><h3>Recent Applications</h3></div><div class="cb" id="ovRecent" style="display:flex;flex-direction:column;gap:8px"><p style="color:var(--g400);font-size:13px">No applications yet.</p></div></div>
+  </div>
+</div>
+
+<!-- CONTACT -->
+<div id="pg-contact" class="pg">
+  <div class="ph"><h2>Contact Information</h2><p>Your basic details used across all applications</p></div>
+  <div class="card"><div class="ch"><h3>Personal Details</h3></div>
+  <div class="cb">
+    <div class="fg" style="margin-bottom:14px">
+      <div class="fld"><label>Full Name</label><input id="ci-name" type="text"></div>
+      <div class="fld"><label>Email</label><input id="ci-email" type="email"></div>
+      <div class="fld"><label>Phone</label><input id="ci-phone" type="tel"></div>
+      <div class="fld"><label>Location (City, State)</label><input id="ci-loc" type="text"></div>
+      <div class="fld"><label>LinkedIn URL</label><input id="ci-li" type="url"></div>
+      <div class="fld"><label>GitHub URL</label><input id="ci-gh" type="url"></div>
+    </div>
+    <div class="fld ff" style="margin-bottom:14px">
+      <label>Professional Summary</label>
+      <textarea id="ci-sum" rows="4" placeholder="2–3 sentence overview used in cover letters and AI answers"></textarea>
+    </div>
+    <button class="btn bp" id="saveContactBtn">Save Contact Info</button>
+  </div></div>
+</div>
+
+<!-- AUTOFILL -->
+<div id="pg-autofill" class="pg">
+  <div class="ph"><h2>Autofill Data</h2><p>These values fill form fields automatically on every ATS platform</p></div>
+  <div class="card"><div class="ch"><h3>Identity</h3></div><div class="cb">
+    <div class="fg3" style="margin-bottom:12px">
+      <div class="fld"><label>First Name</label><input id="af-fn" type="text"></div>
+      <div class="fld"><label>Last Name</label><input id="af-ln" type="text"></div>
+      <div class="fld"><label>Full Name</label><input id="af-full" type="text"></div>
+    </div>
+    <div class="fg3">
+      <div class="fld"><label>Email</label><input id="af-em" type="email"></div>
+      <div class="fld"><label>Phone</label><input id="af-ph" type="tel"></div>
+      <div class="fld"><label>Pronouns</label><input id="af-pro" type="text" placeholder="He/Him"></div>
+    </div>
+  </div></div>
+  <div class="card"><div class="ch"><h3>Location</h3></div><div class="cb">
+    <div class="fg3">
+      <div class="fld"><label>City</label><input id="af-city" type="text"></div>
+      <div class="fld"><label>State (abbr.)</label><input id="af-st" type="text" placeholder="TX"></div>
+      <div class="fld"><label>Zip</label><input id="af-zip" type="text"></div>
+      <div class="fld"><label>Country</label><input id="af-ctry" type="text" placeholder="United States"></div>
+      <div class="fld"><label>Address Line 1</label><input id="af-a1" type="text"></div>
+    </div>
+  </div></div>
+  <div class="card"><div class="ch"><h3>Work Authorization &amp; Preferences</h3></div><div class="cb">
+    <div class="fg3">
+      <div class="fld"><label>Work Authorization</label><select id="af-wa"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+      <div class="fld"><label>Requires Sponsorship</label><select id="af-sp"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+      <div class="fld"><label>Visa Status</label><input id="af-vis" type="text" placeholder="F-1 OPT"></div>
+      <div class="fld"><label>Willing to Relocate</label><select id="af-rel"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+      <div class="fld"><label>Notice Period</label><input id="af-ntp" type="text" placeholder="2 weeks"></div>
+      <div class="fld"><label>Start Date</label><input id="af-sdt" type="text" placeholder="Immediately"></div>
+    </div>
+  </div></div>
+  <div class="card"><div class="ch"><h3>Career &amp; Compensation</h3></div><div class="cb">
+    <div class="fg3">
+      <div class="fld"><label>Current Company</label><input id="af-cco" type="text"></div>
+      <div class="fld"><label>Current Title</label><input id="af-cti" type="text"></div>
+      <div class="fld"><label>Years of Experience</label><input id="af-yoe" type="text"></div>
+      <div class="fld"><label>Desired Role</label><input id="af-dro" type="text"></div>
+      <div class="fld"><label>Salary Expectation</label><input id="af-sal" type="text" placeholder="120000"></div>
+      <div class="fld"><label>Salary Min</label><input id="af-smn" type="text"></div>
+      <div class="fld"><label>Salary Max</label><input id="af-smx" type="text"></div>
+    </div>
+  </div></div>
+  <div class="card"><div class="ch"><h3>Education &amp; EEO</h3></div><div class="cb">
+    <div class="fg3">
+      <div class="fld"><label>Highest Degree</label><input id="af-deg" type="text"></div>
+      <div class="fld"><label>University</label><input id="af-uni" type="text"></div>
+      <div class="fld"><label>Graduation Year</label><input id="af-gyr" type="text"></div>
+      <div class="fld"><label>Gender</label><input id="af-gen" type="text" placeholder="Male"></div>
+      <div class="fld"><label>Ethnicity</label><input id="af-eth" type="text" placeholder="Asian"></div>
+      <div class="fld"><label>Veteran Status</label><input id="af-vet" type="text" placeholder="I am not a protected veteran"></div>
+      <div class="fld"><label>Disability Status</label><input id="af-dis" type="text" placeholder="I don't wish to answer"></div>
+    </div>
+  </div></div>
+  <button class="btn bp" id="saveAutofillBtn">Save Autofill Data</button>
+</div>
+
+<!-- EXPERIENCE -->
+<div id="pg-exp" class="pg">
+  <div class="ph"><h2>Work Experience</h2><p>Your jobs are used to tailor resumes and answer interview questions</p></div>
+  <div id="expList"></div>
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <button class="btn bo" id="addExpBtn">＋ Add Role</button>
+    <button class="btn bp" id="saveExpBtn">Save Experience</button>
+  </div>
+</div>
+
+<!-- EDUCATION -->
+<div id="pg-edu" class="pg">
+  <div class="ph"><h2>Education</h2><p>Degrees and certifications shown on your resume</p></div>
+  <div id="eduList"></div>
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <button class="btn bo" id="addEduBtn">＋ Add Degree</button>
+    <button class="btn bp" id="saveEduBtn">Save Education</button>
+  </div>
+</div>
+
+<!-- SKILLS -->
+<div id="pg-skills" class="pg">
+  <div class="ph"><h2>Skills</h2><p>Used for keyword matching and resume tailoring. Type a skill and press Enter.</p></div>
+  <div class="card"><div class="ch"><h3>Programming Languages</h3></div><div class="cb"><div class="tiw" id="sk-languages"></div></div></div>
+  <div class="card"><div class="ch"><h3>Frameworks &amp; Libraries</h3></div><div class="cb"><div class="tiw" id="sk-frameworks"></div></div></div>
+  <div class="card"><div class="ch"><h3>Tools &amp; Platforms</h3></div><div class="cb"><div class="tiw" id="sk-tools"></div></div></div>
+  <div class="card"><div class="ch"><h3>Databases</h3></div><div class="cb"><div class="tiw" id="sk-databases"></div></div></div>
+  <div class="card"><div class="ch"><h3>AI / ML Domains</h3></div><div class="cb"><div class="tiw" id="sk-domains"></div></div></div>
+  <button class="btn bp" id="saveSkillsBtn">Save Skills</button>
+</div>
+
+<!-- COMMON ANSWERS -->
+<div id="pg-answers" class="pg">
+  <div class="ph"><h2>Common Answers</h2><p>Pre-written responses for frequently asked application &amp; interview questions</p></div>
+  <div class="card"><div class="cb"><div class="qag" id="answersGrid"></div>
+    <button class="btn bp" id="saveAnswersBtn" style="margin-top:16px">Save Answers</button>
+  </div></div>
+</div>
+
+<!-- APPLICATIONS -->
+<div id="pg-apps" class="pg">
+  <div class="ph"><h2>Application Tracker</h2><p>Every job you've applied to, with status and notes</p></div>
+  <div class="pipe">
+    <div class="pcol ca"><div class="pl">Applied</div><div class="pn" id="pc-a">0</div></div>
+    <div class="pcol cs"><div class="pl">Phone Screen</div><div class="pn" id="pc-s">0</div></div>
+    <div class="pcol ci"><div class="pl">Interview</div><div class="pn" id="pc-i">0</div></div>
+    <div class="pcol co"><div class="pl">Offer</div><div class="pn" id="pc-o">0</div></div>
+    <div class="pcol cx"><div class="pl">Rejected</div><div class="pn" id="pc-r">0</div></div>
+    <div class="pcol cw"><div class="pl">Other</div><div class="pn" id="pc-w">0</div></div>
+  </div>
+  <div class="tb">
+    <input type="text" id="appSearch" placeholder="🔍  Search company, role…">
+    <select id="appFiltSt"><option value="">All Statuses</option><option>Applied</option><option>Phone Screen</option><option>Interview</option><option>Offer</option><option>Rejected</option><option>Withdrawn</option></select>
+    <select id="appFiltPl"><option value="">All Platforms</option><option>Greenhouse</option><option>Workday</option><option>Lever</option><option>BambooHR</option><option>iCIMS</option><option>SmartRecruiters</option><option>LinkedIn Easy Apply</option><option>Taleo</option><option>Other</option></select>
+    <div class="mla"><button class="btn bp" id="addAppBtn">＋ Log Application</button></div>
+  </div>
+  <div class="card"><table class="at">
+    <thead><tr><th>Company</th><th>Role</th><th>Platform</th><th>Status</th><th>Applied</th><th>Salary</th><th>Actions</th></tr></thead>
+    <tbody id="appTbody"><tr><td colspan="7" style="text-align:center;color:var(--g400);padding:32px">No applications yet. Click "Log Application" to add one.</td></tr></tbody>
+  </table></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="pg-settings" class="pg">
+  <div class="ph"><h2>Settings</h2><p>Backend connection and AI model configuration</p></div>
+  <div class="card" style="max-width:500px"><div class="ch"><h3>Backend &amp; AI</h3></div><div class="cb" style="display:flex;flex-direction:column;gap:14px">
+    <div class="fld"><label>API URL</label><input id="set-url" type="text" placeholder="http://127.0.0.1:5000"><div class="fhint">Address where your LocalHire backend is running</div></div>
+    <div class="fld"><label>AI Model</label><select id="set-llm"><option value="ollama">Ollama (Local — ai/qwen3-coder)</option><option value="claude">Claude (API Key required)</option></select></div>
+    <div class="fld" id="set-ckrow" style="display:none"><label>Anthropic API Key</label><input id="set-ck" type="password" placeholder="sk-ant-api03-…"></div>
+    <button class="btn bp" id="saveSettingsBtn">Save Settings</button>
+  </div></div>
+</div>
+
+</main>
+</div>
+
+<!-- ADD APPLICATION MODAL -->
+<div class="mo" id="appModal">
+  <div class="md">
+    <div class="mh"><h3 id="modalTitle">Log New Application</h3><button class="mc" id="closeModal">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fld"><label>Company *</label><input id="m-co" type="text" placeholder="Google"></div>
+        <div class="fld"><label>Role / Title *</label><input id="m-ro" type="text" placeholder="AI Engineer"></div>
+        <div class="fld"><label>Platform</label>
+          <select id="m-pl"><option value="Other">Other</option><option>Greenhouse</option><option>Workday</option><option>Lever</option><option>BambooHR</option><option>iCIMS</option><option>SmartRecruiters</option><option>LinkedIn Easy Apply</option><option>Taleo</option></select>
+        </div>
+        <div class="fld"><label>Status</label>
+          <select id="m-st"><option value="Applied">Applied</option><option value="Phone Screen">Phone Screen</option><option value="Interview">Interview</option><option value="Offer">Offer</option><option value="Rejected">Rejected</option><option value="Withdrawn">Withdrawn</option></select>
+        </div>
+        <div class="fld"><label>Date Applied</label><input id="m-dt" type="date"></div>
+        <div class="fld"><label>Salary / Range</label><input id="m-sal" type="text" placeholder="$120k–$150k"></div>
+        <div class="fld"><label>Location</label><input id="m-loc" type="text" placeholder="Remote / Houston, TX"></div>
+        <div class="fld"><label>Job URL</label><input id="m-url" type="url" placeholder="https://…"></div>
+        <div class="fld ff"><label>Notes</label><textarea id="m-nts" rows="2" placeholder="Interview date, recruiter name, etc."></textarea></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn bo" id="cancelModal">Cancel</button><button class="btn bp" id="saveModal">Save Application</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── STATE ────────────────────────────────────────
+let profile = {}, apps = [], editId = null;
+let skillsData = {};
+
+const DEF_API = 'http://127.0.0.1:5000';
+function apiBase(){ return localStorage.getItem('lh_api') || DEF_API; }
+
+// ── UTILS ────────────────────────────────────────
+function toast(msg, type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=(type==='ok'?'✓ ':'✗ ')+msg;
+  t.className='show '+type; clearTimeout(t._t);
+  t._t=setTimeout(()=>t.className='',2800);
+}
+async function api(path, opts={}){
+  const r=await fetch(apiBase()+path,{headers:{'Content-Type':'application/json'},...opts});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function fmtDate(d){ return d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'; }
+
+// ── NAV ──────────────────────────────────────────
+document.querySelectorAll('.ni').forEach(n=>{
+  n.addEventListener('click',()=>{
+    document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.pg').forEach(x=>x.classList.remove('active'));
+    n.classList.add('active');
+    const pg=document.getElementById(n.dataset.pg);
+    if(pg) pg.classList.add('active');
+  });
+});
+
+// ── API STATUS ───────────────────────────────────
+async function checkApi(){
+  const dot=document.getElementById('apiDot'), txt=document.getElementById('apiTxt');
+  try{ await api('/health'); dot.classList.remove('off'); txt.textContent='Backend Online'; }
+  catch{ dot.classList.add('off'); txt.textContent='Backend Offline'; }
+}
+
+// ── LOAD PROFILE ─────────────────────────────────
+async function loadProfile(){
+  try{
+    profile=await api('/profile');
+    fillContact(); fillAutofill(); fillExp(); fillEdu(); fillSkills(); fillAnswers();
+    const n=(profile.contact_info?.name||'').split(' ')[0];
+    document.getElementById('ovName').textContent=n||'there';
+  } catch(e){ toast('Could not load profile','err'); }
+}
+
+// ── CONTACT ──────────────────────────────────────
+function fillContact(){
+  const c=profile.contact_info||{};
+  ['name','email','phone','location','linkedin','github'].forEach(k=>{
+    const el=document.getElementById('ci-'+k.slice(0,2+(k==='linkedin'?5:k==='github'?2:1)));
+    if(!el) return;
+  });
+  document.getElementById('ci-name').value=c.name||'';
+  document.getElementById('ci-email').value=c.email||'';
+  document.getElementById('ci-phone').value=c.phone||'';
+  document.getElementById('ci-loc').value=c.location||'';
+  document.getElementById('ci-li').value=c.linkedin||'';
+  document.getElementById('ci-gh').value=c.github||'';
+  document.getElementById('ci-sum').value=profile.summary||'';
+}
+document.getElementById('saveContactBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('saveContactBtn');
+  btn.disabled=true; btn.textContent='Saving…';
+  try{
+    await api('/profile/contact',{method:'PUT',body:JSON.stringify({
+      contact_info:{
+        name:document.getElementById('ci-name').value.trim(),
+        email:document.getElementById('ci-email').value.trim(),
+        phone:document.getElementById('ci-phone').value.trim(),
+        location:document.getElementById('ci-loc').value.trim(),
+        linkedin:document.getElementById('ci-li').value.trim(),
+        github:document.getElementById('ci-gh').value.trim(),
+      },
+      summary:document.getElementById('ci-sum').value.trim()
+    })});
+    toast('Contact info saved!');
+    await loadProfile();
+  } catch(e){toast('Save failed: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Save Contact Info';}
+});
+
+// ── AUTOFILL ─────────────────────────────────────
+function fillAutofill(){
+  const a=profile.autofill||{};
+  const mp={
+    'af-fn':'first_name','af-ln':'last_name','af-full':'full_name',
+    'af-em':'email','af-ph':'phone','af-pro':'pronouns',
+    'af-city':'city','af-st':'state','af-zip':'zip','af-ctry':'country','af-a1':'address_line1',
+    'af-wa':'work_authorization','af-sp':'requires_sponsorship','af-rel':'willing_to_relocate',
+    'af-vis':'visa_status','af-ntp':'notice_period','af-sdt':'start_date',
+    'af-cco':'current_company','af-cti':'current_title','af-yoe':'years_of_experience',
+    'af-dro':'desired_role','af-sal':'salary_expectation','af-smn':'salary_min','af-smx':'salary_max',
+    'af-deg':'highest_degree','af-uni':'university','af-gyr':'graduation_year',
+    'af-gen':'gender','af-eth':'ethnicity','af-vet':'veteran_status','af-dis':'disability_status'
+  };
+  Object.entries(mp).forEach(([id,key])=>{
+    const el=document.getElementById(id);
+    if(el && a[key]!==undefined) el.value=a[key];
+  });
+}
+document.getElementById('saveAutofillBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('saveAutofillBtn'); btn.disabled=true; btn.textContent='Saving…';
+  const g=id=>document.getElementById(id)?.value?.trim()||'';
+  try{
+    await api('/profile/autofill',{method:'PUT',body:JSON.stringify({autofill:{
+      first_name:g('af-fn'),last_name:g('af-ln'),full_name:g('af-full'),
+      email:g('af-em'),phone:g('af-ph'),pronouns:g('af-pro'),
+      city:g('af-city'),state:g('af-st'),zip:g('af-zip'),country:g('af-ctry'),address_line1:g('af-a1'),
+      work_authorization:g('af-wa'),requires_sponsorship:g('af-sp'),willing_to_relocate:g('af-rel'),
+      visa_status:g('af-vis'),notice_period:g('af-ntp'),start_date:g('af-sdt'),
+      current_company:g('af-cco'),current_title:g('af-cti'),years_of_experience:g('af-yoe'),
+      desired_role:g('af-dro'),salary_expectation:g('af-sal'),salary_min:g('af-smn'),salary_max:g('af-smx'),
+      highest_degree:g('af-deg'),university:g('af-uni'),graduation_year:g('af-gyr'),
+      gender:g('af-gen'),ethnicity:g('af-eth'),veteran_status:g('af-vet'),disability_status:g('af-dis'),
+    }})});
+    toast('Autofill data saved!');
+  } catch(e){toast('Save failed: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Save Autofill Data';}
+});
+
+// ── EXPERIENCE ────────────────────────────────────
+let expData=[];
+function fillExp(){ expData=JSON.parse(JSON.stringify(profile.experience||[])); renderExp(); }
+function renderExp(){
+  const c=document.getElementById('expList'); c.innerHTML='';
+  expData.forEach((e,i)=>{
+    const d=document.createElement('div'); d.className='ic';
+    d.innerHTML=`
+      <div class="ich">
+        <div><div class="ict exp-title-${i}">${e.role||'New Role'}</div><div class="ics">${e.company||''} · ${e.duration||''}</div></div>
+        <div style="display:flex;gap:6px"><button class="btn bo bsm mv-exp" data-dir="-1" data-i="${i}" title="Move up">↑</button><button class="btn bo bsm mv-exp" data-dir="1" data-i="${i}" title="Move down">↓</button><button class="btn bd bsm rm-exp" data-i="${i}">✕ Remove</button></div>
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <div class="fld"><label>Role / Title</label><input class="e-role" data-i="${i}" value="${(e.role||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fld"><label>Company</label><input class="e-co" data-i="${i}" value="${(e.company||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fld"><label>Duration</label><input class="e-dur" data-i="${i}" value="${(e.duration||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fld"><label>Location</label><input class="e-loc" data-i="${i}" value="${(e.location||'').replace(/"/g,'&quot;')}"></div>
+      </div>
+      <div class="fld"><label>Bullet Points</label><ul class="bul" id="bul-${i}"></ul><button class="addb addb-exp" data-i="${i}">＋ Add bullet</button></div>`;
+    c.appendChild(d);
+    renderBullets(i, e.details||[]);
+  });
+  c.querySelectorAll('.rm-exp').forEach(b=>b.addEventListener('click',()=>{expData.splice(+b.dataset.i,1);renderExp();}));
+  c.querySelectorAll('.mv-exp').forEach(b=>b.addEventListener('click',()=>{
+    const i=+b.dataset.i, d=+b.dataset.dir, j=i+d;
+    if(j<0||j>=expData.length) return;
+    [expData[i],expData[j]]=[expData[j],expData[i]]; renderExp();
+  }));
+  c.querySelectorAll('.e-role').forEach(el=>el.addEventListener('input',e=>{expData[+e.target.dataset.i].role=e.target.value; document.querySelector(`.exp-title-${e.target.dataset.i}`).textContent=e.target.value||'New Role';}));
+  c.querySelectorAll('.e-co').forEach(el=>el.addEventListener('input',e=>expData[+e.target.dataset.i].company=e.target.value));
+  c.querySelectorAll('.e-dur').forEach(el=>el.addEventListener('input',e=>expData[+e.target.dataset.i].duration=e.target.value));
+  c.querySelectorAll('.e-loc').forEach(el=>el.addEventListener('input',e=>expData[+e.target.dataset.i].location=e.target.value));
+  c.querySelectorAll('.addb-exp').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.i;if(!expData[i].details)expData[i].details=[];expData[i].details.push('');renderBullets(i,expData[i].details);}));
+}
+function renderBullets(ei,bullets){
+  const ul=document.getElementById('bul-'+ei); if(!ul) return; ul.innerHTML='';
+  bullets.forEach((bul,bi)=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<input type="text" value="${bul.replace(/"/g,'&quot;')}" placeholder="Achievement or responsibility…"><button class="rmb" title="Remove">✕</button>`;
+    li.querySelector('input').addEventListener('input',e=>{expData[ei].details[bi]=e.target.value;});
+    li.querySelector('.rmb').addEventListener('click',()=>{expData[ei].details.splice(bi,1);renderBullets(ei,expData[ei].details);});
+    ul.appendChild(li);
+  });
+}
+document.getElementById('addExpBtn').addEventListener('click',()=>{
+  expData.push({role:'',company:'',duration:'',location:'',details:['']});
+  renderExp(); document.getElementById('expList').lastElementChild?.scrollIntoView({behavior:'smooth'});
+});
+document.getElementById('saveExpBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('saveExpBtn'); btn.disabled=true; btn.textContent='Saving…';
+  try{await api('/profile/experience',{method:'PUT',body:JSON.stringify({experience:expData})});toast('Experience saved!');}
+  catch(e){toast('Save failed: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Save Experience';}
+});
+
+// ── EDUCATION ────────────────────────────────────
+let eduData=[];
+function fillEdu(){ eduData=JSON.parse(JSON.stringify(profile.education||[])); renderEdu(); }
+function renderEdu(){
+  const c=document.getElementById('eduList'); c.innerHTML='';
+  eduData.forEach((e,i)=>{
+    const d=document.createElement('div'); d.className='ic';
+    d.innerHTML=`
+      <div class="ich">
+        <div><div class="ict">${e.degree||'New Degree'}</div><div class="ics">${e.university||''}</div></div>
+        <button class="btn bd bsm rm-edu" data-i="${i}">✕ Remove</button>
+      </div>
+      <div class="fg">
+        <div class="fld"><label>Degree</label><input class="ed-deg" data-i="${i}" value="${(e.degree||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fld"><label>University</label><input class="ed-uni" data-i="${i}" value="${(e.university||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fld"><label>Graduation Date</label><input class="ed-grd" data-i="${i}" value="${(e.graduation_date||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fld"><label>GPA (optional)</label><input class="ed-gpa" data-i="${i}" value="${(e.gpa||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fld ff"><label>Details / Coursework</label><input class="ed-det" data-i="${i}" value="${(e.details||'').replace(/"/g,'&quot;')}"></div>
+      </div>`;
+    c.appendChild(d);
+  });
+  c.querySelectorAll('.rm-edu').forEach(b=>b.addEventListener('click',()=>{eduData.splice(+b.dataset.i,1);renderEdu();}));
+  c.querySelectorAll('.ed-deg').forEach(el=>el.addEventListener('input',e=>eduData[+e.target.dataset.i].degree=e.target.value));
+  c.querySelectorAll('.ed-uni').forEach(el=>el.addEventListener('input',e=>eduData[+e.target.dataset.i].university=e.target.value));
+  c.querySelectorAll('.ed-grd').forEach(el=>el.addEventListener('input',e=>eduData[+e.target.dataset.i].graduation_date=e.target.value));
+  c.querySelectorAll('.ed-gpa').forEach(el=>el.addEventListener('input',e=>eduData[+e.target.dataset.i].gpa=e.target.value));
+  c.querySelectorAll('.ed-det').forEach(el=>el.addEventListener('input',e=>eduData[+e.target.dataset.i].details=e.target.value));
+}
+document.getElementById('addEduBtn').addEventListener('click',()=>{
+  eduData.push({degree:'',university:'',graduation_date:'',details:''});
+  renderEdu(); document.getElementById('eduList').lastElementChild?.scrollIntoView({behavior:'smooth'});
+});
+document.getElementById('saveEduBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('saveEduBtn'); btn.disabled=true; btn.textContent='Saving…';
+  try{await api('/profile/education',{method:'PUT',body:JSON.stringify({education:eduData})});toast('Education saved!');}
+  catch(e){toast('Save failed: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Save Education';}
+});
+
+// ── SKILLS ───────────────────────────────────────
+function fillSkills(){ skillsData=JSON.parse(JSON.stringify(profile.skills||{})); ['languages','frameworks','tools','databases','domains'].forEach(cat=>renderTags('sk-'+cat,skillsData[cat]||[])); }
+function renderTags(wid, tags){
+  const w=document.getElementById(wid); if(!w) return;
+  w.innerHTML='';
+  tags.forEach((t,i)=>{
+    const s=document.createElement('span'); s.className='stag';
+    const cat=wid.replace('sk-','');
+    s.innerHTML=`${t} <button data-i="${i}" data-cat="${cat}">✕</button>`;
+    s.querySelector('button').addEventListener('click',e=>{
+      const ct=e.target.dataset.cat; skillsData[ct].splice(+e.target.dataset.i,1); renderTags('sk-'+ct,skillsData[ct]);
+    });
+    w.appendChild(s);
+  });
+  const inp=document.createElement('input'); inp.className='tinput'; inp.placeholder='Type + Enter…';
+  inp.addEventListener('keydown',e=>{
+    const cat=wid.replace('sk-','');
+    if((e.key==='Enter'||e.key===',')&&inp.value.trim()){
+      e.preventDefault(); const v=inp.value.trim().replace(/,$/,'');
+      if(v){if(!skillsData[cat])skillsData[cat]=[];skillsData[cat].push(v);renderTags(wid,skillsData[cat]);}
     }
+    if(e.key==='Backspace'&&!inp.value&&tags.length){skillsData[cat].pop();renderTags(wid,skillsData[cat]);}
+  });
+  w.addEventListener('click',()=>inp.focus()); w.appendChild(inp);
+}
+document.getElementById('saveSkillsBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('saveSkillsBtn'); btn.disabled=true; btn.textContent='Saving…';
+  try{await api('/profile/skills',{method:'PUT',body:JSON.stringify({skills:skillsData})});toast('Skills saved!');}
+  catch(e){toast('Save failed: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Save Skills';}
+});
 
-    async function loadProfile() {
-      try {
-        const res = await fetch(API_BASE + '/profile');
-        const data = await res.json();
-        document.getElementById('profileName').textContent = data.contact_info?.name || '—';
-        document.getElementById('profileLocation').textContent = data.contact_info?.location || '—';
-        document.getElementById('profileEmail').textContent = data.contact_info?.email || '—';
-        document.getElementById('profileSkills').textContent = data.skills_count ?? '—';
-        document.getElementById('profileProjects').textContent = data.projects_count ?? '—';
-      } catch (e) {
-        document.getElementById('profileName').textContent = 'Backend offline';
-      }
-    }
+// ── COMMON ANSWERS ───────────────────────────────
+const QMAP={
+  why_this_company:'Why this company?',why_this_role:'Why this role?',
+  greatest_strength:'Greatest strength',greatest_weakness:'Greatest weakness',
+  five_year_plan:'5-year plan',describe_yourself:'Describe yourself',
+  biggest_achievement:'Biggest achievement',team_or_solo:'Team vs. solo',
+  handling_pressure:'Handling pressure',remote_work_experience:'Remote work experience'
+};
+function fillAnswers(){
+  const g=document.getElementById('answersGrid'); g.innerHTML='';
+  const ca=profile.common_answers||{};
+  Object.entries(QMAP).forEach(([k,lbl])=>{
+    const d=document.createElement('div'); d.className='qai';
+    d.innerHTML=`<label>${lbl}</label><textarea id="qa-${k}" rows="3">${ca[k]||''}</textarea>`;
+    g.appendChild(d);
+  });
+}
+document.getElementById('saveAnswersBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('saveAnswersBtn'); btn.disabled=true; btn.textContent='Saving…';
+  const ans={};
+  Object.keys(QMAP).forEach(k=>{ans[k]=document.getElementById('qa-'+k)?.value?.trim()||'';});
+  try{await api('/profile/answers',{method:'PUT',body:JSON.stringify({common_answers:ans})});toast('Answers saved!');}
+  catch(e){toast('Save failed: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Save Answers';}
+});
 
-    checkHealth();
-    loadProfile();
-  </script>
+// ── APPLICATIONS ──────────────────────────────────
+async function loadApps(){
+  try{apps=await api('/applications');}catch{apps=[];}
+  renderApps(); updateOverview();
+  document.getElementById('navbadge').textContent=apps.length;
+}
+
+const SCL={'Applied':'sa','Phone Screen':'ss2','Interview':'si','Offer':'so','Rejected':'sr','Withdrawn':'sw'};
+
+function renderApps(){
+  const srch=(document.getElementById('appSearch')?.value||'').toLowerCase();
+  const fst=document.getElementById('appFiltSt')?.value||'';
+  const fpl=document.getElementById('appFiltPl')?.value||'';
+  let rows=[...apps].filter(a=>{
+    const t=`${a.company} ${a.role} ${a.platform}`.toLowerCase();
+    return(!srch||t.includes(srch))&&(!fst||a.status===fst)&&(!fpl||a.platform===fpl);
+  }).sort((a,b)=>new Date(b.date_applied||0)-new Date(a.date_applied||0));
+
+  const tb=document.getElementById('appTbody');
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--g400);padding:32px">No applications match your filter.</td></tr>`;updatePipe();return;}
+
+  tb.innerHTML=rows.map(a=>`<tr data-id="${a.id}">
+    <td><strong>${a.company}</strong>${a.url?` <a href="${a.url}" target="_blank" style="color:var(--brand);font-size:11px;margin-left:4px" title="Open job posting">↗</a>`:''}
+      ${a.notes?`<div style="font-size:11px;color:var(--g400);margin-top:2px">${a.notes.slice(0,60)}${a.notes.length>60?'…':''}</div>`:''}
+    </td>
+    <td>${a.role}</td>
+    <td><span class="pc">${a.platform||'—'}</span></td>
+    <td><select class="sst" data-id="${a.id}" style="border:1px solid var(--g200);border-radius:6px;padding:3px 7px;font-size:12px;cursor:pointer;background:#fff">
+      ${['Applied','Phone Screen','Interview','Offer','Rejected','Withdrawn'].map(s=>`<option value="${s}"${s===a.status?' selected':''}>${s}</option>`).join('')}
+    </select></td>
+    <td style="color:var(--g500);font-size:12.5px;white-space:nowrap">${fmtDate(a.date_applied)}</td>
+    <td style="font-size:12.5px">${a.salary||'—'}</td>
+    <td><div style="display:flex;gap:5px">
+      <button class="btn bo bsm ea" data-id="${a.id}">Edit</button>
+      <button class="btn bd bsm da" data-id="${a.id}">✕</button>
+    </div></td>
+  </tr>`).join('');
+
+  tb.querySelectorAll('.sst').forEach(sel=>sel.addEventListener('change',async e=>{
+    const id=e.target.dataset.id;
+    await api('/applications/'+id,{method:'PATCH',body:JSON.stringify({status:e.target.value})});
+    apps.find(a=>a.id===id).status=e.target.value;
+    updatePipe(); updateOverview(); toast('Status updated');
+  }));
+  tb.querySelectorAll('.ea').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.id)));
+  tb.querySelectorAll('.da').forEach(b=>b.addEventListener('click',()=>delApp(b.dataset.id)));
+  updatePipe();
+}
+
+function updatePipe(){
+  const c={'Applied':0,'Phone Screen':0,'Interview':0,'Offer':0,'Rejected':0,other:0};
+  apps.forEach(a=>{if(c[a.status]!==undefined)c[a.status]++;else c.other++;});
+  document.getElementById('pc-a').textContent=c['Applied'];
+  document.getElementById('pc-s').textContent=c['Phone Screen'];
+  document.getElementById('pc-i').textContent=c['Interview'];
+  document.getElementById('pc-o').textContent=c['Offer'];
+  document.getElementById('pc-r').textContent=c['Rejected'];
+  document.getElementById('pc-w').textContent=c.other;
+}
+
+function updateOverview(){
+  const total=apps.length;
+  const active=apps.filter(a=>['Applied','Phone Screen','Interview'].includes(a.status)).length;
+  const offers=apps.filter(a=>a.status==='Offer').length;
+  const responded=apps.filter(a=>['Phone Screen','Interview','Offer'].includes(a.status)).length;
+  document.getElementById('st-total').textContent=total;
+  document.getElementById('st-active').textContent=active;
+  document.getElementById('st-offers').textContent=offers;
+  document.getElementById('st-rate').textContent=total>0?Math.round(responded/total*100)+'%':'—';
+
+  const last5=[...apps].sort((a,b)=>new Date(b.date_applied||0)-new Date(a.date_applied||0)).slice(0,5);
+  const rec=document.getElementById('ovRecent');
+  rec.innerHTML=last5.length?last5.map(a=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--g100)">
+      <div><div style="font-size:13px;font-weight:600">${a.company}</div><div style="font-size:11.5px;color:var(--g500)">${a.role}</div></div>
+      <span class="sb ${SCL[a.status]||'sa'}">${a.status}</span>
+    </div>`).join(''):
+    '<p style="color:var(--g400);font-size:13px">No applications yet.</p>';
+
+  const pipe=document.getElementById('ovPipe');
+  const sc={};apps.forEach(a=>{sc[a.status]=(sc[a.status]||0)+1;});
+  const stgs=[{l:'Applied',c:'sa'},{l:'Phone Screen',c:'ss2'},{l:'Interview',c:'si'},{l:'Offer',c:'so'},{l:'Rejected',c:'sr'}];
+  pipe.innerHTML=Object.keys(sc).length?stgs.map(s=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0">
+      <span class="sb ${s.c}">${s.l}</span><strong style="font-size:14px">${sc[s.l]||0}</strong>
+    </div>`).join(''):
+    '<p style="color:var(--g400);font-size:13px">No applications yet.</p>';
+}
+
+// ── MODAL ─────────────────────────────────────────
+function openAdd(){
+  editId=null;
+  document.getElementById('modalTitle').textContent='Log New Application';
+  ['m-co','m-ro','m-sal','m-loc','m-url','m-nts'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('m-pl').value='Other';
+  document.getElementById('m-st').value='Applied';
+  document.getElementById('m-dt').value=new Date().toISOString().split('T')[0];
+  document.getElementById('appModal').classList.add('open');
+  setTimeout(()=>document.getElementById('m-co').focus(),50);
+}
+function openEdit(id){
+  const a=apps.find(x=>x.id===id); if(!a) return;
+  editId=id;
+  document.getElementById('modalTitle').textContent='Edit Application';
+  document.getElementById('m-co').value=a.company||'';
+  document.getElementById('m-ro').value=a.role||'';
+  document.getElementById('m-pl').value=a.platform||'Other';
+  document.getElementById('m-st').value=a.status||'Applied';
+  document.getElementById('m-dt').value=a.date_applied||'';
+  document.getElementById('m-sal').value=a.salary||'';
+  document.getElementById('m-loc').value=a.location||'';
+  document.getElementById('m-url').value=a.url||'';
+  document.getElementById('m-nts').value=a.notes||'';
+  document.getElementById('appModal').classList.add('open');
+}
+function closeModal(){ document.getElementById('appModal').classList.remove('open'); }
+document.getElementById('closeModal').addEventListener('click',closeModal);
+document.getElementById('cancelModal').addEventListener('click',closeModal);
+document.getElementById('appModal').addEventListener('click',e=>{if(e.target===document.getElementById('appModal'))closeModal();});
+document.getElementById('addAppBtn').addEventListener('click',openAdd);
+document.getElementById('hdrAdd').addEventListener('click',openAdd);
+
+document.getElementById('saveModal').addEventListener('click',async()=>{
+  const co=document.getElementById('m-co').value.trim();
+  const ro=document.getElementById('m-ro').value.trim();
+  if(!co||!ro){toast('Company and role are required','err');return;}
+  const payload={company:co,role:ro,
+    platform:document.getElementById('m-pl').value,status:document.getElementById('m-st').value,
+    date_applied:document.getElementById('m-dt').value,salary:document.getElementById('m-sal').value.trim(),
+    location:document.getElementById('m-loc').value.trim(),url:document.getElementById('m-url').value.trim(),
+    notes:document.getElementById('m-nts').value.trim()};
+  try{
+    if(editId) await api('/applications/'+editId,{method:'PATCH',body:JSON.stringify(payload)});
+    else await api('/applications',{method:'POST',body:JSON.stringify(payload)});
+    toast(editId?'Application updated!':'Application logged!');
+    closeModal(); await loadApps();
+  } catch(e){toast('Save failed: '+e.message,'err');}
+});
+
+async function delApp(id){
+  if(!confirm('Delete this application?')) return;
+  try{await api('/applications/'+id,{method:'DELETE'});toast('Removed');await loadApps();}
+  catch(e){toast('Delete failed: '+e.message,'err');}
+}
+
+document.getElementById('appSearch').addEventListener('input',renderApps);
+document.getElementById('appFiltSt').addEventListener('change',renderApps);
+document.getElementById('appFiltPl').addEventListener('change',renderApps);
+
+// ── SETTINGS ─────────────────────────────────────
+function loadSettings(){
+  document.getElementById('set-url').value=localStorage.getItem('lh_api')||DEF_API;
+  const llm=localStorage.getItem('lh_llm')||'ollama';
+  document.getElementById('set-llm').value=llm;
+  if(llm==='claude') document.getElementById('set-ckrow').style.display='';
+}
+document.getElementById('set-llm').addEventListener('change',e=>{
+  document.getElementById('set-ckrow').style.display=e.target.value==='claude'?'':'none';
+});
+document.getElementById('saveSettingsBtn').addEventListener('click',async()=>{
+  const url=document.getElementById('set-url').value.trim();
+  const llm=document.getElementById('set-llm').value;
+  const key=document.getElementById('set-ck').value.trim();
+  localStorage.setItem('lh_api',url||DEF_API); localStorage.setItem('lh_llm',llm);
+  if(llm==='claude'&&key){
+    try{await fetch(url+'/set-claude-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});}catch{}
+  }
+  toast('Settings saved!'); checkApi();
+});
+
+// ── INIT ──────────────────────────────────────────
+async function init(){
+  loadSettings(); checkApi(); await Promise.all([loadProfile(),loadApps()]);
+}
+init(); setInterval(checkApi,30000);
+</script>
 </body>
 </html>

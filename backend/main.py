@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
+import uuid
+from datetime import date as _date
 from pydantic import BaseModel
 import requests as http_requests
 import json
@@ -261,12 +263,11 @@ def health_check():
 
 @app.get("/profile")
 def get_profile():
-    data = load_master_data()
-    return {
-        "contact_info": data.get("contact_info", {}),
-        "skills_count": len(data.get("skills", [])),
-        "projects_count": len(data.get("projects", [])),
-    }
+    return load_master_data()
+
+def save_master_data(data: dict):
+    with open("master_data.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 class ClaudeKeyRequest(BaseModel):
     key: str
@@ -291,10 +292,123 @@ def llm_status():
         pass
     return {"ollama": ollama_ok, "claude": claude_ok, "claude_key_set": claude_ok}
 
+# ─────────────────────────────────────────────────────────────────
+# DASHBOARD — full-screen SPA
+# ─────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
     with open(os.path.join(os.path.dirname(__file__), "dashboard.html"), "r") as f:
         return f.read()
+
+# ─────────────────────────────────────────────────────────────────
+# PROFILE CRUD ENDPOINTS
+# ─────────────────────────────────────────────────────────────────
+@app.put("/profile/contact")
+def update_contact(payload: dict):
+    data = load_master_data()
+    if "contact_info" in payload:
+        data["contact_info"] = {**data.get("contact_info", {}), **payload["contact_info"]}
+    if "summary" in payload:
+        data["summary"] = payload["summary"]
+    save_master_data(data)
+    return {"ok": True}
+
+@app.put("/profile/autofill")
+def update_autofill(payload: dict):
+    data = load_master_data()
+    if "autofill" in payload:
+        data["autofill"] = {**data.get("autofill", {}), **payload["autofill"]}
+    save_master_data(data)
+    return {"ok": True}
+
+@app.put("/profile/experience")
+def update_experience(payload: dict):
+    data = load_master_data()
+    data["experience"] = payload.get("experience", data.get("experience", []))
+    save_master_data(data)
+    return {"ok": True}
+
+@app.put("/profile/education")
+def update_education(payload: dict):
+    data = load_master_data()
+    data["education"] = payload.get("education", data.get("education", []))
+    save_master_data(data)
+    return {"ok": True}
+
+@app.put("/profile/skills")
+def update_skills(payload: dict):
+    data = load_master_data()
+    if "skills" in payload:
+        data["skills"] = {**data.get("skills", {}), **payload["skills"]}
+    save_master_data(data)
+    return {"ok": True}
+
+@app.put("/profile/answers")
+def update_answers(payload: dict):
+    data = load_master_data()
+    if "common_answers" in payload:
+        data["common_answers"] = {**data.get("common_answers", {}), **payload["common_answers"]}
+    save_master_data(data)
+    return {"ok": True}
+
+# ─────────────────────────────────────────────────────────────────
+# APPLICATIONS CRUD
+# ─────────────────────────────────────────────────────────────────
+APPS_FILE = os.path.join(os.path.dirname(__file__), "applications.json")
+
+def load_apps():
+    try:
+        with open(APPS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_apps(apps: list):
+    with open(APPS_FILE, "w", encoding="utf-8") as f:
+        json.dump(apps, f, indent=2, ensure_ascii=False)
+
+@app.get("/applications")
+def get_applications():
+    return load_apps()
+
+@app.post("/applications")
+def add_application(payload: dict):
+    apps = load_apps()
+    entry = {
+        "id": str(uuid.uuid4()),
+        "company": payload.get("company", ""),
+        "role": payload.get("role", ""),
+        "platform": payload.get("platform", "Other"),
+        "status": payload.get("status", "Applied"),
+        "date_applied": payload.get("date_applied") or str(_date.today()),
+        "salary": payload.get("salary", ""),
+        "location": payload.get("location", ""),
+        "url": payload.get("url", ""),
+        "notes": payload.get("notes", ""),
+    }
+    apps.append(entry)
+    save_apps(apps)
+    return entry
+
+@app.patch("/applications/{app_id}")
+def update_application(app_id: str, payload: dict):
+    apps = load_apps()
+    for app in apps:
+        if app["id"] == app_id:
+            app.update({k: v for k, v in payload.items() if k != "id"})
+            save_apps(apps)
+            return app
+    raise HTTPException(status_code=404, detail="Application not found")
+
+@app.delete("/applications/{app_id}")
+def delete_application(app_id: str):
+    apps = load_apps()
+    new_apps = [a for a in apps if a["id"] != app_id]
+    if len(new_apps) == len(apps):
+        raise HTTPException(status_code=404, detail="Application not found")
+    save_apps(new_apps)
+    return {"ok": True}
 
 @app.get("/test/greenhouse", response_class=HTMLResponse)
 def test_greenhouse():

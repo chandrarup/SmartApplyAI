@@ -8,6 +8,9 @@ let analysisData = null;
 let chatHistory = [];
 let fillLogEntries = [];
 let currentLlm = "ollama"; // "ollama" | "claude"
+let lastDetectedCompany = "";
+let lastDetectedPlatform = "";
+let lastDetectedRole = "";
 
 // ─────────────────────────────────────────────
 // INIT
@@ -152,12 +155,20 @@ function scrapePageContext(callback) {
 
 function detectPlatform() {
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+    if (!tabs[0]) return;
     chrome.tabs.sendMessage(tabs[0].id, { action: "get_platform" }, response => {
       if (chrome.runtime.lastError || !response) return;
-      document.getElementById("platformBadge").textContent = response.platform;
+      lastDetectedPlatform = response.platform || "";
+      document.getElementById("platformBadge").textContent = lastDetectedPlatform;
       const title = tabs[0].title || "";
-      const companyMatch = title.match(/(?:at|@)\s+(.+?)(?:\s*[-–|]|$)/i);
-      if (companyMatch) document.getElementById("companyInput").value = companyMatch[1].trim();
+      const companyMatch = title.match(/(?:at|@)\s+(.+?)(?:\s*[-–|·]|$)/i);
+      if (companyMatch) {
+        lastDetectedCompany = companyMatch[1].trim();
+        const el = document.getElementById("companyInput");
+        if (el && !el.value) el.value = lastDetectedCompany;
+      }
+      const roleMatch = title.match(/^(.+?)\s+(?:at|@|-|–|\|)/);
+      if (roleMatch) lastDetectedRole = roleMatch[1].trim();
     });
   });
 }
@@ -282,6 +293,8 @@ function handleFillProgress(data) {
       log.innerHTML = fillLogEntries.map(e => `<div class="entry">${e}</div>`).join("");
       showEl("fillLog");
     }
+    // Show "Log Application" banner
+    showEl("logAppBanner");
     btn.disabled = false; btn.textContent = "Auto-Fill Again";
   } else if (data.status === "error") {
     showStatus("autofillStatus", "error", "✗ " + data.message);
@@ -415,4 +428,49 @@ document.getElementById("settingsBtn").addEventListener("click", () => {
   const autofillTab = Array.from(tabs).find(t => t.dataset.panel === "panel-autofill");
   if (autofillTab) autofillTab.click();
   setTimeout(() => document.getElementById("llmSelect").focus(), 100);
+});
+
+// ─────────────────────────────────────────────
+// DASHBOARD BUTTON
+// ─────────────────────────────────────────────
+document.getElementById("dashboardBtn").addEventListener("click", () => {
+  const apiUrl = getApiUrl();
+  const dashUrl = apiUrl.replace(/\/$/, "") + "/dashboard";
+  chrome.tabs.create({ url: dashUrl });
+});
+
+// ─────────────────────────────────────────────
+// LOG APPLICATION BANNER (appears after autofill)
+// ─────────────────────────────────────────────
+document.getElementById("logAppBtn").addEventListener("click", async () => {
+  const company = lastDetectedCompany || document.getElementById("companyInput")?.value?.trim() || "";
+  const role    = lastDetectedRole    || document.getElementById("roleInput")?.value?.trim()    || "";
+  const platform = lastDetectedPlatform || "";
+
+  try {
+    await fetch(`${getApiUrl()}/applications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company: company || "Unknown Company",
+        role: role || "Unknown Role",
+        platform,
+        status: "Applied",
+        date_applied: new Date().toISOString().split("T")[0],
+        url: "",
+        notes: ""
+      })
+    });
+    hideEl("logAppBanner");
+    // Flash success on button
+    const btn = document.getElementById("logAppBtn");
+    btn.textContent = "Logged ✓";
+    btn.style.background = "#166534";
+  } catch (e) {
+    console.error("Log app failed:", e);
+  }
+});
+
+document.getElementById("skipLogBtn").addEventListener("click", () => {
+  hideEl("logAppBanner");
 });

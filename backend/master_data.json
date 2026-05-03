@@ -7,7 +7,7 @@
         "github": "https://github.com/chandrarup",
         "location": "Houston, TX"
     },
-    "summary": "Generative AI Engineer with 2+ years of experience designing and deploying production-grade LLM and agentic solutions across enterprise environments. Passionate about solving real-world problems at scale through intelligent systems.",
+    "summary": "Generative AI Engineer with 2+ years of experience.",
     "education": [
         {
             "degree": "M.S. in Engineering Data Science and Artificial Intelligence",
@@ -204,9 +204,7 @@
         "languages": [
             "Python",
             "SQL",
-            "Java",
-            "C++",
-            "C"
+            "Java"
         ],
         "frameworks": [
             "TensorFlow",
@@ -371,7 +369,7 @@
         "work_authorization": "Yes",
         "requires_sponsorship": "Yes",
         "visa_status": "F-1 OPT",
-        "salary_expectation": "120000",
+        "salary_expectation": "130000",
         "salary_min": "100000",
         "salary_max": "150000",
         "notice_period": "2 weeks",
@@ -397,7 +395,7 @@
     },
     "common_answers": {
         "why_this_company": "Drawn to this company because of its innovative work at the intersection of AI and real-world impact. The opportunity to contribute to cutting-edge intelligent systems aligns directly with 2+ years of hands-on experience building production-grade LLM and agentic AI solutions at Accenture.",
-        "why_this_role": "With 2+ years of experience designing and deploying production-grade LLM solutions, RAG pipelines, and multi-agent systems at Accenture, this role represents the ideal intersection of technical depth and meaningful impact. Proven ability to architect AI systems that deliver measurable business value.",
+        "why_this_role": "I love building AI systems.",
         "greatest_strength": "The ability to bridge cutting-edge AI research with production engineering. Track record of translating complex LLM capabilities into deployable enterprise solutions — including achieving 89% technical analysis coverage and mentoring 30+ engineers at Accenture.",
         "greatest_weakness": "Occasionally invest too much time perfecting solutions before shipping. Actively addressing this by setting milestone checkpoints and embracing iterative delivery — a practice that has improved project velocity significantly.",
         "five_year_plan": "Aiming to grow into a senior AI architect or research engineer role, leading teams building next-generation agentic AI systems. Long-term goal is to contribute foundational work in multi-agent reasoning while deploying systems that meaningfully improve human productivity at scale.",
