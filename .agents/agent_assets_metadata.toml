@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "qOL7XsrUiWW2zEb6Csvmv"
+uri = "file://LocalHireAgent_Guide.md"
+type = "text"
+title = "LocalHire Agent 2.0 — Complete Setup, Testing & Interview Guide"
