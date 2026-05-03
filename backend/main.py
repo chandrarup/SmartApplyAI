@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
-import uuid
+import uuid, hashlib
 from datetime import date as _date
 from pydantic import BaseModel
 import requests as http_requests
@@ -19,6 +19,98 @@ OLLAMA_MODEL = "ai/qwen3-coder"
 OLLAMA_API_URL = "http://localhost:12434/engines/llama.cpp/v1/chat/completions"
 PDF_OUTPUT_DIR = os.path.join(os.getcwd(), "generated_resumes")
 os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
+
+# ─────────────────────────────────────────────────────────────────
+# MULTI-PROFILE MANAGEMENT
+# ─────────────────────────────────────────────────────────────────
+PROFILES_DIR = os.path.join(os.path.dirname(__file__), "profiles")
+os.makedirs(PROFILES_DIR, exist_ok=True)
+PROFILE_COLORS = ["#F97316","#0D9488","#7C3AED","#E11D48","#4F46E5","#059669"]
+MAX_PROFILES = 5
+
+def _safe_pid(pid: str) -> str:
+    return re.sub(r'[^a-zA-Z0-9\-]', '', str(pid)) or "default"
+
+def _profile_dir(pid: str) -> str:
+    return os.path.join(PROFILES_DIR, _safe_pid(pid))
+
+def load_profiles_meta() -> list:
+    try:
+        with open(os.path.join(PROFILES_DIR, "meta.json")) as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_profiles_meta(profiles: list):
+    with open(os.path.join(PROFILES_DIR, "meta.json"), "w") as f:
+        json.dump(profiles, f, indent=2)
+
+def _pin_hash(pin: str) -> str:
+    return hashlib.sha256(pin.encode()).hexdigest() if pin else ""
+
+def load_pdata(pid: str) -> dict:
+    path = os.path.join(_profile_dir(pid), "master_data.json")
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except:
+        try:
+            with open(os.path.join(os.path.dirname(__file__), "master_data.json")) as f:
+                return json.load(f)
+        except:
+            return {}
+
+def save_pdata(pid: str, data: dict):
+    d = _profile_dir(pid)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "master_data.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+def load_papps(pid: str) -> list:
+    path = os.path.join(_profile_dir(pid), "applications.json")
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_papps(pid: str, apps: list):
+    d = _profile_dir(pid)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "applications.json"), "w", encoding="utf-8") as f:
+        json.dump(apps, f, indent=2)
+
+def get_pid(request: Request) -> str:
+    return _safe_pid(request.headers.get("X-Profile-ID", "default"))
+
+def migrate_to_profiles():
+    """One-time migration of existing master_data.json → profiles/default/"""
+    if load_profiles_meta():
+        return
+    pid = "default"
+    d = _profile_dir(pid)
+    os.makedirs(d, exist_ok=True)
+    src = os.path.join(os.path.dirname(__file__), "master_data.json")
+    dst = os.path.join(d, "master_data.json")
+    data = {}
+    if os.path.exists(src):
+        with open(src) as f:
+            data = json.load(f)
+        if not os.path.exists(dst):
+            with open(dst, "w") as f:
+                json.dump(data, f, indent=4)
+    asrc = os.path.join(os.path.dirname(__file__), "applications.json")
+    adst = os.path.join(d, "applications.json")
+    if os.path.exists(asrc) and not os.path.exists(adst):
+        with open(asrc) as f:
+            apps = json.load(f)
+        with open(adst, "w") as f:
+            json.dump(apps, f, indent=2)
+    name = data.get("contact_info", {}).get("name", "My Profile") or "My Profile"
+    save_profiles_meta([{"id": pid, "name": name, "color": PROFILE_COLORS[0],
+                         "created_at": str(_date.today()), "pin_hash": ""}])
+
+migrate_to_profiles()
 
 # Claude / Anthropic config — read from env at request time so hot-reload works
 def get_anthropic_key():
@@ -293,88 +385,164 @@ def llm_status():
     return {"ollama": ollama_ok, "claude": claude_ok, "claude_key_set": claude_ok}
 
 # ─────────────────────────────────────────────────────────────────
-# DASHBOARD — full-screen SPA
+# PAGES
 # ─────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    with open(os.path.join(os.path.dirname(__file__), "login.html"), "r") as f:
+        return f.read()
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
     with open(os.path.join(os.path.dirname(__file__), "dashboard.html"), "r") as f:
         return f.read()
 
 # ─────────────────────────────────────────────────────────────────
-# PROFILE CRUD ENDPOINTS
+# PROFILES API
 # ─────────────────────────────────────────────────────────────────
+@app.get("/profiles")
+def list_profiles():
+    meta = load_profiles_meta()
+    return [{"id": p["id"], "name": p["name"], "color": p["color"],
+             "created_at": p.get("created_at",""), "has_pin": bool(p.get("pin_hash",""))} for p in meta]
+
+@app.post("/profiles")
+def create_profile(payload: dict):
+    meta = load_profiles_meta()
+    if len(meta) >= MAX_PROFILES:
+        raise HTTPException(status_code=400, detail=f"Maximum {MAX_PROFILES} profiles reached")
+    name = payload.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+    pid = re.sub(r'[^a-z0-9]', '-', name.lower())[:20] + "-" + str(uuid.uuid4())[:6]
+    color = payload.get("color", PROFILE_COLORS[len(meta) % len(PROFILE_COLORS)])
+    pin = payload.get("pin", "")
+    new_profile = {"id": pid, "name": name, "color": color,
+                   "created_at": str(_date.today()), "pin_hash": _pin_hash(pin)}
+    os.makedirs(_profile_dir(pid), exist_ok=True)
+    # Start with empty profile data
+    save_pdata(pid, {"contact_info": {"name": name}, "autofill": {}, "experience": [],
+                     "education": [], "skills": {}, "common_answers": {}, "summary": ""})
+    save_papps(pid, [])
+    meta.append(new_profile)
+    save_profiles_meta(meta)
+    return {"id": pid, "name": name, "color": color, "has_pin": bool(pin)}
+
+@app.post("/profiles/{pid}/verify-pin")
+def verify_pin(pid: str, payload: dict):
+    pid = _safe_pid(pid)
+    meta = load_profiles_meta()
+    profile = next((p for p in meta if p["id"] == pid), None)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    stored = profile.get("pin_hash", "")
+    if not stored:
+        return {"ok": True}  # no PIN set
+    submitted = _pin_hash(payload.get("pin", ""))
+    if submitted != stored:
+        raise HTTPException(status_code=401, detail="Incorrect PIN")
+    return {"ok": True}
+
+@app.delete("/profiles/{pid}")
+def delete_profile(pid: str):
+    pid = _safe_pid(pid)
+    meta = load_profiles_meta()
+    if len(meta) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete the only profile")
+    new_meta = [p for p in meta if p["id"] != pid]
+    if len(new_meta) == len(meta):
+        raise HTTPException(status_code=404, detail="Profile not found")
+    save_profiles_meta(new_meta)
+    import shutil
+    d = _profile_dir(pid)
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    return {"ok": True}
+
+@app.put("/profiles/{pid}/name")
+def rename_profile(pid: str, payload: dict):
+    pid = _safe_pid(pid)
+    meta = load_profiles_meta()
+    for p in meta:
+        if p["id"] == pid:
+            p["name"] = payload.get("name", p["name"]).strip() or p["name"]
+            save_profiles_meta(meta)
+            return {"ok": True}
+    raise HTTPException(status_code=404, detail="Profile not found")
+
+# ─────────────────────────────────────────────────────────────────
+# PROFILE DATA CRUD (profile-aware)
+# ─────────────────────────────────────────────────────────────────
+@app.get("/profile")
+def get_profile(request: Request):
+    return load_pdata(get_pid(request))
+
 @app.put("/profile/contact")
-def update_contact(payload: dict):
-    data = load_master_data()
+def update_contact(request: Request, payload: dict):
+    pid = get_pid(request)
+    data = load_pdata(pid)
     if "contact_info" in payload:
         data["contact_info"] = {**data.get("contact_info", {}), **payload["contact_info"]}
     if "summary" in payload:
         data["summary"] = payload["summary"]
-    save_master_data(data)
+    save_pdata(pid, data)
     return {"ok": True}
 
 @app.put("/profile/autofill")
-def update_autofill(payload: dict):
-    data = load_master_data()
+def update_autofill(request: Request, payload: dict):
+    pid = get_pid(request)
+    data = load_pdata(pid)
     if "autofill" in payload:
         data["autofill"] = {**data.get("autofill", {}), **payload["autofill"]}
-    save_master_data(data)
+    save_pdata(pid, data)
     return {"ok": True}
 
 @app.put("/profile/experience")
-def update_experience(payload: dict):
-    data = load_master_data()
+def update_experience(request: Request, payload: dict):
+    pid = get_pid(request)
+    data = load_pdata(pid)
     data["experience"] = payload.get("experience", data.get("experience", []))
-    save_master_data(data)
+    save_pdata(pid, data)
     return {"ok": True}
 
 @app.put("/profile/education")
-def update_education(payload: dict):
-    data = load_master_data()
+def update_education(request: Request, payload: dict):
+    pid = get_pid(request)
+    data = load_pdata(pid)
     data["education"] = payload.get("education", data.get("education", []))
-    save_master_data(data)
+    save_pdata(pid, data)
     return {"ok": True}
 
 @app.put("/profile/skills")
-def update_skills(payload: dict):
-    data = load_master_data()
+def update_skills(request: Request, payload: dict):
+    pid = get_pid(request)
+    data = load_pdata(pid)
     if "skills" in payload:
         data["skills"] = {**data.get("skills", {}), **payload["skills"]}
-    save_master_data(data)
+    save_pdata(pid, data)
     return {"ok": True}
 
 @app.put("/profile/answers")
-def update_answers(payload: dict):
-    data = load_master_data()
+def update_answers(request: Request, payload: dict):
+    pid = get_pid(request)
+    data = load_pdata(pid)
     if "common_answers" in payload:
         data["common_answers"] = {**data.get("common_answers", {}), **payload["common_answers"]}
-    save_master_data(data)
+    save_pdata(pid, data)
     return {"ok": True}
 
 # ─────────────────────────────────────────────────────────────────
-# APPLICATIONS CRUD
+# APPLICATIONS CRUD (profile-aware)
 # ─────────────────────────────────────────────────────────────────
-APPS_FILE = os.path.join(os.path.dirname(__file__), "applications.json")
-
-def load_apps():
-    try:
-        with open(APPS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-def save_apps(apps: list):
-    with open(APPS_FILE, "w", encoding="utf-8") as f:
-        json.dump(apps, f, indent=2, ensure_ascii=False)
-
 @app.get("/applications")
-def get_applications():
-    return load_apps()
+def get_applications(request: Request):
+    return load_papps(get_pid(request))
 
 @app.post("/applications")
-def add_application(payload: dict):
-    apps = load_apps()
+def add_application(request: Request, payload: dict):
+    pid = get_pid(request)
+    apps = load_papps(pid)
     entry = {
         "id": str(uuid.uuid4()),
         "company": payload.get("company", ""),
@@ -388,26 +556,28 @@ def add_application(payload: dict):
         "notes": payload.get("notes", ""),
     }
     apps.append(entry)
-    save_apps(apps)
+    save_papps(pid, apps)
     return entry
 
 @app.patch("/applications/{app_id}")
-def update_application(app_id: str, payload: dict):
-    apps = load_apps()
+def update_application(app_id: str, request: Request, payload: dict):
+    pid = get_pid(request)
+    apps = load_papps(pid)
     for app in apps:
         if app["id"] == app_id:
             app.update({k: v for k, v in payload.items() if k != "id"})
-            save_apps(apps)
+            save_papps(pid, apps)
             return app
     raise HTTPException(status_code=404, detail="Application not found")
 
 @app.delete("/applications/{app_id}")
-def delete_application(app_id: str):
-    apps = load_apps()
+def delete_application(app_id: str, request: Request):
+    pid = get_pid(request)
+    apps = load_papps(pid)
     new_apps = [a for a in apps if a["id"] != app_id]
     if len(new_apps) == len(apps):
         raise HTTPException(status_code=404, detail="Application not found")
-    save_apps(new_apps)
+    save_papps(pid, new_apps)
     return {"ok": True}
 
 @app.get("/test/greenhouse", response_class=HTMLResponse)

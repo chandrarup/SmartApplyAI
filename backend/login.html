@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocalHire Agent — Sign In</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --accent:#F97316;--accent-d:#EA580C;--accent-l:#FFF7ED;--accent-m:#FFEDD5;
+  --bg:#F5F4F1;--surface:#FFFFFF;--border:#E5E3DF;--border-light:#EEECE9;
+  --t1:#111110;--t2:#3D3935;--t3:#7A746E;--t4:#B5AFA9;
+  --red:#DC2626;--green:#16A34A;
+  --sh:0 1px 2px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.06);
+  --shm:0 8px 32px rgba(0,0,0,.12);
+}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t2);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;-webkit-font-smoothing:antialiased}
+
+/* BRAND */
+.brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:40px;text-align:center}
+.brand-logo{width:48px;height:48px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(249,115,22,.3)}
+.brand-logo svg{color:#fff}
+.brand-name{font-size:20px;font-weight:700;color:var(--t1);letter-spacing:-.3px}
+.brand-sub{font-size:13px;color:var(--t3);font-weight:400}
+
+/* CONTAINER */
+.container{width:100%;max-width:480px}
+.section-label{font-size:11.5px;font-weight:600;color:var(--t3);margin-bottom:14px;text-transform:uppercase;letter-spacing:.4px}
+
+/* PROFILE GRID */
+.profiles-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:32px}
+
+.profile-card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:20px 12px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:all .18s;position:relative;user-select:none}
+.profile-card:hover{border-color:var(--accent-m);box-shadow:var(--sh);transform:translateY(-2px)}
+.profile-card:active{transform:translateY(0)}
+
+.avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:-.5px}
+.profile-name{font-size:13px;font-weight:600;color:var(--t1);text-align:center;line-height:1.3;word-break:break-word}
+.profile-sub{font-size:11px;color:var(--t4);text-align:center}
+.pin-lock{position:absolute;top:8px;right:8px;width:16px;height:16px;color:var(--t4)}
+
+/* ADD PROFILE CARD */
+.add-card{background:transparent;border:1.5px dashed var(--border);border-radius:14px;padding:20px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .18s;color:var(--t4)}
+.add-card:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-l)}
+.add-icon{width:40px;height:40px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:300;line-height:1}
+.add-label{font-size:12.5px;font-weight:500}
+
+/* MAX PROFILES */
+.max-note{font-size:12px;color:var(--t4);text-align:center;margin-top:-20px;margin-bottom:20px}
+
+/* MODAL OVERLAY */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.mo.open{display:flex}
+.md{background:#fff;border-radius:16px;width:380px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.2);animation:mdi .2s cubic-bezier(.22,1,.36,1)}
+@keyframes mdi{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.mh{padding:20px 22px 0;display:flex;align-items:center;justify-content:space-between}
+.mh h3{font-size:16px;font-weight:700;color:var(--t1)}
+.mc{background:none;border:none;cursor:pointer;color:var(--t4);font-size:20px;line-height:1;padding:2px 6px;border-radius:6px;transition:all .12s}
+.mc:hover{background:var(--bg);color:var(--t2)}
+.mb{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.mf{padding:14px 22px 20px;display:flex;justify-content:flex-end;gap:8px}
+
+/* FORM ELEMENTS */
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;font-weight:500;color:var(--t3)}
+.fld input{padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;color:var(--t1);outline:none;transition:border-color .12s,box-shadow .12s;background:#fff}
+.fld input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(249,115,22,.1)}
+.fld input::placeholder{color:var(--t4)}
+
+/* COLOR PICKER */
+.color-grid{display:flex;gap:8px;flex-wrap:wrap}
+.color-dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .15s;flex-shrink:0}
+.color-dot:hover{transform:scale(1.12)}
+.color-dot.sel{border-color:#fff;box-shadow:0 0 0 2.5px var(--t1)}
+
+/* PIN INPUT */
+.pin-row{display:flex;gap:10px;justify-content:center;margin-top:4px}
+.pin-digit{width:48px;height:56px;border:1.5px solid var(--border);border-radius:10px;font-size:22px;font-weight:700;text-align:center;font-family:inherit;color:var(--t1);outline:none;transition:border-color .12s,box-shadow .12s;background:#fff}
+.pin-digit:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(249,115,22,.1)}
+.pin-hint{font-size:11.5px;color:var(--t4);text-align:center;margin-top:4px}
+.pin-err{font-size:12px;color:var(--red);text-align:center;margin-top:2px;display:none}
+.pin-err.show{display:block}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-size:13.5px;font-weight:600;font-family:inherit;transition:all .15s;letter-spacing:-.1px}
+.bp{background:var(--accent);color:#fff}.bp:hover{background:var(--accent-d)}
+.bo{background:#fff;color:var(--t2);border:1px solid var(--border)}.bo:hover{background:var(--bg)}
+.bd{background:transparent;color:var(--red);border:1px solid var(--red);font-size:12px;padding:6px 12px}.bd:hover{background:var(--red);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* DELETE BUTTON on card */
+.del-btn{position:absolute;top:7px;left:7px;width:20px;height:20px;border-radius:50%;background:var(--bg);border:1px solid var(--border);color:var(--t4);font-size:10px;cursor:pointer;display:none;align-items:center;justify-content:center;transition:all .14s;padding:0}
+.profile-card:hover .del-btn{display:flex}
+.del-btn:hover{background:var(--red);border-color:var(--red);color:#fff}
+
+/* FOOTER */
+.footer{margin-top:24px;font-size:12px;color:var(--t4);text-align:center}
+
+/* ERROR */
+.err-msg{font-size:12.5px;color:var(--red);text-align:center;padding:8px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA;display:none}
+.err-msg.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="brand">
+  <div class="brand-logo">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+  </div>
+  <div>
+    <div class="brand-name">LocalHire Agent</div>
+    <div class="brand-sub">v2.0 · Your job search command center</div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="section-label" id="profilesLabel">Choose a profile</div>
+  <div class="profiles-grid" id="profilesGrid"></div>
+  <div class="max-note" id="maxNote" style="display:none">Maximum 5 profiles reached</div>
+  <div class="err-msg" id="errMsg"></div>
+</div>
+
+<div class="footer">LocalHire Agent v2.0 · Running locally</div>
+
+<!-- PIN MODAL -->
+<div class="mo" id="pinModal">
+  <div class="md">
+    <div class="mh">
+      <h3 id="pinTitle">Enter PIN</h3>
+      <button class="mc" id="closePinModal">✕</button>
+    </div>
+    <div class="mb">
+      <p style="font-size:13px;color:var(--t3);text-align:center" id="pinSubtitle">This profile is protected with a PIN</p>
+      <div class="pin-row">
+        <input class="pin-digit" id="pd0" type="password" maxlength="1" inputmode="numeric" pattern="[0-9]">
+        <input class="pin-digit" id="pd1" type="password" maxlength="1" inputmode="numeric" pattern="[0-9]">
+        <input class="pin-digit" id="pd2" type="password" maxlength="1" inputmode="numeric" pattern="[0-9]">
+        <input class="pin-digit" id="pd3" type="password" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      </div>
+      <div class="pin-err" id="pinErr">Incorrect PIN. Please try again.</div>
+    </div>
+    <div class="mf">
+      <button class="btn bo" id="cancelPinModal">Cancel</button>
+      <button class="btn bp" id="submitPin">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE PROFILE MODAL -->
+<div class="mo" id="createModal">
+  <div class="md">
+    <div class="mh">
+      <h3>Create Profile</h3>
+      <button class="mc" id="closeCreateModal">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fld">
+        <label>Full Name</label>
+        <input id="c-name" type="text" placeholder="e.g. Jane Smith" maxlength="50" autocomplete="off">
+      </div>
+      <div class="fld">
+        <label>Color</label>
+        <div class="color-grid" id="colorGrid"></div>
+      </div>
+      <div class="fld">
+        <label>PIN (optional, 4 digits)</label>
+        <input id="c-pin" type="password" placeholder="Leave blank for no PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password">
+      </div>
+      <div class="err-msg" id="createErr"></div>
+    </div>
+    <div class="mf">
+      <button class="btn bo" id="cancelCreate">Cancel</button>
+      <button class="btn bp" id="submitCreate">Create Profile</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ["#F97316","#0D9488","#7C3AED","#E11D48","#4F46E5","#059669"];
+let profiles = [];
+let selectedPid = null;
+let selectedColor = COLORS[0];
+
+function initials(name) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+}
+
+function apiBase() {
+  return localStorage.getItem('lh_api') || window.location.origin;
+}
+
+async function loadProfiles() {
+  try {
+    const r = await fetch(apiBase() + '/profiles');
+    profiles = await r.json();
+    renderProfiles();
+  } catch(e) {
+    showErr('Could not connect to backend. Make sure the server is running.');
+  }
+}
+
+function renderProfiles() {
+  const grid = document.getElementById('profilesGrid');
+  const maxNote = document.getElementById('maxNote');
+  const label = document.getElementById('profilesLabel');
+  grid.innerHTML = '';
+
+  label.textContent = profiles.length ? 'Choose a profile' : 'No profiles yet';
+
+  profiles.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'profile-card';
+    card.innerHTML = `
+      <button class="del-btn" data-pid="${p.id}" title="Delete profile">✕</button>
+      <div class="avatar" style="background:${p.color}">${initials(p.name)}</div>
+      <div class="profile-name">${p.name}</div>
+      <div class="profile-sub">${p.has_pin ? '🔒 PIN protected' : 'No PIN'}</div>
+      ${p.has_pin ? `<svg class="pin-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>` : ''}
+    `;
+    card.addEventListener('click', e => {
+      if (e.target.classList.contains('del-btn') || e.target.closest('.del-btn')) return;
+      selectProfile(p);
+    });
+    card.querySelector('.del-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteProfile(p);
+    });
+    grid.appendChild(card);
+  });
+
+  if (profiles.length < 5) {
+    const add = document.createElement('div');
+    add.className = 'add-card';
+    add.innerHTML = `<div class="add-icon">+</div><div class="add-label">New Profile</div>`;
+    add.addEventListener('click', openCreateModal);
+    grid.appendChild(add);
+    maxNote.style.display = 'none';
+  } else {
+    maxNote.style.display = 'block';
+  }
+}
+
+function selectProfile(p) {
+  selectedPid = p.id;
+  if (p.has_pin) {
+    openPinModal(p);
+  } else {
+    signIn(p.id, p.name, p.color);
+  }
+}
+
+function signIn(pid, name, color) {
+  localStorage.setItem('lh_profile_id', pid);
+  localStorage.setItem('lh_profile_name', name);
+  localStorage.setItem('lh_profile_color', color);
+  window.location.href = '/dashboard';
+}
+
+// ── PIN MODAL ────────────────────────────────────
+function openPinModal(p) {
+  document.getElementById('pinTitle').textContent = `Sign in as ${p.name}`;
+  document.getElementById('pinSubtitle').textContent = 'This profile is protected with a PIN';
+  document.getElementById('pinErr').classList.remove('show');
+  ['pd0','pd1','pd2','pd3'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pinModal').classList.add('open');
+  setTimeout(() => document.getElementById('pd0').focus(), 80);
+}
+
+document.getElementById('closePinModal').addEventListener('click', () => {
+  document.getElementById('pinModal').classList.remove('open');
+});
+document.getElementById('cancelPinModal').addEventListener('click', () => {
+  document.getElementById('pinModal').classList.remove('open');
+});
+
+// Auto-advance PIN digits
+['pd0','pd1','pd2','pd3'].forEach((id, i) => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', e => {
+    const v = e.target.value.replace(/\D/g, '');
+    e.target.value = v;
+    if (v && i < 3) document.getElementById(`pd${i+1}`).focus();
+    if (i === 3 && v) submitPinFn();
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !e.target.value && i > 0) {
+      document.getElementById(`pd${i-1}`).focus();
+    }
+    if (e.key === 'Enter') submitPinFn();
+  });
+});
+
+async function submitPinFn() {
+  const pin = ['pd0','pd1','pd2','pd3'].map(id => document.getElementById(id).value).join('');
+  if (pin.length < 4) return;
+  const btn = document.getElementById('submitPin');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const p = profiles.find(x => x.id === selectedPid);
+    const r = await fetch(apiBase() + `/profiles/${selectedPid}/verify-pin`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({pin})
+    });
+    if (!r.ok) {
+      document.getElementById('pinErr').classList.add('show');
+      ['pd0','pd1','pd2','pd3'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('pd0').focus();
+    } else {
+      document.getElementById('pinModal').classList.remove('open');
+      signIn(p.id, p.name, p.color);
+    }
+  } catch(e) {
+    document.getElementById('pinErr').textContent = 'Connection error. Try again.';
+    document.getElementById('pinErr').classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Continue';
+  }
+}
+
+document.getElementById('submitPin').addEventListener('click', submitPinFn);
+
+// ── CREATE PROFILE MODAL ──────────────────────────
+function openCreateModal() {
+  selectedColor = COLORS[profiles.length % COLORS.length];
+  document.getElementById('c-name').value = '';
+  document.getElementById('c-pin').value = '';
+  document.getElementById('createErr').classList.remove('show');
+  renderColorGrid();
+  document.getElementById('createModal').classList.add('open');
+  setTimeout(() => document.getElementById('c-name').focus(), 80);
+}
+
+function renderColorGrid() {
+  const grid = document.getElementById('colorGrid');
+  grid.innerHTML = '';
+  COLORS.forEach(c => {
+    const dot = document.createElement('div');
+    dot.className = 'color-dot' + (c === selectedColor ? ' sel' : '');
+    dot.style.background = c;
+    dot.title = c;
+    dot.addEventListener('click', () => {
+      selectedColor = c;
+      renderColorGrid();
+    });
+    grid.appendChild(dot);
+  });
+}
+
+document.getElementById('closeCreateModal').addEventListener('click', () => {
+  document.getElementById('createModal').classList.remove('open');
+});
+document.getElementById('cancelCreate').addEventListener('click', () => {
+  document.getElementById('createModal').classList.remove('open');
+});
+
+document.getElementById('submitCreate').addEventListener('click', async () => {
+  const name = document.getElementById('c-name').value.trim();
+  const pin = document.getElementById('c-pin').value.trim();
+  const errEl = document.getElementById('createErr');
+
+  if (!name) { errEl.textContent='Name is required'; errEl.classList.add('show'); return; }
+  if (pin && (pin.length !== 4 || !/^\d{4}$/.test(pin))) {
+    errEl.textContent='PIN must be exactly 4 digits'; errEl.classList.add('show'); return;
+  }
+
+  const btn = document.getElementById('submitCreate');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const r = await fetch(apiBase() + '/profiles', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, color: selectedColor, pin: pin || ''})
+    });
+    const data = await r.json();
+    if (!r.ok) { errEl.textContent = data.detail || 'Error creating profile'; errEl.classList.add('show'); return; }
+    document.getElementById('createModal').classList.remove('open');
+    await loadProfiles();
+    // Auto sign in to the new profile
+    signIn(data.id, data.name, data.color);
+  } catch(e) {
+    errEl.textContent = 'Connection error. Try again.'; errEl.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create Profile';
+  }
+});
+
+// ── DELETE PROFILE ────────────────────────────────
+async function deleteProfile(p) {
+  if (profiles.length <= 1) { showErr('Cannot delete the only profile.'); return; }
+  if (!confirm(`Delete "${p.name}"? All data will be permanently removed.`)) return;
+  try {
+    const r = await fetch(apiBase() + `/profiles/${p.id}`, {method: 'DELETE'});
+    if (!r.ok) { const d = await r.json(); showErr(d.detail || 'Delete failed'); return; }
+    // Clear localStorage if this was the active profile
+    if (localStorage.getItem('lh_profile_id') === p.id) {
+      localStorage.removeItem('lh_profile_id');
+      localStorage.removeItem('lh_profile_name');
+      localStorage.removeItem('lh_profile_color');
+    }
+    await loadProfiles();
+  } catch(e) { showErr('Connection error.'); }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('errMsg');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── PIN INPUT (paste support) ──────────────────────
+document.getElementById('pd0').addEventListener('paste', e => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,4);
+  text.split('').forEach((ch, i) => {
+    const el = document.getElementById(`pd${i}`);
+    if (el) el.value = ch;
+  });
+  const last = document.getElementById(`pd${Math.min(text.length-1,3)}`);
+  if (last) last.focus();
+  if (text.length === 4) submitPinFn();
+});
+
+// Close modals on backdrop click
+document.getElementById('pinModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('pinModal')) document.getElementById('pinModal').classList.remove('open');
+});
+document.getElementById('createModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('createModal')) document.getElementById('createModal').classList.remove('open');
+});
+
+// ── INIT ──────────────────────────────────────────
+loadProfiles();
+</script>
+</body>
+</html>

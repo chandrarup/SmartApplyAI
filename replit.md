@@ -46,12 +46,33 @@ Workday · Greenhouse · Lever · BambooHR · iCIMS · SmartRecruiters · Linked
 | POST | `/chat` | Chat with AI about a job page |
 | POST | `/generate-pdf` | Render tailored LaTeX resume → PDF download |
 
+## Multi-Profile System
+
+- Up to **5 profiles**, each fully isolated
+- Profile data stored in `backend/profiles/{id}/master_data.json` and `applications.json`
+- Profile metadata (name, color, pin_hash) stored in `backend/profiles/meta.json`
+- PIN protection: optional 4-digit PIN hashed with SHA-256
+- `/` and `/login` → profile selector; `/dashboard` → app (redirects to login if no profile in localStorage)
+- Dashboard sends `X-Profile-ID` header on all API calls; extension defaults to `"default"` profile
+
+### Profile API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/profiles` | List all profiles |
+| POST | `/profiles` | Create profile (name, color, pin) |
+| POST | `/profiles/{id}/verify-pin` | Verify PIN (returns 401 on mismatch) |
+| DELETE | `/profiles/{id}` | Delete profile + all its data |
+| PUT | `/profiles/{id}/name` | Rename profile |
+
 ## Key Files
 
-- `backend/main.py` — FastAPI app with all API endpoints
-- `backend/master_data.json` — Candidate profile (includes `autofill` and `common_answers` sections)
+- `backend/main.py` — FastAPI app with all API + multi-profile endpoints
+- `backend/login.html` — Profile selector / sign-in page
+- `backend/dashboard.html` — Web dashboard SPA (profile-aware)
+- `backend/profiles/` — Per-profile data directories
+- `backend/master_data.json` — Legacy profile data (migrated to `profiles/default/` on first run)
 - `backend/resume_template.tex` — Jinja2 LaTeX template
-- `backend/dashboard.html` — Web dashboard at `/`
 - `extension/manifest.json` — Chrome Extension manifest v3 with all platform permissions
 - `extension/background.js` — Service worker for API URL storage and state
 - `extension/content.js` — Platform detection, field scanning, and auto-fill logic

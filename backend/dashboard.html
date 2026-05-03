@@ -213,6 +213,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   </div>
   <div class="hdr-actions">
     <div class="api-pill"><div class="api-dot" id="apiDot"></div><span id="apiTxt">Checking…</span></div>
+    <div id="hdrProfile" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px 4px 4px;border-radius:8px;transition:background .14s" onclick="window.location.href='/login'" title="Switch profile">
+      <div id="hdrAvatar" style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0"></div>
+      <span id="hdrProfileName" style="font-size:12.5px;font-weight:500;color:var(--t2)"></span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--t4)"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
     <button class="hdr-btn" id="hdrAdd">+ Log Application</button>
   </div>
 </header>
@@ -455,7 +460,8 @@ function toast(msg, type='ok'){
   t._t=setTimeout(()=>t.className='',2800);
 }
 async function api(path, opts={}){
-  const r=await fetch(apiBase()+path,{headers:{'Content-Type':'application/json'},...opts});
+  const pid=localStorage.getItem('lh_profile_id')||'default';
+  const r=await fetch(apiBase()+path,{headers:{'Content-Type':'application/json','X-Profile-ID':pid,...(opts.headers||{})},...opts,headers:{...((opts.headers)||{}),'Content-Type':'application/json','X-Profile-ID':pid}});
   if(!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -886,8 +892,22 @@ document.getElementById('saveSettingsBtn').addEventListener('click',async()=>{
   toast('Settings saved!'); checkApi();
 });
 
+// ── PROFILE HEADER ────────────────────────────────
+function initProfileHeader(){
+  const pid=localStorage.getItem('lh_profile_id');
+  const name=localStorage.getItem('lh_profile_name')||'Profile';
+  const color=localStorage.getItem('lh_profile_color')||'#F97316';
+  if(!pid){ window.location.href='/login'; return false; }
+  const initials=name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const av=document.getElementById('hdrAvatar');
+  av.textContent=initials; av.style.background=color;
+  document.getElementById('hdrProfileName').textContent=name.split(' ')[0];
+  return true;
+}
+
 // ── INIT ──────────────────────────────────────────
 async function init(){
+  if(!initProfileHeader()) return;
   loadSettings(); checkApi(); await Promise.all([loadProfile(),loadApps()]);
 }
 init(); setInterval(checkApi,30000);
