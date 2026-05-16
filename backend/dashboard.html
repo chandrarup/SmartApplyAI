@@ -1455,7 +1455,8 @@ function tlrRenderPreview(res) {
   const summaryChanged  = !!(sd.tailored && sd.original && sd.tailored !== sd.original);
 
   // ── Helper: escape HTML entities ──────────────────────────────
-  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Convert LaTeX em-dash (---) to real em dash for HTML display, then escape HTML
+  const esc = s => (s||'').replace(/---/g,'—').replace(/--/g,'–').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // ── Helper: render a section heading ──────────────────────────
   const sec = label => `

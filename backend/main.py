@@ -1476,6 +1476,80 @@ def _build_style_fingerprint(user_data: dict) -> dict:
     }
 
 
+def _rank_projects_for_jd(project_library: list, jd_text: str, hint_titles: list = None, n: int = 3) -> list:
+    """Score every project against the JD via keyword overlap and return top-n.
+
+    Priority boosts:
+      - Explicitly requested projects (hint_titles) always rank first.
+      - GPT-2 SLM from Scratch is a top-tier LLM project → +5 bonus for any AI/ML/LLM JD.
+    """
+    jd_lower = jd_text.lower()
+    hint_set = {t.lower().strip() for t in (hint_titles or [])}
+    scored = []
+    for proj in project_library:
+        title_lower = (proj.get("title") or "").lower().strip()
+        # Explicit user selection → always include
+        if any(h in title_lower or title_lower in h for h in hint_set):
+            scored.append((1000, proj))
+            continue
+        tech_text = " ".join(proj.get("tech_stack") or [])
+        corpus = (title_lower + " " + tech_text.lower() + " " + (proj.get("description") or "").lower())
+        tokens = re.findall(r"\b[a-z][a-z0-9_-]{2,}\b", corpus)
+        score = sum(1 for t in tokens if t in jd_lower)
+        # Bonus: GPT-2/SLM project is uniquely strong for any LLM-related JD
+        if "build-slm" in (proj.get("url") or "").lower() or "gpt" in title_lower or "language model" in title_lower:
+            if any(kw in jd_lower for kw in ["llm", "language model", "transformer", "fine-tun", "rag", "generative"]):
+                score += 5
+        scored.append((score, proj))
+    scored.sort(key=lambda x: -x[0])
+    return [p for _, p in scored[:n]]
+
+
+def _assemble_tailored_skills(master_skills: dict, jd_text: str, selected_skill_names: list = None) -> dict:
+    """Build the 5-category skills block for the resume.
+
+    Strategy:
+      - Start from the FULL master skills (never truncate).
+      - Promote selected_skills to the front of the appropriate category.
+      - Optionally surface a few JD keywords that aren't already present.
+    Returns a dict with keys: domains, frameworks, tools, databases, languages.
+    """
+    import copy
+    skills = copy.deepcopy(master_skills)
+    jd_lower = jd_text.lower()
+
+    # The 5 display categories (template keys → label)
+    display_keys = ["domains", "frameworks", "tools", "databases", "languages"]
+
+    # Promote selected_skills to front of appropriate category
+    selected_set = {s.lower().strip() for s in (selected_skill_names or [])}
+    for key in display_keys:
+        cat = skills.get(key) or []
+        # Move selected ones to front, deduplicated
+        front = [s for s in cat if s.lower().strip() in selected_set]
+        rest  = [s for s in cat if s.lower().strip() not in selected_set]
+        skills[key] = front + rest
+
+    # Surface highly-relevant JD keywords not already in any category
+    all_existing = {s.lower().strip() for key in display_keys for s in (skills.get(key) or [])}
+    # Keyword → category mapping for common ML/AI skills
+    jd_additions = {
+        "domains": ["llm", "rag", "fine-tuning", "prompt engineering", "langchain", "llamaindex", "openai", "claude", "gemini", "autogen", "crewai"],
+        "frameworks": ["pytorch", "tensorflow", "keras", "hugging face", "scikit-learn", "fastapi", "langchain", "llama-index"],
+        "tools": ["docker", "kubernetes", "aws", "azure", "mlflow", "airflow", "fastapi", "git"],
+        "databases": ["pinecone", "chromadb", "pgvector", "neo4j", "mongodb", "redis"],
+        "languages": ["python", "sql", "typescript", "javascript"],
+    }
+    for key, candidates in jd_additions.items():
+        for kw in candidates:
+            if kw in jd_lower and kw not in all_existing:
+                # Only add if not already present (case-insensitive)
+                skills.setdefault(key, []).append(kw.capitalize() if key == "languages" else kw)
+                all_existing.add(kw)
+
+    return {k: skills.get(k) or [] for k in display_keys}
+
+
 @app.post("/tailor-resume")
 async def tailor_resume(req: TailorResumeRequest, request: Request):
     pid = get_pid(request)
@@ -1487,91 +1561,78 @@ async def tailor_resume(req: TailorResumeRequest, request: Request):
         style = _build_style_fingerprint(user_data)
         bundle = resume_source.build_resume_source_bundle()
         project_library = user_data.get("project_library", user_data.get("projects", []))
+        master_skills   = user_data.get("skills", {})
 
-        # Build evidence text for fact-invention validation
+        # ── STEP 1: Deterministic project selection + skills assembly ────
+        selected_projects = _rank_projects_for_jd(
+            project_library, req.jd_text, hint_titles=req.selected_projects, n=3
+        )
+        tailored_skills = _assemble_tailored_skills(
+            master_skills, req.jd_text, selected_skill_names=req.selected_skills
+        )
+        print(f"[tailor-resume] Selected projects: {[p.get('title','') for p in selected_projects]}")
+
+        # ── STEP 2: Build evidence for constraint validation ─────────────
         evidence_text = (user_data.get("summary", "") + " " + bundle.get("base_resume_plain", "") + " " +
             bundle.get("cv_plain", "") + " " + " ".join(
             b for e in user_data.get("experience", [])
             for b in (e.get("details") or e.get("bullets") or [])
         ))
 
-        prompt = f"""You are an expert technical resume writer. Your job is to ACTIVELY REWRITE the candidate's experience bullets to maximize keyword match with the target JD.
+        # ── STEP 3: Focused LLM call — only summary + bullets ────────────
+        # Build bullet list for experience[0] only (the dynamic section)
+        exp0 = user_data.get("experience", [{}])[0]
+        exp0_bullets = exp0.get("details") or exp0.get("bullets") or []
+        bullets_json = json.dumps([{"text": b, "original": b, "status": "unchanged"} for b in exp0_bullets], indent=2)
 
-WHAT "EDITING" MEANS (you MUST do this):
-- Rephrase bullets to front-load JD-required skills (e.g., if JD wants "RAG pipelines", make sure bullets that mention RAG lead with that)
-- Swap generic verbs for stronger JD-matching ones (e.g., "Built" → "Deployed", "Designed" → "Architected")
-- Add JD keywords inline where they are genuinely supported by existing work (e.g., "...using LangChain and AutoGen (LLM orchestration frameworks)" → adds "LLM orchestration")
-- Reorder clauses to put the JD-relevant achievement first
-- Status "edited" means the text changed. Status "unchanged" means the text is IDENTICAL to the original.
+        prompt = f"""You are a technical resume editor. Edit the candidate's resume summary and experience bullets for the target role.
 
-HARD RULES:
-1. NEVER modify company names, job titles, or dates — copy them EXACTLY from source.
-2. NEVER invent metrics or achievements — but you MAY rephrase how existing metrics are presented.
-3. NEVER add buzzwords (synergize, cutting-edge, world-class, paradigm shift, enterprise-grade solutions).
-4. You MUST set status="edited" for bullets you changed, and include the original text in "original".
-5. When the tailored_summary mentions the target company, use the FULL name "{req.company}" — never abbreviate.
-6. MINIMUM: at least 3 bullets across all experience entries MUST have status="edited" or "added". Returning all "unchanged" is a FAILURE — the output will be rejected.
+TASK 1 — Write a new summary (2-3 sentences, 50-80 words, implied first-person, no pronouns):
+- Highlight skills most relevant to the JD
+- Keep the candidate's direct writing style (no buzzwords, no filler)
+- If mentioning target company use the FULL name "{req.company}"
+- DO NOT write "...rewritten..." or any placeholder — write actual sentences
 
-CANDIDATE STYLE FINGERPRINT (preserve this style):
-- Median bullet length: {style['median_words']} words (max {style['max_words']})
-- Verb-start ratio: {style['starts_with_verb_pct']}% (most bullets start with action verbs)
-- Metric-led ratio: {style['metric_pct']}% (bullets reference numbers/percentages from real work)
-- Example bullets: {json.dumps(style.get('sample_bullets', []))}
+TASK 2 — Edit experience bullets for maximum JD keyword match:
+- VALID edit: rephrase to front-load a JD skill, add a JD keyword inline where supported by the existing text, reorder clauses to lead with the JD-relevant achievement
+- INVALID edit: invent new metrics, change facts, change company/title/dates
+- Status "edited" = text changed. "unchanged" = text is IDENTICAL to original. "added" = new bullet backed by existing evidence.
+- REQUIREMENT: at least 3 bullets must be "edited" or "added" — otherwise the output is rejected.
 
-CANDIDATE PROFILE (source of truth):
-{json.dumps(user_data, indent=2)[:6000]}
-
-FULL CV EVIDENCE BANK (use to find additional evidence for rewrites — only real facts):
-{bundle.get("cv_plain", "")[:3000]}
+JOB DESCRIPTION:
+\"\"\"{req.jd_text[:4000]}\"\"\"
 
 TARGET ROLE: {req.role}
 TARGET COMPANY: {req.company}
-SKILLS TO EMPHASIZE: {", ".join(req.selected_skills) if req.selected_skills else "(choose JD-relevant from existing skills)"}
-PROJECTS TO PRIORITIZE: {", ".join(req.selected_projects) if req.selected_projects else "(choose best fit from project library)"}
-OPTIONAL USER INSTRUCTION: {req.user_instruction or "(none)"}
+SKILLS TO EMPHASIZE: {", ".join(req.selected_skills) if req.selected_skills else "choose from JD"}
+OPTIONAL INSTRUCTION: {req.user_instruction or "(none)"}
 
-PROJECT LIBRARY (choose from this set only):
-{json.dumps(project_library, indent=2)[:4000]}
+CANDIDATE SUMMARY (rewrite this):
+{user_data.get("summary", "")}
 
-JOB DESCRIPTION:
-\"\"\"{req.jd_text[:5000]}\"\"\"
+EXPERIENCE ENTRY TO EDIT:
+Company: {exp0.get("company", "")}
+Title: {exp0.get("role") or exp0.get("title", "")}
+Dates: {exp0.get("duration", "")}
+Bullets (edit these):
+{bullets_json}
 
-OUTPUT JSON ONLY, exact shape:
+OUTPUT JSON ONLY:
 {{
-  "tailored_summary": "Rewritten 2-3 sentence summary in implied first person, no pronouns. Match candidate's writing style. Use FULL company name '{req.company}' if mentioned.",
-  "summary_diff": {{"original": "...source summary...", "tailored": "...rewritten..."}},
-  "skills_added":   ["skills newly surfaced for this JD"],
-  "skills_removed": ["skills de-emphasized as irrelevant"],
-  "tailored_skills": {{
-    "languages": [],
-    "frameworks": [],
-    "tools": [],
-    "databases": [],
-    "domains": []
-  }},
+  "tailored_summary": "<actual 2-3 sentence summary here — not a placeholder>",
+  "summary_diff": {{"original": "{user_data.get("summary", "")[:200]}", "tailored": "<same as tailored_summary>"}},
   "experience": [
     {{
-      "company": "EXACT source company string",
-      "title":   "EXACT source title/role string",
-      "dates":   "EXACT source dates/duration string",
+      "company": "{exp0.get("company", "")}",
+      "title": "{exp0.get("role") or exp0.get("title", "")}",
+      "dates": "{exp0.get("duration", "")}",
       "bullets": [
-        {{"text":"...rewritten or original bullet (max {style['max_words']} words)...","status":"unchanged|edited|added","original":"...source bullet text, empty string only if status=added..."}}
+        {{"text": "<rewritten or original text>", "status": "edited|unchanged|added", "original": "<exact source text, empty string if added>"}}
       ]
     }}
   ],
-  "selected_projects": ["3 most relevant project titles, EXACT match from candidate.projects"],
-  "keywords_inserted": ["JD keywords woven into the rewrite"],
-  "score_estimate": 0
-}}
-
-Rules:
-- Include all original bullets — but ACTIVELY REWRITE those that can better match the JD (status: "edited").
-- Only use "unchanged" when a bullet already perfectly matches the JD with zero changes needed.
-- Add at most 1 NEW bullet per role only if backed by source evidence (status: "added", original: "").
-- "edited" bullets MUST include the exact original source text in "original" field.
-- Max {style['max_words']} words per bullet. Max 5 bullets per role.
-- `tailored_skills` must use the same 5-category shape as the base resume.
-- `selected_projects` must be chosen from PROJECT LIBRARY only (exact title match)."""
+  "keywords_inserted": ["list of JD keywords you wove in"]
+}}"""
 
         try:
             content = call_llm([{"role": "user", "content": prompt}],
@@ -1581,7 +1642,22 @@ Rules:
             print(f"Tailor resume error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-        # ── ConstraintEngine validation ─────────────────────────────────
+        # ── STEP 4: Post-process — validate summary, attach deterministic fields ──
+        # Reject placeholder summaries
+        summary = result.get("tailored_summary", "")
+        placeholder_patterns = ["...rewritten...", "rewritten for this role", "<actual", "2-3 sentence summary"]
+        if not summary or any(p.lower() in summary.lower() for p in placeholder_patterns) or len(summary) < 40:
+            print(f"[tailor-resume] Summary placeholder detected, falling back to master: {summary!r}")
+            result["tailored_summary"] = user_data.get("summary", "")
+            result.setdefault("summary_diff", {})["tailored"] = result["tailored_summary"]
+
+        # Attach deterministic projects + skills (override LLM guesses)
+        result["selected_projects"] = [p.get("title", "") for p in selected_projects]
+        result["tailored_skills"] = tailored_skills
+        result["skills_added"] = req.selected_skills or []
+        result["skills_removed"] = []
+
+        # ── STEP 5: Constraint validation ────────────────────────────────
         validation = constraints_engine.validate_tailored_resume(
             user_data, result, evidence_text=evidence_text,
         )
@@ -1590,14 +1666,12 @@ Rules:
         if not validation.ok:
             print(f"[tailor-resume] {len(validation.fatal_violations)} fatal violations, attempting auto-repair")
             result, repair_actions = constraints_engine.auto_repair(result, validation, user_data)
-            # Re-validate after repair
             validation_after = constraints_engine.validate_tailored_resume(
                 user_data, result, evidence_text=evidence_text,
             )
         else:
             validation_after = validation
 
-        # Attach validation diagnostics to response so UI can show them
         result["_validation"] = {
             "ok": validation_after.ok,
             "violations": [v.to_dict() for v in validation_after.violations],
@@ -1633,20 +1707,37 @@ def _merge_tailored_into_master(master: dict, data: dict) -> dict:
                     src_exp["details"] = new_bullets
                     src_exp["bullets"] = new_bullets
 
-    # 3. Project selection — explicit list, or default to top 3 (1-page constraint)
+    # 3. Project selection — use pre-ranked titles from _rank_projects_for_jd
     project_library = merged.get("project_library") or merged.get("projects") or []
     if data.get("selected_projects"):
         target_titles = {t.lower().strip() for t in data["selected_projects"]}
-        filtered = [p for p in project_library if p.get("title","").lower().strip() in target_titles]
+        # Match by substring so minor title differences don't break lookup
+        filtered = [p for p in project_library
+                    if any(t in p.get("title","").lower() or p.get("title","").lower() in t
+                           for t in target_titles)]
         if filtered:
             merged["projects"] = filtered[:3]
     elif merged.get("projects") and len(merged["projects"]) > 3:
-        # No selection provided → keep only top 3 to fit 1 page
         merged["projects"] = merged["projects"][:3]
 
-    # 3b. Apply tailored skills if provided
+    # 3b. Apply tailored skills — use the full assembled version from _assemble_tailored_skills.
+    # The tailored_skills dict already contains the complete master list with JD additions.
+    # Only override if it has non-empty values for at least 3 categories (guards against LLM truncation).
     if data.get("tailored_skills"):
-        merged["skills"] = {**merged.get("skills", {}), **data["tailored_skills"]}
+        ts = data["tailored_skills"]
+        non_empty = sum(1 for v in ts.values() if isinstance(v, list) and len(v) > 1)
+        if non_empty >= 3:
+            # Merge: for each category keep master entries + any new items from tailored (no truncation)
+            master_skills = merged.get("skills", {})
+            for key in ["domains", "frameworks", "tools", "databases", "languages"]:
+                master_list = master_skills.get(key) or []
+                tailored_list = ts.get(key) or []
+                # Union preserving order: tailored first (may reorder for emphasis), then any master extras
+                seen = {s.lower().strip() for s in tailored_list}
+                extras = [s for s in master_list if s.lower().strip() not in seen]
+                merged.setdefault("skills", {})[key] = tailored_list + extras
+        else:
+            print(f"[merge] tailored_skills too sparse ({non_empty} non-empty categories) — keeping master skills")
 
     # 4. Dedup: don't repeat publications under projects
     if merged.get("publications") and merged.get("projects"):
