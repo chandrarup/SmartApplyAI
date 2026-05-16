@@ -1495,33 +1495,34 @@ async def tailor_resume(req: TailorResumeRequest, request: Request):
             for b in (e.get("details") or e.get("bullets") or [])
         ))
 
-        prompt = f"""You are an expert technical resume writer. Rewrite the candidate's resume to maximize fit for the target role while staying 100% factually faithful to the source data.
+        prompt = f"""You are an expert technical resume writer. Your job is to ACTIVELY REWRITE the candidate's experience bullets to maximize keyword match with the target JD.
 
-ABSOLUTE RULES (violating these will reject the output):
-1. NEVER modify company names, job titles, or dates — copy them EXACTLY.
-2. NEVER invent metrics, numbers, percentages, or achievements not in source.
-3. NEVER add corporate buzzwords (synergize, cutting-edge, world-class, paradigm shift).
-4. Keep bullets SHORT and METRIC-LED in the candidate's existing style.
-5. New bullets must be backed by source evidence (existing bullets or summary).
-6. When the tailored_summary mentions the target company, use the FULL name "{req.company}" — never abbreviate, shorten, or use initials.
+WHAT "EDITING" MEANS (you MUST do this):
+- Rephrase bullets to front-load JD-required skills (e.g., if JD wants "RAG pipelines", make sure bullets that mention RAG lead with that)
+- Swap generic verbs for stronger JD-matching ones (e.g., "Built" → "Deployed", "Designed" → "Architected")
+- Add JD keywords inline where they are genuinely supported by existing work (e.g., "...using LangChain and AutoGen (LLM orchestration frameworks)" → adds "LLM orchestration")
+- Reorder clauses to put the JD-relevant achievement first
+- Status "edited" means the text changed. Status "unchanged" means the text is IDENTICAL to the original.
+
+HARD RULES:
+1. NEVER modify company names, job titles, or dates — copy them EXACTLY from source.
+2. NEVER invent metrics or achievements — but you MAY rephrase how existing metrics are presented.
+3. NEVER add buzzwords (synergize, cutting-edge, world-class, paradigm shift, enterprise-grade solutions).
+4. You MUST set status="edited" for bullets you changed, and include the original text in "original".
+5. When the tailored_summary mentions the target company, use the FULL name "{req.company}" — never abbreviate.
+6. MINIMUM: at least 3 bullets across all experience entries MUST have status="edited" or "added". Returning all "unchanged" is a FAILURE — the output will be rejected.
 
 CANDIDATE STYLE FINGERPRINT (preserve this style):
 - Median bullet length: {style['median_words']} words (max {style['max_words']})
-- Verb-start ratio: {style['starts_with_verb_pct']}% (most bullets start with "Built", "Designed", "Achieved", etc.)
+- Verb-start ratio: {style['starts_with_verb_pct']}% (most bullets start with action verbs)
 - Metric-led ratio: {style['metric_pct']}% (bullets reference numbers/percentages from real work)
 - Example bullets: {json.dumps(style.get('sample_bullets', []))}
 
-CANDIDATE PROFILE (source of truth — JSON):
+CANDIDATE PROFILE (source of truth):
 {json.dumps(user_data, indent=2)[:6000]}
 
-LOCKED BASE RESUME TEMPLATE (the output must preserve this structure exactly and only change approved regions):
-{bundle.get("base_resume_tex", "")[:5000]}
-
-FULL CV EVIDENCE BANK (you may use this to choose stronger project/work evidence, but only if it is already true of the candidate):
-{bundle.get("cv_plain", "")[:5000]}
-
-EDITABLE REGIONS ONLY:
-{json.dumps(bundle.get("editable_regions", []))}
+FULL CV EVIDENCE BANK (use to find additional evidence for rewrites — only real facts):
+{bundle.get("cv_plain", "")[:3000]}
 
 TARGET ROLE: {req.role}
 TARGET COMPANY: {req.company}
@@ -1529,15 +1530,15 @@ SKILLS TO EMPHASIZE: {", ".join(req.selected_skills) if req.selected_skills else
 PROJECTS TO PRIORITIZE: {", ".join(req.selected_projects) if req.selected_projects else "(choose best fit from project library)"}
 OPTIONAL USER INSTRUCTION: {req.user_instruction or "(none)"}
 
-PROJECT LIBRARY (exact titles + descriptions; choose from this set only):
-{json.dumps(project_library, indent=2)[:5000]}
+PROJECT LIBRARY (choose from this set only):
+{json.dumps(project_library, indent=2)[:4000]}
 
 JOB DESCRIPTION:
 \"\"\"{req.jd_text[:5000]}\"\"\"
 
 OUTPUT JSON ONLY, exact shape:
 {{
-  "tailored_summary": "Rewritten 2-3 sentence summary in implied first person, no pronouns. Match candidate's writing style. If mentioning the target company, use the FULL name '{req.company}' — never abbreviate or shorten it.",
+  "tailored_summary": "Rewritten 2-3 sentence summary in implied first person, no pronouns. Match candidate's writing style. Use FULL company name '{req.company}' if mentioned.",
   "summary_diff": {{"original": "...source summary...", "tailored": "...rewritten..."}},
   "skills_added":   ["skills newly surfaced for this JD"],
   "skills_removed": ["skills de-emphasized as irrelevant"],
@@ -1554,7 +1555,7 @@ OUTPUT JSON ONLY, exact shape:
       "title":   "EXACT source title/role string",
       "dates":   "EXACT source dates/duration string",
       "bullets": [
-        {{"text":"...rewritten bullet (max {style['max_words']} words, style-consistent)...","status":"unchanged|edited|added","original":"...source bullet text or empty if added..."}}
+        {{"text":"...rewritten or original bullet (max {style['max_words']} words)...","status":"unchanged|edited|added","original":"...source bullet text, empty string only if status=added..."}}
       ]
     }}
   ],
@@ -1563,21 +1564,18 @@ OUTPUT JSON ONLY, exact shape:
   "score_estimate": 0
 }}
 
-Constraints:
-- For every existing experience entry, include ALL original bullets first (status: unchanged or edited).
-- Add at most 1 NEW bullet per role only if backed by source evidence (status: added, original: "").
-- "edited" bullets MUST include source text in "original".
-- Max {style['max_words']} words per bullet (matches candidate's style).
-- Max 5 bullets per role.
-- Only edit these regions: summary, skills, selected projects, and experience bullets.
-- Do not create new sections, new companies, new titles, or new dates.
-- `tailored_skills` must preserve the same 5-category shape used by the base resume.
-- `selected_projects` must be chosen from PROJECT LIBRARY only.
-- NEVER use any of: synergize, cutting-edge, world-class, enterprise-grade solutions, paradigm shift."""
+Rules:
+- Include all original bullets — but ACTIVELY REWRITE those that can better match the JD (status: "edited").
+- Only use "unchanged" when a bullet already perfectly matches the JD with zero changes needed.
+- Add at most 1 NEW bullet per role only if backed by source evidence (status: "added", original: "").
+- "edited" bullets MUST include the exact original source text in "original" field.
+- Max {style['max_words']} words per bullet. Max 5 bullets per role.
+- `tailored_skills` must use the same 5-category shape as the base resume.
+- `selected_projects` must be chosen from PROJECT LIBRARY only (exact title match)."""
 
         try:
             content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.2, prefer=req.llm, timeout=600)
+                               temperature=0.4, prefer=req.llm, timeout=600)
             result = json.loads(clean_json(content))
         except Exception as e:
             print(f"Tailor resume error: {e}")
