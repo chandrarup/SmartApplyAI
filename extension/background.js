@@ -17,27 +17,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
 
   } else if (message.action === "get_settings") {
-    chrome.storage.sync.get(["apiUrl", "llm", "claudeKey"], (result) => {
+    chrome.storage.sync.get(["apiUrl", "llm", "claudeKey", "autoRetrigger"], (result) => {
       sendResponse({
-        url: result.apiUrl || "http://127.0.0.1:8000",
+        url: result.apiUrl || "http://127.0.0.1:5001",
         llm: result.llm || "ollama",
-        claudeKey: result.claudeKey || ""
+        claudeKey: result.claudeKey || "",
+        autoRetrigger: !!result.autoRetrigger,
       });
     });
     return true;
 
   } else if (message.action === "save_settings") {
-    chrome.storage.sync.set({
-      apiUrl: message.url || "http://127.0.0.1:8000",
+    const payload = {
+      apiUrl: message.url || "http://127.0.0.1:5001",
       llm: message.llm || "ollama",
       claudeKey: message.claudeKey || ""
-    }, () => sendResponse({ success: true }));
+    };
+    if (typeof message.autoRetrigger === "boolean") payload.autoRetrigger = message.autoRetrigger;
+    chrome.storage.sync.set(payload, () => sendResponse({ success: true }));
     return true;
 
   // Legacy compat — keep old get_api_url / save_api_url working
   } else if (message.action === "get_api_url") {
     chrome.storage.sync.get(["apiUrl"], (result) => {
-      sendResponse({ url: result.apiUrl || "http://127.0.0.1:8000" });
+      sendResponse({ url: result.apiUrl || "http://127.0.0.1:5001" });
     });
     return true;
 
@@ -45,6 +48,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.sync.set({ apiUrl: message.url }, () => {
       sendResponse({ success: true });
     });
+    return true;
+
+  // Cache JD text from content script so popup can read it even after navigation
+  } else if (message.action === "cache_page_context") {
+    if (tabId) {
+      tabState[tabId] = {
+        ...tabState[tabId],
+        pageContext: message.text,
+        jobContext: message.jobContext || null,
+        platform: message.platform,
+        ts: Date.now()
+      };
+    }
+    sendResponse({ success: true });
+
+  } else if (message.action === "get_page_context") {
+    const tid = message.tabId || tabId;
+    const cached = tabState[tid];
+    // Return cache if under 2 hours old
+    if (cached?.pageContext && (Date.now() - (cached.ts || 0)) < 7200000) {
+      sendResponse({ text: cached.pageContext, jobContext: cached.jobContext || null, platform: cached.platform, ts: cached.ts });
+    } else {
+      sendResponse({ text: null, jobContext: null });
+    }
     return true;
   }
 

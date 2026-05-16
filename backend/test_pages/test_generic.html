@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Senior AI Engineer — Generic Form Test | StartupXYZ</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 700px; margin: 0 auto; padding: 32px 24px; color: #2c2c2c; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; color: #1a1a2e; }
+  .subtitle { color: #666; font-size: 15px; margin-bottom: 28px; }
+  .badge { display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-bottom: 24px; font-family: sans-serif; }
+  fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; }
+  legend { font-family: sans-serif; font-size: 13px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px; padding: 0 8px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { margin-bottom: 14px; }
+  label { display: block; font-family: sans-serif; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 4px; }
+  input[type=text], input[type=email], input[type=tel], input[type=url], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1.5px solid #ccc; border-radius: 5px; font-size: 14px; outline: none; box-sizing: border-box; font-family: sans-serif;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #6366f1; }
+  textarea { resize: vertical; min-height: 80px; }
+  .radio-group { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; font-family: sans-serif; font-size: 14px; }
+  .radio-group label { font-weight: 400; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .submit-btn { background: #6366f1; color: white; border: none; padding: 13px 36px; font-size: 15px; font-weight: 700; cursor: pointer; border-radius: 8px; margin-top: 8px; font-family: sans-serif; }
+  .submit-btn:hover { background: #4f46e5; }
+  .result-overlay { display: none; position: fixed; top: 20px; right: 20px; background: white; border: 2px solid #6366f1; border-radius: 8px; padding: 16px 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); max-width: 340px; z-index: 9999; font-family: sans-serif; font-size: 13px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 10px; color: #6366f1; font-size: 14px; }
+  .result-item { padding: 3px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .close-btn { float: right; background: none; border: none; font-size: 16px; cursor: pointer; }
+  .jd-box { background: #f8faff; border: 1px solid #e0e7ff; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; font-family: sans-serif; font-size: 13.5px; line-height: 1.6; }
+  .jd-box h3 { margin: 0 0 8px; font-size: 13px; color: #6366f1; text-transform: uppercase; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+
+<h1>Senior AI Engineer</h1>
+<p class="subtitle">StartupXYZ · Remote · Full-time · $140k–$180k + equity</p>
+
+<div class="badge">Generic Form — LocalHire Agent Test Page</div>
+
+<div class="jd-box">
+  <h3>About the Role</h3>
+  We're building the next generation of AI-powered developer tools. You'll design and ship production LLM integrations, RAG pipelines, and agentic workflows using Python, LangChain, and AWS. 3+ years of experience with ML systems required. US work authorization required. We sponsor H-1B visas.
+</div>
+
+<form id="generic-form">
+
+  <fieldset>
+    <legend>Personal Info</legend>
+    <div class="row">
+      <div class="field">
+        <label for="g_first">First Name *</label>
+        <input type="text" id="g_first" name="first_name" placeholder="First name" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="g_last">Last Name *</label>
+        <input type="text" id="g_last" name="last_name" placeholder="Last name" autocomplete="off">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="g_email">Email *</label>
+        <input type="email" id="g_email" name="email" placeholder="your@email.com" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="g_phone">Mobile Phone</label>
+        <input type="tel" id="g_phone" name="phone" placeholder="+1 (555) 000-0000" autocomplete="off">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="g_city">City</label>
+        <input type="text" id="g_city" name="city" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="g_country">Country</label>
+        <select id="g_country" name="country">
+          <option value="">Select...</option>
+          <option value="United States">United States</option>
+          <option value="Canada">Canada</option>
+          <option value="India">India</option>
+          <option value="UK">United Kingdom</option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Links &amp; Portfolio</legend>
+    <div class="row">
+      <div class="field">
+        <label for="g_linkedin">LinkedIn URL</label>
+        <input type="url" id="g_linkedin" name="linkedin" placeholder="https://linkedin.com/in/..." autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="g_github">GitHub URL</label>
+        <input type="url" id="g_github" name="github" placeholder="https://github.com/..." autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <label for="g_portfolio">Portfolio / Website</label>
+      <input type="url" id="g_portfolio" name="website" placeholder="https://yourportfolio.com" autocomplete="off">
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Work History</legend>
+    <div class="row">
+      <div class="field">
+        <label for="g_employer">Current Employer</label>
+        <input type="text" id="g_employer" name="current_company" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="g_title">Current Job Title</label>
+        <input type="text" id="g_title" name="current_title" autocomplete="off">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="g_exp">Years of Experience</label>
+        <select id="g_exp" name="years_experience">
+          <option value="">Select range...</option>
+          <option value="0-1">Less than 1 year</option>
+          <option value="1-2">1–2 years</option>
+          <option value="2-3">2–3 years</option>
+          <option value="3-5">3–5 years</option>
+          <option value="5+">5+ years</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="g_salary">Expected Salary (USD/yr)</label>
+        <input type="text" id="g_salary" name="desired_salary" placeholder="e.g. 140000" autocomplete="off">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Eligibility</legend>
+    <div class="field">
+      <label>Are you authorized to work in the United States?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="work_auth" value="Yes"> Yes, I am authorized</label>
+        <label><input type="radio" name="work_auth" value="No"> No</label>
+      </div>
+    </div>
+    <div class="field">
+      <label>Do you require sponsorship now or in the future?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="sponsorship" value="Yes"> Yes</label>
+        <label><input type="radio" name="sponsorship" value="No"> No</label>
+      </div>
+    </div>
+    <div class="field">
+      <label for="g_start">Earliest Available Start Date</label>
+      <input type="text" id="g_start" name="start_date" placeholder="e.g. Immediately, 2 weeks notice" autocomplete="off">
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>About You</legend>
+    <div class="field">
+      <label for="g_summary">Brief Professional Summary *</label>
+      <textarea id="g_summary" name="summary" rows="4" placeholder="Tell us about your background, skills, and what you're looking for..."></textarea>
+    </div>
+    <div class="field">
+      <label for="g_why">Why are you interested in this role at StartupXYZ?</label>
+      <textarea id="g_why" name="why_company" rows="3"></textarea>
+    </div>
+    <div class="field">
+      <label for="g_strength">What is your greatest strength?</label>
+      <textarea id="g_strength" name="greatest_strength" rows="2"></textarea>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="g_referral">How did you find this job?</label>
+        <select id="g_referral" name="referral_source">
+          <option value="">Select...</option>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="Indeed">Indeed</option>
+          <option value="Referral">Friend / Referral</option>
+          <option value="Company Website">Company Website</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="g_pronouns">Preferred Pronouns (optional)</label>
+        <select id="g_pronouns" name="pronouns">
+          <option value="">Prefer not to say</option>
+          <option value="He/Him">He/Him</option>
+          <option value="She/Her">She/Her</option>
+          <option value="They/Them">They/Them</option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
+
+  <button type="submit" class="submit-btn">Submit Application</button>
+</form>
+
+<div class="result-overlay" id="resultOverlay">
+  <button class="close-btn" onclick="document.getElementById('resultOverlay').style.display='none'">✕</button>
+  <h3>Fields Filled</h3>
+  <div id="resultList"></div>
+</div>
+
+<script>
+document.getElementById("generic-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const list = document.getElementById("resultList");
+  list.innerHTML = "";
+  let filled = 0, total = 0;
+
+  // Check text/email/tel/url/select/textarea
+  document.querySelectorAll("input[type=text],input[type=email],input[type=tel],input[type=url],select,textarea").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const labels = document.querySelectorAll(`label[for="${f.id}"]`);
+      const lbl = labels[0]?.textContent?.replace("*","").trim() || f.name;
+      const div = document.createElement("div");
+      div.className = "result-item";
+      div.innerHTML = `<strong>${lbl}:</strong> ${f.value.substring(0,55)}${f.value.length>55?"...":""}`;
+      list.appendChild(div);
+    }
+  });
+
+  // Check radios
+  ["work_auth","sponsorship"].forEach(n => {
+    total++;
+    const checked = document.querySelector(`input[name="${n}"]:checked`);
+    if (checked) {
+      filled++;
+      const div = document.createElement("div");
+      div.className = "result-item";
+      div.innerHTML = `<strong>${n}:</strong> ${checked.value}`;
+      list.appendChild(div);
+    }
+  });
+
+  const s = document.createElement("div");
+  s.style.cssText = "margin-top:8px;padding-top:8px;border-top:2px solid #e0e7ff;font-weight:700;color:#6366f1;font-family:sans-serif";
+  s.textContent = `${filled}/${total} fields filled`;
+  list.appendChild(s);
+  document.getElementById("resultOverlay").style.display = "block";
+});
+</script>
+</body>
+</html>

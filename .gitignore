@@ -1,17 +1,62 @@
-# Python temporary files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual Environments (if you use them later)
+# Virtual Environments
 venv/
 env/
 .env
 
-# OS System files
+# OS
 .DS_Store
 Thumbs.db
 
-# IDE settings (VS Code, JetBrains)
+# IDE
 .vscode/
 .idea/
+
+# LaTeX build artifacts (never commit these)
+*.aux
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+tailored_resume.pdf
+tailored_resume.tex
+backend/tailored_resume.*
+backend/test_pkg.*
+
+# Generated resume PDFs (runtime output)
+generated resume/
+backend/generated_resumes/
+
+# Versioned resume variants (runtime output)
+backend/profiles/*/resumes/
+
+# Test screenshots
+backend/screenshots/
+
+# Runtime logs (keep the logs/ dir via .gitkeep, not the .log files)
+backend/telemetry.log
+backend/logs/*.log
+
+# Analysis / planning docs (not codebase)
+DEEP_ANALYSIS_AND_REWRITES.md
+IMPLEMENTATION_PLAN.md
+jobright_platform_analysis.md
+autofill_technical_report.md
+*.md.bak
+
+# Node.js
+node_modules/
+
+# Personal / temp
+.Rhistory
+.local/
+~$*
+*.docx
+
+# Pytest cache
+.pytest_cache/
+pytest-cache-files-*/

@@ -1,6 +1,84 @@
 // LocalHire Agent — Popup Script v2.1
 
 // ─────────────────────────────────────────────
+// EXTENSION LOGGER
+// Toggle: Settings checkbox "Enable Extension Logs"
+// Storage key: lh_log_enabled  (boolean, default true)
+// Logs stored in: chrome.storage.local  lh_logs[]  (circular 200)
+// Backend sink: POST /lh/ext-logs  (batched every 5 s)
+// ─────────────────────────────────────────────
+const LHLog = (() => {
+  const LEVELS  = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
+  const MAX_BUF = 200;
+  let _enabled  = true;
+  let _minLevel = LEVELS.INFO;
+  let _buf      = [];
+  let _timer    = null;
+
+  // Load persisted settings
+  try {
+    chrome.storage.local.get(["lh_log_enabled", "lh_log_level", "lh_logs"], res => {
+      if (res.lh_log_enabled !== undefined) _enabled = !!res.lh_log_enabled;
+      if (res.lh_log_level)  _minLevel = LEVELS[res.lh_log_level] ?? LEVELS.INFO;
+      if (Array.isArray(res.lh_logs)) _buf = res.lh_logs.slice(-MAX_BUF);
+    });
+  } catch (_) {}
+
+  function _write(level, module, msg, data) {
+    if (!_enabled || LEVELS[level] < _minLevel) return;
+    const ts    = new Date().toISOString();
+    const entry = { ts, level, module, msg, data: data ?? null };
+
+    // Console
+    const fn = level === "ERROR" ? console.error
+             : level === "WARN"  ? console.warn
+             : level === "DEBUG" ? console.debug
+             : console.log;
+    fn(`[LH][${level}][${module}] ${msg}`, data ?? "");
+
+    // Circular buffer
+    _buf.push(entry);
+    if (_buf.length > MAX_BUF) _buf = _buf.slice(-MAX_BUF);
+
+    // Persist to local storage (debounced)
+    clearTimeout(_timer);
+    _timer = setTimeout(() => {
+      try { chrome.storage.local.set({ lh_logs: _buf }); } catch (_) {}
+      _flush();
+    }, 3000);
+  }
+
+  async function _flush() {
+    if (!_buf.length) return;
+    try {
+      const apiUrl = document.getElementById("apiUrlInput")?.value?.trim() || "http://127.0.0.1:5001";
+      const toSend = _buf.slice();
+      await fetch(`${apiUrl}/lh/ext-logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logs: toSend }),
+        keepalive: true,
+      });
+    } catch (_) { /* backend offline — keep in buffer */ }
+  }
+
+  return {
+    debug:  (mod, msg, d) => _write("DEBUG", mod, msg, d),
+    info:   (mod, msg, d) => _write("INFO",  mod, msg, d),
+    warn:   (mod, msg, d) => _write("WARN",  mod, msg, d),
+    error:  (mod, msg, d) => _write("ERROR", mod, msg, d),
+
+    setEnabled(val) {
+      _enabled = val;
+      try { chrome.storage.local.set({ lh_log_enabled: val }); } catch (_) {}
+    },
+    isEnabled: () => _enabled,
+    getLogs:   () => _buf.slice(),
+    flush:     _flush,
+  };
+})();
+
+// ─────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────
 let pageContext = null;
@@ -11,14 +89,89 @@ let currentLlm = "ollama"; // "ollama" | "claude"
 let lastDetectedCompany = "";
 let lastDetectedPlatform = "";
 let lastDetectedRole = "";
+let currentTabId = null;
+
+// ─────────────────────────────────────────────
+// SESSION PERSISTENCE (survives popup close/reopen)
+// ─────────────────────────────────────────────
+async function saveSession(updates) {
+  if (!currentTabId) return;
+  const key = `tab_${currentTabId}`;
+  return new Promise(resolve => {
+    chrome.storage.session.get([key], result => {
+      const current = result[key] || {};
+      chrome.storage.session.set({ [key]: { ...current, ...updates, ts: Date.now() } }, resolve);
+    });
+  });
+}
+
+async function loadSession() {
+  if (!currentTabId) return null;
+  return new Promise(resolve => {
+    chrome.storage.session.get([`tab_${currentTabId}`], result => {
+      const data = result[`tab_${currentTabId}`];
+      if (data && (Date.now() - (data.ts || 0)) < 7200000) resolve(data);
+      else resolve(null);
+    });
+  });
+}
 
 // ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
   await loadSettings();
+
+  // Get current tab
+  const tabs = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+  currentTabId = tabs[0]?.id;
+  LHLog.info("popup", "DOMContentLoaded", { tabId: currentTabId, url: tabs[0]?.url });
+
   detectPlatform();
-  scrapePageContext(() => loadFAQs());
+
+  // Restore cached session state first (instant — no network).
+  // On Greenhouse form pages, skip restoring cached context — it may be stale form text.
+  const isOnGreenhouseForm = (() => {
+    try {
+      const u = new URL(tabs[0]?.url || "");
+      return /greenhouse\.io/.test(u.hostname) && /embed\/job_app/i.test(u.pathname);
+    } catch { return false; }
+  })();
+  const session = await loadSession();
+  if (session?.pageContext && !isOnGreenhouseForm) {
+    pageContext = session.pageContext;
+  }
+  if (session?.analysisData) {
+    analysisData = session.analysisData;
+    renderAnalysis(analysisData);
+  }
+  if (session?.chatHistory?.length) {
+    chatHistory = session.chatHistory;
+    const histDiv = document.getElementById("chat-history");
+    histDiv.innerHTML = "";
+    chatHistory.forEach(m => addBubble(m.content, m.role === "user" ? "user" : "bot"));
+  }
+
+  // Load page context: try background cache first (works cross-page), then live scrape.
+  // Exception: on Greenhouse application form pages the cache holds form boilerplate,
+  // not the JD — always go through scrapePageContext so the API adapter runs.
+  if (!pageContext) {
+    if (isOnGreenhouseForm) {
+      scrapePageContext(() => loadFAQs());
+    } else {
+      chrome.runtime.sendMessage({ action: "get_page_context", tabId: currentTabId }, bgRes => {
+        if (bgRes?.text) {
+          pageContext = bgRes.text;
+          saveSession({ pageContext });
+          loadFAQs();
+        } else {
+          scrapePageContext(() => loadFAQs());
+        }
+      });
+    }
+  } else {
+    loadFAQs();
+  }
 
   // Listen for autofill progress from content script
   chrome.runtime.onMessage.addListener((msg) => {
@@ -52,7 +205,7 @@ function hideEl(id) { document.getElementById(id)?.classList.add("hidden"); }
 function showEl(id) { document.getElementById(id)?.classList.remove("hidden"); }
 
 function getApiUrl() {
-  return document.getElementById("apiUrlInput").value.trim() || "http://127.0.0.1:8000";
+  return document.getElementById("apiUrlInput").value.trim() || "http://127.0.0.1:5001";
 }
 
 function getLlm() {
@@ -70,6 +223,11 @@ async function loadSettings() {
         toggleClaudeKeyRow(res.llm);
       }
       if (res?.claudeKey) document.getElementById("claudeKeyInput").value = res.claudeKey;
+      // Sync log toggle UI with persisted state
+      chrome.storage.local.get(["lh_log_enabled"], r => {
+        const el = document.getElementById("logToggle");
+        if (el) el.checked = r.lh_log_enabled !== false; // default true
+      });
       resolve();
     });
   });
@@ -107,14 +265,20 @@ document.getElementById("llmSelect").addEventListener("change", (e) => {
 // ─────────────────────────────────────────────
 // SAVE SETTINGS
 // ─────────────────────────────────────────────
+document.getElementById("logToggle")?.addEventListener("change", e => {
+  LHLog.setEnabled(e.target.checked);
+  LHLog.info("settings", `Extension logging ${e.target.checked ? "enabled" : "disabled"}`);
+});
+
 document.getElementById("saveSettingsBtn").addEventListener("click", () => {
   const url = document.getElementById("apiUrlInput").value.trim();
   const llm = document.getElementById("llmSelect").value;
   const claudeKey = document.getElementById("claudeKeyInput").value.trim();
+  LHLog.info("settings", "Settings saved", { url, llm });
 
   chrome.runtime.sendMessage({
     action: "save_settings",
-    url: url || "http://127.0.0.1:8000",
+    url: url || "http://127.0.0.1:5001",
     llm,
     claudeKey
   }, () => {
@@ -142,12 +306,88 @@ document.getElementById("saveSettingsBtn").addEventListener("click", () => {
   });
 });
 
+// Greenhouse public API adapter — fetches real JD when on application form page
+async function fetchGreenhouseJD(company, jobId) {
+  LHLog.info("greenhouse", "Fetching JD from Greenhouse API", { company, jobId });
+  const url = `https://boards-api.greenhouse.io/v1/boards/${company}/jobs/${jobId}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    LHLog.error("greenhouse", `Greenhouse API error ${res.status}`, { company, jobId, url });
+    throw new Error(`Greenhouse API ${res.status}`);
+  }
+  const data = await res.json();
+  const title = data.title || "";
+  const div = document.createElement("div");
+  div.innerHTML = data.content || "";
+  const bodyText = (div.textContent || "").replace(/\s+/g, " ").trim();
+  const text = (title ? title + "\n\n" : "") + bodyText;
+  LHLog.info("greenhouse", "JD fetched OK", { title, chars: text.length });
+  // Surface role name into UI
+  if (title) {
+    lastDetectedRole = lastDetectedRole || title;
+    const roleEl = document.getElementById("roleInput");
+    if (roleEl && !roleEl.value) roleEl.value = title;
+  }
+  return text;
+}
+
 function scrapePageContext(callback) {
-  if (pageContext) { if (callback) callback(pageContext); return; }
+  if (pageContext) {
+    LHLog.debug("scrape", "pageContext already cached", { chars: pageContext.length });
+    if (callback) callback(pageContext);
+    return;
+  }
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: "get_text" }, response => {
-      if (chrome.runtime.lastError || !response) return;
+    const tab = tabs[0];
+    if (!tab) return;
+
+    // Greenhouse application form — scraping returns a blank form, not the JD.
+    // Detect the pattern and fetch the real JD from the Greenhouse public API.
+    if (tab.url) {
+      try {
+        const u = new URL(tab.url);
+        const isGreenhouseForm = /greenhouse\.io/.test(u.hostname) && /embed\/job_app/i.test(u.pathname);
+        if (isGreenhouseForm) {
+          const company = u.searchParams.get("for") || u.searchParams.get("board_token") || "";
+          const token   = u.searchParams.get("token") || "";
+          LHLog.info("scrape", "Greenhouse form detected — using API adapter", { company, token });
+          if (company && token) {
+            fetchGreenhouseJD(company, token)
+              .then(text => {
+                if (text && text.length > 50) {
+                  pageContext = text;
+                  saveSession({ pageContext });
+                  LHLog.info("scrape", "pageContext set from Greenhouse API", { chars: text.length });
+                  if (callback) callback(pageContext);
+                } else {
+                  throw new Error("empty");
+                }
+              })
+              .catch(err => {
+                LHLog.error("scrape", "Greenhouse API failed — falling back to content script", { err: err?.message });
+                chrome.tabs.sendMessage(tab.id, { action: "get_text" }, response => {
+                  if (chrome.runtime.lastError || !response) return;
+                  pageContext = response.text;
+                  saveSession({ pageContext });
+                  LHLog.warn("scrape", "Fallback: form page text used", { chars: pageContext?.length });
+                  if (callback) callback(pageContext);
+                });
+              });
+            return; // exit early — async path takes over
+          }
+        }
+      } catch (_) { /* URL parse error — fall through to content script */ }
+    }
+
+    LHLog.debug("scrape", "Scraping page text via content script", { tabId: tab.id, url: tab.url });
+    chrome.tabs.sendMessage(tab.id, { action: "get_text" }, response => {
+      if (chrome.runtime.lastError || !response) {
+        LHLog.error("scrape", "content script get_text failed", { err: chrome.runtime.lastError?.message });
+        return;
+      }
       pageContext = response.text;
+      saveSession({ pageContext });
+      LHLog.info("scrape", "pageContext set from page scrape", { chars: pageContext?.length });
       if (callback) callback(pageContext);
     });
   });
@@ -176,14 +416,38 @@ function detectPlatform() {
 // ─────────────────────────────────────────────
 // MATCH TAB
 // ─────────────────────────────────────────────
+function renderAnalysis(data) {
+  document.getElementById("matchScore").textContent = data.score || "—";
+  document.getElementById("matchRole").textContent = data.role || "—";
+  document.getElementById("matchSummary").textContent = data.tailored_summary || "";
+  document.getElementById("missingSkill").textContent = data.missing_skill || "";
+  const skillList = document.getElementById("matchedSkills");
+  skillList.innerHTML = "";
+  (data.skills_matched || []).forEach(s => {
+    const tag = document.createElement("span");
+    tag.className = "tag green"; tag.textContent = s;
+    skillList.appendChild(tag);
+  });
+  if (data.missing_skill) {
+    const tag = document.createElement("span");
+    tag.className = "tag red"; tag.textContent = "✗ " + data.missing_skill;
+    skillList.appendChild(tag);
+  }
+  if (data.role) document.getElementById("roleInput").value = data.role;
+  hideEl("matchStatus");
+  showEl("matchResult");
+}
+
 document.getElementById("analyzeBtn").addEventListener("click", () => {
   const btn = document.getElementById("analyzeBtn");
   btn.disabled = true;
   btn.textContent = "Analyzing...";
   hideEl("matchResult");
   showStatus("matchStatus", "loading", "Reading page & thinking...", true);
+  LHLog.info("analyze", "Analyze button clicked", { llm: getLlm() });
 
   scrapePageContext(async text => {
+    LHLog.info("analyze", "JD text ready for /analyze", { chars: text?.length, llm: getLlm() });
     try {
       const res = await fetch(`${getApiUrl()}/analyze`, {
         method: "POST",
@@ -193,30 +457,11 @@ document.getElementById("analyzeBtn").addEventListener("click", () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Analyze failed");
       analysisData = data;
-
-      document.getElementById("matchScore").textContent = data.score || "—";
-      document.getElementById("matchRole").textContent = data.role || "—";
-      document.getElementById("matchSummary").textContent = data.tailored_summary || "";
-      document.getElementById("missingSkill").textContent = data.missing_skill || "";
-
-      const skillList = document.getElementById("matchedSkills");
-      skillList.innerHTML = "";
-      (data.skills_matched || []).forEach(s => {
-        const tag = document.createElement("span");
-        tag.className = "tag green"; tag.textContent = s;
-        skillList.appendChild(tag);
-      });
-      if (data.missing_skill) {
-        const tag = document.createElement("span");
-        tag.className = "tag red"; tag.textContent = "✗ " + data.missing_skill;
-        skillList.appendChild(tag);
-      }
-
-      if (data.role) document.getElementById("roleInput").value = data.role;
-
-      hideEl("matchStatus");
-      showEl("matchResult");
+      saveSession({ analysisData });
+      renderAnalysis(data);
+      LHLog.info("analyze", "Analysis complete", { score: data.score, role: data.role });
     } catch (e) {
+      LHLog.error("analyze", "Analyze request failed", { err: e?.message });
       showStatus("matchStatus", "error", "Error: " + e.message);
     } finally {
       btn.disabled = false;
@@ -243,10 +488,81 @@ document.getElementById("pdfBtn").addEventListener("click", async () => {
       btn.textContent = "Downloaded ✓";
       setTimeout(() => { btn.disabled = false; btn.textContent = "Generate Tailored PDF Resume"; }, 3000);
     } else {
-      btn.textContent = "PDF Failed (Docker required)"; btn.disabled = false;
+      btn.textContent = "PDF Failed (check local TeX tools)"; btn.disabled = false;
     }
   } catch (e) {
     btn.textContent = "Error: " + e.message; btn.disabled = false;
+  }
+});
+
+// Customize Resume — POST JD to backend /pending-jd, then open dashboard
+document.getElementById("customizeResumeBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("customizeResumeBtn");
+  btn.disabled = true;
+  btn.textContent = "Opening…";
+
+  // Prefer structured cached context, else ask the content script directly, else use raw page text
+  const getContext = () => new Promise(resolve => {
+    chrome.runtime.sendMessage({ action: "get_page_context", tabId: currentTabId }, bgRes => {
+      if (bgRes?.jobContext || bgRes?.text) {
+        resolve({
+          jd: bgRes?.jobContext?.jdText || bgRes?.text || "",
+          role: bgRes?.jobContext?.title || "",
+          company: bgRes?.jobContext?.company || "",
+        });
+        return;
+      }
+      if (currentTabId) {
+        chrome.tabs.sendMessage(currentTabId, { action: "get_job_context" }, liveRes => {
+          if (!chrome.runtime.lastError && liveRes) {
+            resolve({
+              jd: liveRes.jdText || pageContext || "",
+              role: liveRes.title || "",
+              company: liveRes.company || "",
+            });
+            return;
+          }
+          if (pageContext) return resolve({ jd: pageContext, role: "", company: "" });
+          scrapePageContext(t => resolve({ jd: t || "", role: "", company: "" }));
+        });
+        return;
+      }
+      if (pageContext) return resolve({ jd: pageContext, role: "", company: "" });
+      scrapePageContext(t => resolve({ jd: t || "", role: "", company: "" }));
+    });
+  });
+
+  const ctx = await getContext();
+  const jd = ctx.jd || "";
+  const role = ctx.role || (analysisData && analysisData.role) || lastDetectedRole || "";
+  const company = document.getElementById("companyInput")?.value?.trim()
+                  || ctx.company || lastDetectedCompany || "";
+  const apiUrl = getApiUrl();
+  LHLog.info("customize", "customizeResumeBtn clicked", { jdLen: jd?.length, role, company, apiUrl });
+
+  try {
+    // POST full JD text to backend — avoids URL length limits (JDs can be 5-10KB)
+    const pendingRes = await fetch(`${apiUrl}/pending-jd`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jd, role, company })
+    });
+    const pending = await pendingRes.json().catch(() => ({}));
+    LHLog.info("customize", "POST /pending-jd OK — opening dashboard");
+    const token = pending?.token ? `&token=${encodeURIComponent(pending.token)}` : "";
+    chrome.tabs.create({ url: `${apiUrl}/dashboard?from=extension${token}` });
+  } catch (e) {
+    LHLog.error("customize", "POST /pending-jd failed — using URL fallback", { err: e?.message });
+    const p = new URLSearchParams();
+    p.set("jd", (jd || "").slice(0, 1800));
+    if (role) p.set("role", role);
+    if (company) p.set("company", company);
+    chrome.tabs.create({ url: `${apiUrl}/dashboard?${p.toString()}` });
+  } finally {
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = "Customize Resume on Web";
+    }, 3000);
   }
 });
 
@@ -398,6 +714,7 @@ async function sendChat(msg = null) {
     addBubble(data.answer || "No response.", "bot");
     chatHistory.push({ role: "user", content: question });
     chatHistory.push({ role: "assistant", content: data.answer });
+    saveSession({ chatHistory });
     historyDiv.scrollTop = historyDiv.scrollHeight;
   } catch (e) {
     addBubble("Error: could not reach backend.", "bot");
@@ -418,6 +735,8 @@ document.getElementById("chatInput").addEventListener("keydown", e => { if (e.ke
 // ─────────────────────────────────────────────
 document.getElementById("refreshBtn").addEventListener("click", () => {
   pageContext = null; analysisData = null; chatHistory = [];
+  if (currentTabId) chrome.storage.session.remove(`tab_${currentTabId}`);
+  hideEl("matchResult");
   document.getElementById("chat-history").innerHTML = '<div class="msg bot">Page refreshed. What would you like to know?</div>';
   scrapePageContext(() => loadFAQs());
   detectPlatform();

@@ -10,20 +10,14 @@
     "tabs"
   ],
   "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
+    "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "background.js"
   },
   "host_permissions": [
-    "http://127.0.0.1:8000/*",
-    "http://localhost:8000/*",
-    "http://localhost:5000/*",
+    "http://localhost:5001/*",
+    "http://127.0.0.1:5001/*",
     "*://*.myworkdayjobs.com/*",
     "*://*.wd1.myworkdayjobs.com/*",
     "*://*.wd3.myworkdayjobs.com/*",
@@ -40,13 +34,26 @@
     "*://*.taleo.net/*",
     "*://*.successfactors.com/*",
     "*://*.jobvite.com/*",
-    "*://*.paylocity.com/*"
+    "*://*.paylocity.com/*",
+    "*://*.ashbyhq.com/*",
+    "*://*.rippling.com/*",
+    "*://*.paycom.com/*",
+    "*://*.workable.com/*",
+    "*://*.recruitee.com/*",
+    "*://*.greenhouse.io/*"
   ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

@@ -1,0 +1,26 @@
+{
+  "name": "smartapplyai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Phase 1 resume-tailoring workflow for SmartApplyAI",
+  "scripts": {
+    "setup:backend": "python3 -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt",
+    "setup:optional": "python3 -m pip install -r backend/requirements-optional.txt",
+    "dev:backend": "cd backend && python3 -m uvicorn main:app --host 127.0.0.1 --port 5001 --reload",
+    "test:js": "node tests/unit/test_field_matching.js",
+    "test:py": "pytest tests/unit -q",
+    "test:smoke": "pytest tests/smoke -q",
+    "test": "npm run test:js && npm run test:py && npm run test:smoke",
+    "test:integration": "pytest tests/integration -q",
+    "test:resume-pipeline": "python3 backend/test_resume_pipeline.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  },
+  "dependencies": {
+    "playwright": "^1.59.1"
+  }
+}

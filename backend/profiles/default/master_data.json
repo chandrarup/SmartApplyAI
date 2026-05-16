@@ -29,10 +29,12 @@
             "duration": "Aug 2023 - Aug 2025",
             "location": "India",
             "details": [
-                "Architected production-grade LLM solutions for reverse engineering SDLC workflows.",
-                "Achieved 89% coverage in Technical Analysis with 9% efficiency improvement.",
-                "Designed custom RAG pipelines using LangChain and AutoGen.",
-                "Mentored 30+ engineers and recognized with Wall of Fame Award (Q4 FY24)."
+                "Eliminated weeks of manual senior-engineer review by building a Change Impact Analysis pipeline using LLM-backed dependency graphs and RAG --- what previously required days of expert effort now completes in hours, achieving 89% coverage across codebases with 30,000+ files.",
+                "Architected multi-agent LLM workflows (LangChain + AutoGen) for automated Code Translation, Dependency Graph Generation, and User Story / Test Case Generation --- deployed on the client-facing GenWizard platform sold to enterprise clients across multiple industries.",
+                "Built semantic parsing layer supporting 15+ programming languages including legacy COBOL and VB.NET --- enabling cross-language dependency mapping at a scale and fidelity rarely achieved outside academic research.",
+                "Designed custom RAG pipelines with BERTopic topic modeling, sentence transformers, and Neo4j knowledge graphs; backed by multi-vector-store architecture (ChromaDB, Pinecone, PostgreSQL pgvector).",
+                "Mentored 30+ junior engineers on LLM application development and agentic frameworks; engineers went on to independently ship GenAI features across client projects.",
+                "Awarded Wall of Fame (Q4 FY24), Client Recognition Award, and Best Team Award for production delivery directly tied to client retention."
             ]
         },
         {
@@ -58,6 +60,27 @@
     ],
     "projects": [
         {
+            "title": "GPT-2 Style Small Language Model --- Built from Scratch",
+            "url": "https://github.com/chandrarup/Build-SLM-From-Scratch",
+            "tech_stack": ["PyTorch", "Transformers", "BPE Tokenization", "TinyStories"],
+            "date": "2024",
+            "description": "Implemented a 100M+ parameter GPT-2 style LLM from scratch --- token embeddings, positional encodings, stacked transformer blocks with multi-head self-attention, and next-token prediction training loop --- demonstrating end-to-end understanding of modern LLM internals."
+        },
+        {
+            "title": "Multi-Agent Deep RL for Autonomous Highway Merging",
+            "url": "https://github.com/chandrarup/Multi-Agent-Deep-Reinforcement-Learning-for-Highway-Merging",
+            "tech_stack": ["PyTorch", "DQN/DDQN", "CNN"],
+            "date": "2022",
+            "description": "Designed MARL system for autonomous on-ramp merging with human-driven vehicles; CNN policy network on raw pixels with Experience Replay and dual-network architecture for training stability."
+        },
+        {
+            "title": "Speech Emotion Recognition",
+            "url": "https://github.com/chandrarup/Speech-Emotion-Recognition-SER-using-Deep-Learning",
+            "tech_stack": ["CNN", "librosa", "RAVDESS"],
+            "date": "2022",
+            "description": "CNN with MFCC / mel-spectrogram feature pipeline; 81% accuracy on RAVDESS --- applications in customer service automation and mental health monitoring."
+        },
+        {
             "title": "Detection of Real and Manipulated Videos using Transfer Learning",
             "tech_stack": [
                 "Python",
@@ -68,6 +91,7 @@
                 "LSTM",
                 "Bi-LSTM"
             ],
+            "date": "2024",
             "description": "Developed deep learning framework for deepfake detection achieving 96% accuracy on 6,500-video dataset. Published in GCAT October 2024."
         },
         {
@@ -83,18 +107,6 @@
             "description": "Real-time speech-to-sign translation system for Tamil-speaking hearing-impaired community. Published in ICACCS March 2023."
         },
         {
-            "title": "Multi-Agent Deep Reinforcement Learning for Highway Merging",
-            "tech_stack": [
-                "Python",
-                "Keras",
-                "DQN",
-                "DDQN",
-                "CNN",
-                "Multi-Agent RL"
-            ],
-            "description": "Autonomous vehicle on-ramp merging solution using DQN/DDQN with CNN-based policy network, Experience Replay buffers, and complex reward function balancing safety and efficiency."
-        },
-        {
             "title": "Stock Price Prediction Using Deep Q-Learning",
             "tech_stack": [
                 "Python",
@@ -103,16 +115,6 @@
                 "TensorFlow"
             ],
             "description": "Automated trading system learning optimal policies (Buy, Sell, Hold) using DQN with Experience Replay and dual-network architecture. Tested on Adani Enterprises stock data."
-        },
-        {
-            "title": "Speech Emotion Recognition System",
-            "tech_stack": [
-                "Python",
-                "CNN",
-                "librosa",
-                "RAVDESS Dataset"
-            ],
-            "description": "CNN-based emotion recognition achieving 81.11% accuracy. Implemented acoustic feature extraction (MFCCs, chroma, mel-spectrograms, tonnetz)."
         },
         {
             "title": "Telugu News Article Classification",
@@ -202,61 +204,53 @@
     ],
     "skills": {
         "languages": [
-            "Python",
+            "Python (Expert)",
             "SQL",
             "Java"
         ],
         "frameworks": [
-            "TensorFlow",
             "PyTorch",
+            "TensorFlow",
             "Keras",
-            "LangChain",
-            "AutoGen",
-            "CrewAI",
-            "FastAPI",
-            "Flask",
             "Hugging Face Transformers",
-            "Scikit-learn"
+            "Scikit-learn",
+            "Reinforcement Learning",
+            "Computer Vision"
         ],
         "tools": [
             "Docker",
+            "FastAPI",
+            "Flask",
             "Git",
-            "ROS",
-            "OpenCV",
-            "Arduino IDE",
-            "Jupyter",
-            "VS Code",
-            "MoveIt!",
-            "RViz",
-            "Gazebo"
+            "OpenAI API",
+            "Anthropic API",
+            "Azure OpenAI"
         ],
         "databases": [
             "ChromaDB",
             "Pinecone",
-            "PostgreSQL",
+            "PostgreSQL (pgvector)",
             "Neo4j",
             "MongoDB"
         ],
-        "apis": [
-            "OpenAI API",
-            "Anthropic API",
-            "Google Generative AI",
-            "REST APIs"
-        ],
         "domains": [
-            "Large Language Models (LLMs)",
-            "Agentic AI Systems",
-            "Natural Language Processing",
-            "Retrieval-Augmented Generation (RAG)",
-            "Deep Learning",
-            "Reinforcement Learning",
-            "Computer Vision",
-            "Speech Processing",
-            "Robotics",
-            "Multi-Agent Systems",
+            "OpenAI",
+            "Claude",
+            "Gemini",
+            "LangChain",
+            "AutoGen",
+            "CrewAI",
+            "RAG",
             "Prompt Engineering",
-            "Transfer Learning",
-            "Low-Resource Language Technologies"
+            "Fine-tuning",
+            "LoRA",
+            "PEFT",
+            "Transformer Architecture",
+            "GAN's",
+            "Multi-Head Self-Attention",
+            "BPE Tokenization",
+            "Positional Encoding",
+            "Next-Token Prediction"
         ],
         "specialized_libraries": [
             "librosa",
@@ -266,7 +260,16 @@
             "Pandas",
             "NumPy",
             "Matplotlib",
-            "Seaborn"
+            "Seaborn",
+            "OpenCV",
+            "ROS"
+        ],
+        "apis": [
+            "OpenAI API",
+            "Anthropic API",
+            "Google Generative AI",
+            "Azure OpenAI",
+            "REST APIs"
         ]
     },
     "publications": [
@@ -391,7 +394,14 @@
         "university": "University of Houston",
         "graduation_year": "2027",
         "gpa": "",
-        "referral_source": "LinkedIn"
+        "referral_source": "LinkedIn",
+        "phone_country_code": "+1",
+        "travel_pct": "10",
+        "age_18_or_over": "Yes",
+        "has_relatives_at_company": "No",
+        "has_noncompete": "No",
+        "currently_employed": "Yes",
+        "available_to_start": "2 weeks"
     },
     "common_answers": {
         "why_this_company": "Drawn to this company because of its innovative work at the intersection of AI and real-world impact. The opportunity to contribute to cutting-edge intelligent systems aligns directly with 2+ years of hands-on experience building production-grade LLM and agentic AI solutions at Accenture.",
@@ -404,5 +414,8 @@
         "team_or_solo": "Equally effective working independently and collaboratively. At Accenture, led cross-functional GenAI platform development while also mentoring 30+ engineers — combining individual technical contributions with team leadership.",
         "handling_pressure": "Approach high-pressure situations by breaking complex problems into structured milestones, prioritizing ruthlessly, and communicating proactively. This approach was key in delivering production GenAI systems on tight enterprise timelines at Accenture.",
         "remote_work_experience": "Extensive experience working in distributed team environments. Comfortable with async communication, documentation-first workflows, and remote collaboration tools."
+    },
+    "learned_answers": {
+        "test.workdayjobs.com::custom question": "My answer"
     }
 }

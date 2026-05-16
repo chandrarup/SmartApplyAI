@@ -1,10 +1,11 @@
 %-------------------------
-% Final LaTeX Resume: Chandra Rup Daka
-% Role: AI/ML/GenAI Engineer
-% Type: HYBRID (Static Layout + Dynamic AI Content)
-%------------------------
+% Resume: Chandra Rup Daka — AI/ML/GenAI Engineer
+% Base: AI_ML_resume.tex (exact structure preserved)
+% Dynamic sections only: summary, experience[0] bullets, selected projects, skills
+% FROZEN: header, education, research section, all dates/names/titles
+%-------------------------
 
-\documentclass[letterpaper,11pt]{article}
+\documentclass[letterpaper,10.5pt]{article}
 
 \usepackage{latexsym}
 \usepackage[empty]{fullpage}
@@ -16,8 +17,6 @@
 \usepackage{fancyhdr}
 \usepackage[english]{babel}
 \usepackage{tabularx}
-\usepackage{fontawesome5}
-\usepackage{multicol}
 \input{glyphtounicode}
 
 \pagestyle{fancy}
@@ -25,11 +24,11 @@
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\footrulewidth}{0pt}
 
-% Margins (Your Exact Settings)
+% Tight margins — keeps everything on one page
 \addtolength{\oddsidemargin}{-0.6in}
 \addtolength{\textwidth}{1.2in}
-\addtolength{\topmargin}{-0.5in}
-\addtolength{\textheight}{1.8in}
+\addtolength{\topmargin}{-0.6in}
+\addtolength{\textheight}{2.0in}
 
 \urlstyle{same}
 \setlength{\tabcolsep}{0in}
@@ -37,95 +36,117 @@
 \raggedright
 
 \titleformat{\section}{
-  \vspace{6pt}\scshape\large\bfseries
-}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+  \vspace{4pt}\scshape\large\bfseries
+}{}{0em}{}[\color{black}\titlerule\vspace{-4pt}]
 
 \pdfgentounicode=1
 
-\newcommand{\resumeItem}[1]{\item\small{#1}}
+% ── Helpers ──────────────────────────────────────────────────────────────────
+\newcommand{\resumeItem}[1]{\item\small{#1\vspace{-1pt}}}
+
 \newcommand{\resumeSubheading}[4]{
   \item
   \begin{tabular*}{1.0\textwidth}{l@{\extracolsep{\fill}}r}
-    \textbf{#1} & \textbf{#2} \\
-    \textit{#3} & \textit{#4} \\
-  \end{tabular*}\vspace{-4pt}
+    \textbf{#1} & \textbf{\small #2} \\
+    \textit{\small #3} & \textit{\small #4} \\
+  \end{tabular*}\vspace{-5pt}
 }
+
 \newcommand{\resumeProjectHeading}[2]{
   \item
   \begin{tabular*}{1.0\textwidth}{l@{\extracolsep{\fill}}r}
-    \textbf{#1} & \textit{#2} \\
-  \end{tabular*}\vspace{-4pt}
+    \small#1 & \textit{\small #2} \\
+  \end{tabular*}\vspace{-5pt}
 }
 
-\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]} 
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
 \newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
-\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.2in]}
-\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.2in, itemsep=-1pt]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-4pt}}
 
+% ─────────────────────────────────────────────────────────────────────────────
 \begin{document}
 
-%----------HEADER (Dynamic Data)----------
+%----------HEADER — FROZEN----------
 \begin{center}
-    {\Huge \scshape \VAR{ contact_info.name } } \\[4pt]
-    \small
-    \underline{\VAR{ contact_info.phone | latex }} ~
-    \href{mailto:\VAR{ contact_info.email }}{\underline{\VAR{ contact_info.email | latex }}} ~
-    % Link uses raw variable (has https), Display strips it
-    \href{\VAR{ contact_info.linkedin }}{\underline{\VAR{ contact_info.linkedin | replace('https://', '') | replace('www.', '') | latex }}} ~
-    \href{\VAR{ contact_info.github }}{\underline{\VAR{ contact_info.github | replace('https://', '') | replace('www.', '') | latex }}}
+  {\Huge \scshape Chandra Rup Daka} \\[3pt]
+  \small
+  \href{tel:12536323181}{\underline{+1-(253) 632-3181}} ~$\cdot$~
+  \href{mailto:chandrarupdaka@gmail.com}{\underline{chandrarupdaka@gmail.com}} ~$\cdot$~
+  \href{https://linkedin.com/in/chandra-rup-daka}{\underline{linkedin.com/in/chandra-rup-daka}} ~$\cdot$~
+  \href{https://chandrarup.github.io/Portfolio_New/}{\underline{chandrarup.github.io}} ~$\cdot$~
+  Houston, TX
 \end{center}
+\vspace{-9mm}
+
+%----------SUMMARY — DYNAMIC----------
+\section{Summary}
+\vspace{1pt}
+% LH_REGION_BEGIN: id=summary, type=text, max_words=80, max_chars=600
+\small{\VAR{ summary | latex }}
+% LH_REGION_END: summary
 \vspace{-6mm}
 
-%----------SUMMARY (AI Tailored)----------
-\vspace{-4mm}
-\section{Professional Summary}
-\VAR{ summary | latex }
-\vspace{-7mm}
-
-%----------EDUCATION (Static - Preserving your layout)----------
+%----------EDUCATION — FROZEN----------
 \section{Education}
 \resumeSubHeadingListStart
-\resumeSubheading
-{University Of Houston}{Aug 2025 -- May 2027}
-{Master of Science in Engineering Data Science and Artificial Intelligence}{}
-
-\vspace{-6mm}
-\resumeSubheading
-  {Amrita Vishwa Vidyapeetham}{Jun 2019 -- May 2023}
-  {B.Tech in Computer Science and Engineering (Artificial Intelligence)}{}
-
-\resumeSubHeadingListEnd
-\vspace{-13mm}
-
-%----------EXPERIENCE (Static - Preserving your bullets)----------
-\section{Experience}
 \vspace{-1mm}
-\resumeSubHeadingListStart
-\resumeSubheading{Accenture}{Aug 2023 -- Aug 2025}{Advanced App Engineering Analyst}{Chennai, India}
-\resumeItemListStart
-  \resumeItem{Delivered GenAI solutions for Reverse Engineering SDLC use cases to production: Change Impact Analysis, Code Translation, Code Dependency Graphs, and automated User Stories \& Test Case Generation.}
-  \resumeItem{Achieved 89\% coverage in Technical Analysis phase and 9\% efficiency at 46\% code coverage.}
-  \resumeItem{Architected LLM workflows using LangChain, AutoGen with prompt tuning, few-shot learning, reranking, and tool execution. Customized LLM auth via certs, custom tokens, APIM endpoints for diverse client needs}
-  \resumeItem{Recognized with Wall of Fame (Q4 FY24) and Client Recognition Award for successful delivery.}
-\resumeItemListEnd
+  \resumeSubheading
+    {University of Houston}{Aug 2025 -- May 2027}
+    {Master of Science in Engineering Data Science \& Artificial Intelligence}{Houston, TX}
+
+  \vspace{-5mm}
+
+  \resumeSubheading
+    {Amrita Vishwa Vidyapeetham}{Jun 2019 -- May 2023}
+    {B.Tech in Computer Science \& Engineering (Artificial Intelligence)}{Bangalore, India}
 
 \resumeSubHeadingListEnd
-\vspace{-11mm}
+\vspace{-9mm}
 
-%-----------RESEARCH PUBLICATIONS (Static)-----------
-\section{Research Publications}
+%----------EXPERIENCE — company/role/dates FROZEN, bullets DYNAMIC----------
+\section{Experience}
+\resumeSubHeadingListStart
+
+  \resumeSubheading
+    {Generative AI Engineer}{Aug 2023 -- Aug 2025}
+    {Accenture --- GenWizard Platform (Client-Facing Enterprise AI Product)}{Chennai, India}
+  \resumeItemListStart
+% LH_REGION_BEGIN: id=experience.0.bullets, type=bullets, max_items=6, max_words_per_item=35
+\BLOCK{ for bullet in (experience[0].details or experience[0].bullets or []) }
+    \resumeItem{\VAR{ bullet | latex }}
+\BLOCK{ endfor }
+% LH_REGION_END: experience.0.bullets
+  \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+\vspace{-9mm}
+
+%----------RESEARCH — FROZEN (publications + research role)----------
+\section{Research}
 \vspace{-5pt}
 \resumeSubHeadingListStart
 
+  \resumeSubheading
+    {Research Collaborator --- AI \& Spatial Proteomics}{2026 -- Present}
+    {Prof. Badri Roysam's Lab, University of Houston}{Houston, TX}
+  \resumeItemListStart
+    \resumeItem{Implemented \textbf{CellPose} and \textbf{StarDist} pipelines for automated cell segmentation and labelling on \textbf{large-scale multichannel DAPI-stained fluorescence microscopy} images (\textasciitilde5GB TIFFs) --- enabling \textbf{differential protein expression profiling} across spatial proteomics samples.}
+    \resumeItem{Trained a \textbf{domain-specific BioGPT} from scratch on public biomedical datasets --- model generates coherent biological language output, supporting natural language reasoning over multichannel spatial proteomics data.}
+  \resumeItemListEnd
+
+  \vspace{-5mm}
+
   \resumeProjectHeading
-    {\textbf{Detection of Real and Manipulated Videos using Transfer Learning} $|$ (GCAT Conference)}{\textbf {Oct 2024}}
+    {\href{https://doi.org/10.1109/GCAT62922.2024.10924003}{\textbf{Detection of Real and Manipulated Videos using Transfer Learning}} $|$ (GCAT Conference)}{\textbf{Oct 2024}}
     \resumeItemListStart
       \resumeItem{Proposed a \textbf{deep learning framework} to detect fake and manipulated video content, contributing to digital media integrity and AI-assisted misinformation detection.}
     \resumeItemListEnd
-  \vspace{-6mm}
+
+  \vspace{-5mm}
 
   \resumeProjectHeading
-    {\textbf{Indian Sign Language Generation from Live Audio/Text (Tamil)} $|$ (ICACCS)}{\textbf {Mar 2023}}
+    {\href{https://doi.org/10.1109/ICACCS57279.2023.10112880}{\textbf{Indian Sign Language Generation from Live Audio/Text (Tamil)}} $|$ (ICACCS)}{\textbf{Mar 2023}}
     \resumeItemListStart
       \resumeItem{Developed a real-time \textbf{speech-to-sign translation pipeline} integrating NLP and computer vision, enhancing accessibility for Tamil-speaking hearing-impaired users.}
     \resumeItemListEnd
@@ -133,55 +154,36 @@
 \resumeSubHeadingListEnd
 \vspace{-8mm}
 
-%-----------PROJECTS (Dynamic - AI Selects Top 3)-----------
-\vspace{-3mm}
-\section{Projects}
+%----------SELECTED PROJECTS — DYNAMIC (chosen from pool, max 3)----------
+\section{Selected Projects}
 \resumeSubHeadingListStart
-\vspace{-2mm}
-\BLOCK{ for proj in projects }
-    \resumeProjectHeading{\VAR{ proj.title | latex }}{\textbf {\VAR{ proj.date | latex }}}
-    \resumeItemListStart
-        \resumeItem{\VAR{ proj.description | latex }}
-    \resumeItemListEnd
-    \vspace{-6mm}
+  \vspace{-2mm}
+% LH_REGION_BEGIN: id=projects, type=projects, max_items=3
+\BLOCK{ for proj in projects[:3] }
+  \resumeProjectHeading
+    {\BLOCK{ if proj.url }\href{\VAR{ proj.url }}{\textbf{\VAR{ proj.title | latex }}}\BLOCK{ else }\textbf{\VAR{ proj.title | latex }}\BLOCK{ endif }\BLOCK{ if proj.tech_stack } $|$ \VAR{ proj.tech_stack | join(', ') | latex }\BLOCK{ endif }}{\VAR{ (proj.date or proj.year or '') | latex }}
+  \resumeItemListStart
+    \resumeItem{\VAR{ (proj.description or '') | latex }}
+  \resumeItemListEnd
+
+  \vspace{-5mm}
 \BLOCK{ endfor }
+% LH_REGION_END: projects
 \resumeSubHeadingListEnd
 
-%-----------CERTIFICATIONS (Static - Your Custom Spacing)-----------
-% Note: The vspace here is very specific to your original file
-\vspace{-5mm} 
-\section{Certifications}
-\vspace{-5pt}
-\resumeSubHeadingListStart
-
-  \resumeProjectHeading
-    {AWS Certified Cloud Practitioner}{\textbf{(06/2024 -- 06/2027)}}
-    \vspace{-11mm}
-
-  \resumeProjectHeading
-    {Azure AI Fundamentals}{\textbf{(03/2025)}}
-    \vspace{-11mm}
-
-  \resumeProjectHeading
-    {Azure AI Engineer Associate}{\textbf{(04/2025 -- 04/2026)}}
-    \vspace{-10mm}
-    \resumeProjectHeading
-    {NVIDIA Building Transformer-Based Natural Language Processing Applications}{\textbf{(11/2025)}}
-
-\resumeSubHeadingListEnd
-
-
-%-----------SKILLS (Fixed: TabularX for Overflow Protection)-----------
-\vspace{-14mm}
+%----------SKILLS — DYNAMIC (5 frozen categories, content swapped per JD)----------
+\vspace{-8mm}
 \section{Skills}
 \vspace{-2pt}
-\small
-% Table with 2 columns: Left (bold label) is minimal width, Right (X) fills space & wraps
-\begin{tabularx}{\textwidth}{@{}l X@{}}
-\textbf{AI/ML:} & \VAR{ skills.domains | join(', ') | latex } \\
-\textbf{Data Science:} & \VAR{ skills.data_science | join(', ') | latex } \\
-\textbf{Tools \& Frameworks:} & \VAR{ skills.tools | join(', ') | latex }, \VAR{ skills.frameworks | join(', ') | latex } \\
-\textbf{Languages:} & \VAR{ skills.languages | join(', ') | latex } \\
-\end{tabularx}
-\vspace{-10pt}
+% LH_REGION_BEGIN: id=skills, type=skills, max_words=180
+\small{
+\textbf{LLMs \& Agentic AI:} \VAR{ skills.domains | join(', ') | latex } \\[-1pt]
+\textbf{ML / DL:} \VAR{ skills.frameworks | join(', ') | latex } \\[-1pt]
+\textbf{Databases \& Vector Stores:} \VAR{ skills.databases | join(', ') | latex } \\[-1pt]
+\textbf{Infrastructure \& APIs:} \VAR{ skills.tools | join(', ') | latex } \\[-1pt]
+\textbf{Languages:} \VAR{ skills.languages | join(', ') | latex }
+}
+% LH_REGION_END: skills
+\vspace{-4mm}
+
 \end{document}
