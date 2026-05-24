@@ -38,19 +38,29 @@ def _fake_call_llm(messages, temperature=0.3, system="", prefer="ollama", timeou
             "gaps": ["AWS"],
             "recommendations": ["Highlight deployment work"],
         })
-    if '"tailored_summary"' in prompt and '"skills_added"' in prompt:
+    if '"tailored_summary"' in prompt and '"score_estimate"' in prompt and "SOURCE SUMMARY" in prompt:
         return json.dumps({
             "tailored_summary": "Machine learning engineer with production Python and applied AI experience.",
             "summary_diff": {
                 "original": "Original summary",
                 "tailored": "Machine learning engineer with production Python and applied AI experience.",
             },
-            "skills_added": ["Python"],
-            "skills_removed": [],
-            "experience": [],
-            "selected_projects": [],
             "keywords_inserted": ["Python"],
             "score_estimate": 91,
+        })
+    if '"experience"' in prompt and '"keywords_inserted"' in prompt and "EXPERIENCE ENTRY TO EDIT" in prompt:
+        return json.dumps({
+            "experience": [{
+                "company": "Accenture (GenWizard Platform)",
+                "title": "Advanced App Engineering Analyst - GenAI Specialist",
+                "dates": "Aug 2023 - Aug 2025",
+                "bullets": [{
+                    "text": "Built production Python workflows for machine learning delivery.",
+                    "status": "edited",
+                    "original": "Built production Python workflows."
+                }]
+            }],
+            "keywords_inserted": ["Python"],
         })
     if '"skills_matched"' in prompt and '"tailored_summary"' in prompt:
         return json.dumps({

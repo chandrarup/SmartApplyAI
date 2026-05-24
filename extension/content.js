@@ -1267,6 +1267,74 @@ function isJobDescriptionPage() {
 }
 
 /**
+ * Score whether extracted text is likely a real JD (vs form chrome / nav noise).
+ * Used before Customize / pending-jd so we do not send garbage to the LLM.
+ */
+function scoreJDQuality(text, sourceAdapter) {
+  const reasons = [];
+  const t = (text || "").replace(/\s+/g, " ").trim();
+  const lower = t.toLowerCase();
+  if (t.length < 200) {
+    return { ok: false, score: 0, reasons: ["JD too short (<200 characters)"], jdSignals: 0, formSignals: 0 };
+  }
+
+  const JD_SIGNALS = [
+    "responsibilities", "requirements", "qualifications", "what you'll do",
+    "what you will do", "about the role", "minimum qualifications",
+    "preferred qualifications", "we are looking for", "you will",
+    "experience required", "must have", "nice to have", "years of experience",
+    "bachelor", "master's", "phd", "proficiency in", "knowledge of",
+  ];
+  const FORM_SIGNALS = [
+    "first name", "last name", "submit application", "upload resume",
+    "attach resume", "attach cv", "cover letter", "equal opportunity",
+    "privacy policy", "required field", "i certify", "work authorization",
+    "voluntary self", "eeo", "signature", "submit your application",
+  ];
+
+  const jdHits = JD_SIGNALS.filter(s => lower.includes(s));
+  const formHits = FORM_SIGNALS.filter(s => lower.includes(s));
+  let score = 70;
+
+  if (jdHits.length >= 3) score += 20;
+  else if (jdHits.length >= 1) score += 8;
+  else { score -= 35; reasons.push("Few job-description keywords found"); }
+
+  if (formHits.length >= 2 && jdHits.length === 0) {
+    score -= 50;
+    reasons.push("Reads like an application form, not a job posting");
+  } else if (formHits.length > jdHits.length + 1) {
+    score -= 30;
+    reasons.push("Form labels outweigh job-description content");
+  }
+
+  if (/\bfirst name\b/.test(lower) && jdHits.length < 2) {
+    score -= 25;
+    reasons.push("Contains form fields (e.g. First Name)");
+  }
+
+  const adapter = sourceAdapter || "unknown";
+  const fromStructured = /-(api|html)$/.test(adapter) && adapter !== "fallback";
+  if (fromStructured) score += 15;
+  if (adapter === "fallback") {
+    score -= 20;
+    reasons.push("No ATS adapter matched — generic page scrape");
+  }
+
+  if (t.length < 450 && jdHits.length < 2) {
+    score -= 15;
+    reasons.push("Text is short and may be incomplete");
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const ok = fromStructured
+    ? t.length >= 200
+    : (score >= 55 && (jdHits.length >= 2 || t.length >= 900));
+
+  return { ok, score, reasons, jdSignals: jdHits.length, formSignals: formHits.length, adapter };
+}
+
+/**
  * Get the best JD text available for this tab.
  * Priority: background cache (populated on JD page load) > live page text.
  * If we're on a form page (not a JD), warns the user so they know resume analysis may be poor.
@@ -1758,6 +1826,14 @@ async function tryPlatformApplyPageFetch() {
   return null;
 }
 
+function withJDQuality(ctx) {
+  if (!ctx) return ctx;
+  if (!ctx.jdQuality) {
+    ctx.jdQuality = scoreJDQuality(ctx.jdText || "", ctx.sourceAdapter || "unknown");
+  }
+  return ctx;
+}
+
 async function getBestJobContext() {
   // Step 1: Background cache (populated when user visited the JD page earlier)
   if (isExtensionAlive()) {
@@ -1771,7 +1847,7 @@ async function getBestJobContext() {
     });
     if (cached && (cached.jdText || "").length > 200) {
       lhLog("INFO", "jd-extract", "Cache hit", { chars: cached.jdText.length, source: cached.sourceAdapter });
-      return cached;
+      return withJDQuality(cached);
     }
     lhLog("INFO", "jd-extract", "Cache miss", { cachedChars: (cached?.jdText || "").length, url: location.href });
   }
@@ -1789,7 +1865,7 @@ async function getBestJobContext() {
             action: "cache_page_context", text: ctx.jdText, jobContext: ctx, platform: "greenhouse"
           }, () => { void chrome.runtime.lastError; });
         }
-        return ctx;
+        return withJDQuality(ctx);
       }
     } catch (e) {
       lhLog("ERROR", "jd-extract", "Greenhouse API fetch failed", { error: e.message });
@@ -1808,7 +1884,7 @@ async function getBestJobContext() {
           action: "cache_page_context", text: platformCtx.jdText, jobContext: platformCtx, platform: platformCtx.sourceAdapter
         }, () => { void chrome.runtime.lastError; });
       }
-      return platformCtx;
+      return withJDQuality(platformCtx);
     }
   } catch (e) {
     lhLog("WARN", "jd-extract", "Platform apply-page adapters failed", { error: e.message });
@@ -1820,7 +1896,7 @@ async function getBestJobContext() {
     const ctx = normalizedJobToJobContext(job);
     if ((ctx.jdText || "").length > 200) {
       lhLog("INFO", "jd-extract", "extractJob success", { chars: ctx.jdText.length, adapter: ctx.sourceAdapter });
-      return ctx;
+      return withJDQuality(ctx);
     }
     lhLog("WARN", "jd-extract", "extractJob returned short text", { chars: (ctx.jdText || "").length });
   } catch (e) {
@@ -1830,6 +1906,7 @@ async function getBestJobContext() {
   // Step 4: Raw page text (last resort — will be garbage on form pages)
   const rawText = getCleanText();
   lhLog("WARN", "jd-extract", "Falling back to raw page text", { chars: rawText?.length || 0, url: location.href });
+  const quality = scoreJDQuality(rawText, "fallback");
   return {
     title: "",
     company: extractCompanyFromPage(),
@@ -1837,6 +1914,7 @@ async function getBestJobContext() {
     jdText: rawText,
     sourceAdapter: "fallback",
     confidence: {},
+    jdQuality: quality,
   };
 }
 
@@ -2941,16 +3019,55 @@ function bindBodyHandlers(tab) {
           if (settings && settings.apiUrl) apiUrl = settings.apiUrl;
         } catch (e) { /* fall back to default */ }
 
-        const best = await getBestJobContext();
-        const jd = (best.jdText || "").slice(0, 8000);
-        const company = best.company || extractCompanyFromPage();
-        const role = panelState.coRole || best.title || "";
+        let best = await getBestJobContext();
+        let jd = (best.jdText || "").slice(0, 8000);
+        let company = best.company || extractCompanyFromPage();
+        let role = panelState.coRole || best.title || "";
+        let quality = best.jdQuality || scoreJDQuality(jd, best.sourceAdapter || "unknown");
+
+        if ((!jd || jd.length < 200) && best.sourceAdapter === "fallback") {
+          panelLog("→ Retrying ATS adapters…");
+          try {
+            const retry = await tryPlatformApplyPageFetch();
+            if (retry && (retry.jdText || "").length > 200) {
+              best = withJDQuality(retry);
+              jd = (best.jdText || "").slice(0, 8000);
+              company = best.company || company;
+              role = best.title || role;
+              quality = best.jdQuality;
+              panelLog(`→ Adapter recovered JD (${best.sourceAdapter}, ${jd.length} chars)`);
+            }
+          } catch (e) {
+            lhLog("WARN", "customize", "Adapter retry failed", { error: e.message });
+          }
+        }
+
         if (!jd || jd.length < 50) {
-          panelLog("⚠ JD extraction failed — see logs. Dashboard will open: paste JD manually.");
-          lhLog("WARN", "customize", "JD empty before POST to /pending-jd", { adapter: best.sourceAdapter, url: location.href });
+          const go = confirm(
+            "Could not extract a job description from this page.\n\n" +
+            "Open the dashboard to paste the JD manually?"
+          );
+          if (!go) {
+            panelLog("Customize cancelled — no JD found.");
+            return;
+          }
+          panelLog("⚠ No JD — opening dashboard to paste manually.");
+          lhLog("WARN", "customize", "JD empty", { url: location.href });
+        } else if (!quality.ok) {
+          const reason = quality.reasons[0] || "This may be form text, not the job posting.";
+          const go = confirm(
+            `Job description quality looks low (${quality.score}/100).\n${reason}\n\n` +
+            "Open dashboard anyway? (Best: visit the job posting page first, or paste the full JD there.)"
+          );
+          if (!go) {
+            panelLog("Customize cancelled — improve JD source first.");
+            return;
+          }
+          panelLog(`⚠ Low-quality JD (${quality.score}/100) — verify on dashboard.`);
+          lhLog("WARN", "customize", "JD quality low — user continued", { quality, url: location.href });
         } else {
-          panelLog(`→ JD extracted via ${best.sourceAdapter || "page"} — ${jd.length} chars`);
-          lhLog("INFO", "customize", "JD ready", { adapter: best.sourceAdapter, chars: jd.length });
+          panelLog(`→ JD OK via ${best.sourceAdapter || "page"} — ${jd.length} chars (quality ${quality.score}/100)`);
+          lhLog("INFO", "customize", "JD ready", { adapter: best.sourceAdapter, chars: jd.length, quality });
         }
 
         // Clear stale resume state (best-effort)
@@ -2967,7 +3084,7 @@ function bindBodyHandlers(tab) {
           const pendingRes = await fetch(`${apiUrl}/pending-jd`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jd, company, role }),
+            body: JSON.stringify({ jd, company, role, jd_quality: quality }),
           });
           const pending = await pendingRes.json().catch(() => ({}));
           const token = pending?.token ? `&token=${encodeURIComponent(pending.token)}` : "";

@@ -331,15 +331,88 @@ async function fetchGreenhouseJD(company, jobId) {
   return text;
 }
 
+function withTimeout(promise, ms, fallback = null) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
+/** Fast JD for Customize — avoids slow getBestJobContext() which can hang 60s+. */
+async function fetchCustomizeContext() {
+  if (pageContext && pageContext.length >= 50) {
+    return {
+      jd: pageContext,
+      role: analysisData?.role || lastDetectedRole || "",
+      company: document.getElementById("companyInput")?.value?.trim() || lastDetectedCompany || "",
+      jdQuality: null,
+      source: "popup-cache",
+    };
+  }
+
+  const bg = await withTimeout(
+    new Promise(resolve => {
+      chrome.runtime.sendMessage({ action: "get_page_context", tabId: currentTabId }, resolve);
+    }),
+    3000,
+    null,
+  );
+  if (bg?.jobContext?.jdText?.length >= 50) {
+    return {
+      jd: bg.jobContext.jdText,
+      role: bg.jobContext.title || "",
+      company: bg.jobContext.company || document.getElementById("companyInput")?.value?.trim() || "",
+      jdQuality: bg.jobContext.jdQuality || null,
+      source: bg.jobContext.sourceAdapter || "bg-jobContext",
+    };
+  }
+  if (bg?.text?.length >= 50) {
+    return {
+      jd: bg.text,
+      role: analysisData?.role || "",
+      company: document.getElementById("companyInput")?.value?.trim() || lastDetectedCompany || "",
+      jdQuality: null,
+      source: "bg-text",
+    };
+  }
+
+  if (!currentTabId) {
+    return { jd: "", role: "", company: "", jdQuality: null, source: "none" };
+  }
+
+  const text = await withTimeout(
+    new Promise(resolve => {
+      chrome.tabs.sendMessage(currentTabId, { action: "get_text" }, r => {
+        if (chrome.runtime.lastError) resolve("");
+        else resolve(r?.text || "");
+      });
+    }),
+    10000,
+    "",
+  );
+  if (text.length >= 50) {
+    pageContext = text;
+    saveSession({ pageContext: text });
+  }
+  return {
+    jd: text,
+    role: analysisData?.role || lastDetectedRole || "",
+    company: document.getElementById("companyInput")?.value?.trim() || lastDetectedCompany || "",
+    jdQuality: null,
+    source: text.length >= 50 ? "get_text" : "empty",
+  };
+}
+
 function scrapePageContext(callback) {
+  const finish = (text) => { if (callback) callback(text || ""); };
   if (pageContext) {
     LHLog.debug("scrape", "pageContext already cached", { chars: pageContext.length });
-    if (callback) callback(pageContext);
+    finish(pageContext);
     return;
   }
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
     const tab = tabs[0];
-    if (!tab) return;
+    if (!tab) { finish(""); return; }
 
     // Greenhouse application form — scraping returns a blank form, not the JD.
     // Detect the pattern and fetch the real JD from the Greenhouse public API.
@@ -358,7 +431,7 @@ function scrapePageContext(callback) {
                   pageContext = text;
                   saveSession({ pageContext });
                   LHLog.info("scrape", "pageContext set from Greenhouse API", { chars: text.length });
-                  if (callback) callback(pageContext);
+                  finish(pageContext);
                 } else {
                   throw new Error("empty");
                 }
@@ -366,11 +439,15 @@ function scrapePageContext(callback) {
               .catch(err => {
                 LHLog.error("scrape", "Greenhouse API failed — falling back to content script", { err: err?.message });
                 chrome.tabs.sendMessage(tab.id, { action: "get_text" }, response => {
-                  if (chrome.runtime.lastError || !response) return;
+                  if (chrome.runtime.lastError || !response) {
+                    LHLog.warn("scrape", "Fallback get_text failed", { err: chrome.runtime.lastError?.message });
+                    finish("");
+                    return;
+                  }
                   pageContext = response.text;
                   saveSession({ pageContext });
                   LHLog.warn("scrape", "Fallback: form page text used", { chars: pageContext?.length });
-                  if (callback) callback(pageContext);
+                  finish(pageContext);
                 });
               });
             return; // exit early — async path takes over
@@ -383,12 +460,13 @@ function scrapePageContext(callback) {
     chrome.tabs.sendMessage(tab.id, { action: "get_text" }, response => {
       if (chrome.runtime.lastError || !response) {
         LHLog.error("scrape", "content script get_text failed", { err: chrome.runtime.lastError?.message });
+        finish("");
         return;
       }
       pageContext = response.text;
       saveSession({ pageContext });
       LHLog.info("scrape", "pageContext set from page scrape", { chars: pageContext?.length });
-      if (callback) callback(pageContext);
+      finish(pageContext);
     });
   });
 }
@@ -500,69 +578,56 @@ document.getElementById("customizeResumeBtn").addEventListener("click", async ()
   const btn = document.getElementById("customizeResumeBtn");
   btn.disabled = true;
   btn.textContent = "Opening…";
-
-  // Prefer structured cached context, else ask the content script directly, else use raw page text
-  const getContext = () => new Promise(resolve => {
-    chrome.runtime.sendMessage({ action: "get_page_context", tabId: currentTabId }, bgRes => {
-      if (bgRes?.jobContext || bgRes?.text) {
-        resolve({
-          jd: bgRes?.jobContext?.jdText || bgRes?.text || "",
-          role: bgRes?.jobContext?.title || "",
-          company: bgRes?.jobContext?.company || "",
-        });
-        return;
-      }
-      if (currentTabId) {
-        chrome.tabs.sendMessage(currentTabId, { action: "get_job_context" }, liveRes => {
-          if (!chrome.runtime.lastError && liveRes) {
-            resolve({
-              jd: liveRes.jdText || pageContext || "",
-              role: liveRes.title || "",
-              company: liveRes.company || "",
-            });
-            return;
-          }
-          if (pageContext) return resolve({ jd: pageContext, role: "", company: "" });
-          scrapePageContext(t => resolve({ jd: t || "", role: "", company: "" }));
-        });
-        return;
-      }
-      if (pageContext) return resolve({ jd: pageContext, role: "", company: "" });
-      scrapePageContext(t => resolve({ jd: t || "", role: "", company: "" }));
-    });
-  });
-
-  const ctx = await getContext();
-  const jd = ctx.jd || "";
-  const role = ctx.role || (analysisData && analysisData.role) || lastDetectedRole || "";
-  const company = document.getElementById("companyInput")?.value?.trim()
-                  || ctx.company || lastDetectedCompany || "";
-  const apiUrl = getApiUrl();
-  LHLog.info("customize", "customizeResumeBtn clicked", { jdLen: jd?.length, role, company, apiUrl });
+  showStatus("matchStatus", "loading", "Preparing job description…", true);
 
   try {
-    // POST full JD text to backend — avoids URL length limits (JDs can be 5-10KB)
+    const ctx = await fetchCustomizeContext();
+    const jd = (ctx.jd || "").slice(0, 8000);
+    const role = ctx.role || (analysisData && analysisData.role) || lastDetectedRole || "";
+    const company = document.getElementById("companyInput")?.value?.trim()
+                    || ctx.company || lastDetectedCompany || "";
+    const apiUrl = getApiUrl();
+    const jdQuality = ctx.jdQuality || null;
+    LHLog.info("customize", "customizeResumeBtn clicked", {
+      jdLen: jd.length, role, company, apiUrl, source: ctx.source, jdQuality,
+    });
+
+    if (!jd || jd.length < 50) {
+      hideEl("matchStatus");
+      if (!confirm("No job description found on this page.\n\nOpen dashboard to paste the JD manually?")) {
+        return;
+      }
+    } else if (jdQuality && jdQuality.ok === false) {
+      const reason = (jdQuality.reasons && jdQuality.reasons[0]) || "Low-quality extraction.";
+      if (!confirm(`JD quality is low (${jdQuality.score}/100): ${reason}\n\nContinue anyway?`)) {
+        hideEl("matchStatus");
+        return;
+      }
+    }
+
+    showStatus("matchStatus", "loading", "Opening dashboard…", true);
     const pendingRes = await fetch(`${apiUrl}/pending-jd`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jd, role, company })
+      body: JSON.stringify({ jd, role, company, jd_quality: jdQuality }),
     });
+    if (!pendingRes.ok) throw new Error(`Server returned ${pendingRes.status}`);
     const pending = await pendingRes.json().catch(() => ({}));
     LHLog.info("customize", "POST /pending-jd OK — opening dashboard");
     const token = pending?.token ? `&token=${encodeURIComponent(pending.token)}` : "";
     chrome.tabs.create({ url: `${apiUrl}/dashboard?from=extension${token}` });
+    hideEl("matchStatus");
+    showStatus("matchStatus", "success", "Dashboard opened — click Analyze Match when ready.");
   } catch (e) {
-    LHLog.error("customize", "POST /pending-jd failed — using URL fallback", { err: e?.message });
-    const p = new URLSearchParams();
-    p.set("jd", (jd || "").slice(0, 1800));
-    if (role) p.set("role", role);
-    if (company) p.set("company", company);
-    chrome.tabs.create({ url: `${apiUrl}/dashboard?${p.toString()}` });
+    LHLog.error("customize", "Customize failed", { err: e?.message });
+    showStatus("matchStatus", "error", "Customize failed: " + e.message);
+    try {
+      const apiUrl = getApiUrl();
+      chrome.tabs.create({ url: `${apiUrl}/dashboard?from=extension` });
+    } catch (_) {}
   } finally {
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.textContent = "Customize Resume on Web";
-    }, 3000);
+    btn.disabled = false;
+    btn.textContent = "✨ Customize Resume on Web";
   }
 });
 

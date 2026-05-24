@@ -64,13 +64,15 @@ def _parse_resume_projects(tex: str) -> list[dict]:
         tech = []
         if "$|$" in head:
             tech = [t.strip() for t in latex_to_plain(head.split("$|$", 1)[1]).split(",") if t.strip()]
-        bullets = re.findall(r"\\resumeItem\{([^}]*)\}", body, re.S)
-        desc = " ".join(latex_to_plain(b) for b in bullets[:2]).strip()
+        bullets = [latex_to_plain(b) for b in re.findall(r"\\resumeItem\{([^}]*)\}", body, re.S)]
+        bullets = [b for b in bullets[:2] if b.strip()]
+        desc = " ".join(bullets).strip()
         entries.append({
             "title": latex_to_plain(title),
             "url": url_match.group(1).strip() if url_match else "",
             "date": latex_to_plain(date),
             "description": desc,
+            "bullets": bullets or ([desc] if desc else []),
             "tech_stack": tech,
         })
     if entries:
@@ -85,12 +87,15 @@ def _parse_resume_projects(tex: str) -> list[dict]:
             continue
         title = latex_to_plain(title_match.group(1))
         date = latex_to_plain(title_match.group(2))
-        bullets = re.findall(r"\\CVItem\{([^}]*)\}", chunk, re.S)
+        bullets = [latex_to_plain(b) for b in re.findall(r"\\CVItem\{([^}]*)\}", chunk, re.S)]
+        bullets = [b for b in bullets[:2] if b.strip()]
+        desc = " ".join(bullets).strip()
         cv_entries.append({
             "title": title,
             "url": "",
             "date": date,
-            "description": " ".join(latex_to_plain(b) for b in bullets[:2]).strip(),
+            "description": desc,
+            "bullets": bullets or ([desc] if desc else []),
             "tech_stack": [],
         })
     return cv_entries

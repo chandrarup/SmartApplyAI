@@ -306,8 +306,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <select id="jd-llm" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:#fff;color:var(--t2)">
-          <option value="ollama">Ollama (Local AI)</option>
-          <option value="claude">Claude (Optional)</option>
+          <option value="ollama">Loading models…</option>
         </select>
         <button class="btn bp" id="analyzeBtn" style="gap:7px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -420,8 +419,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
       <div class="ch"><h3>Job Description</h3>
         <div style="display:flex;gap:8px;align-items:center">
           <select id="tlr-llm" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff">
-            <option value="ollama">Ollama (Local)</option>
-            <option value="claude">Claude (Optional)</option>
+            <option value="ollama">Loading models…</option>
           </select>
           <button class="btn bp" id="tlr-analyzeBtn">Analyze Match</button>
         </div>
@@ -433,6 +431,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
         </div>
         <div class="fld">
           <label>Paste Job Description <span style="font-weight:400;color:var(--t4)">(extension import is optional)</span></label>
+          <div id="tlr-jd-quality" style="display:none;margin-bottom:8px;padding:10px 12px;border-radius:8px;font-size:12.5px;line-height:1.5"></div>
           <textarea id="tlr-jd" rows="7" style="min-height:120px" placeholder="Paste the full job description here. Extension import is optional, not required."></textarea>
         </div>
       </div>
@@ -770,7 +769,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   <div class="ph"><h2>Settings</h2><p>Backend connection and AI model configuration</p></div>
   <div class="card" style="max-width:500px"><div class="ch"><h3>Backend &amp; AI</h3></div><div class="cb" style="display:flex;flex-direction:column;gap:14px">
     <div class="fld"><label>API URL</label><input id="set-url" type="text" placeholder="http://127.0.0.1:5001"><div class="fhint">Address where your SmartApplyAI backend is running</div></div>
-    <div class="fld"><label>AI Model</label><select id="set-llm"><option value="ollama">Ollama (Default — qwen2.5-coder:7b)</option><option value="claude">Claude (Optional)</option></select></div>
+    <div class="fld"><label>AI Model</label><select id="set-llm"><option value="ollama">Loading models…</option></select><div class="fhint" id="set-llm-hint" style="margin-top:4px;display:none"></div></div>
     <div class="fld" id="set-ckrow" style="display:none"><label>Anthropic API Key</label><input id="set-ck" type="password" placeholder="sk-ant-api03-…"></div>
     <button class="btn bp" id="saveSettingsBtn">Save Settings</button>
   </div></div>
@@ -1235,22 +1234,116 @@ document.getElementById('appSearch').addEventListener('input',renderApps);
 document.getElementById('appFiltSt').addEventListener('change',renderApps);
 document.getElementById('appFiltPl').addEventListener('change',renderApps);
 
+// ── MODELS ───────────────────────────────────────
+function _buildModelLabel(m){
+  if(m.provider==='ollama'){
+    const size=m.size_gb!=null?` ${m.size_gb}GB`:'';
+    const star=m.default?' ★':'';
+    return `${m.label}${size}${star}`;
+  }
+  if(m.provider==='claude'){
+    return m.label;
+  }
+  return m.label;
+}
+function _applyModelValue(sel, savedVal){
+  // Try exact match first, then prefix match (migrate "ollama" → "ollama/…")
+  if(savedVal){
+    for(const opt of sel.options){
+      if(opt.value===savedVal){ sel.value=savedVal; return; }
+    }
+    // prefix fallback: "ollama" matches first "ollama/…"
+    for(const opt of sel.options){
+      if(opt.value.startsWith(savedVal+'/')){ sel.value=opt.value; return; }
+    }
+  }
+  // pick the default model
+  for(const opt of sel.options){
+    if(opt.dataset.isDefault==='1'){ sel.value=opt.value; return; }
+  }
+}
+async function loadModels(){
+  let data;
+  try{ data=await api('/models'); }
+  catch{
+    // Offline fallback: leave "Loading models…" placeholder replaced with offline message
+    ['jd-llm','tlr-llm','set-llm'].forEach(id=>{
+      const sel=document.getElementById(id);
+      sel.innerHTML='<option value="ollama">Ollama (offline — default)</option>';
+      const saved=localStorage.getItem('lh_llm');
+      if(saved) sel.value=saved;
+    });
+    return;
+  }
+  const models=data.models||[];
+  const saved=localStorage.getItem('lh_llm');
+  ['jd-llm','tlr-llm','set-llm'].forEach(id=>{
+    const sel=document.getElementById(id);
+    sel.innerHTML='';
+    // Group: Ollama first, then Claude
+    ['ollama','claude'].forEach(provider=>{
+      const group=models.filter(m=>m.provider===provider);
+      if(!group.length) return;
+      const og=document.createElement('optgroup');
+      og.label=provider==='ollama'?'Ollama (Local)':'Claude (Cloud)';
+      group.forEach(m=>{
+        const opt=document.createElement('option');
+        opt.value=m.id;
+        opt.textContent=_buildModelLabel(m);
+        opt.dataset.isDefault=m.default?'1':'0';
+        const noteStr = m.note ? ` ${m.note}.` : '';
+        opt.dataset.hint=m.provider==='ollama'
+          ?`Local (Ollama)${m.size_gb?' · '+m.size_gb+'GB':''}.${noteStr}`
+          :`Cloud (Anthropic API · requires key).${noteStr}`;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+    _applyModelValue(sel, saved);
+    // Sync: if a new resolved value differs from stored, update storage
+    if(sel.value&&sel.value!==saved) localStorage.setItem('lh_llm',sel.value);
+  });
+  // Sync all three selects to same value
+  const resolved=document.getElementById('set-llm').value;
+  document.getElementById('jd-llm').value=resolved;
+  document.getElementById('tlr-llm').value=resolved;
+  // Show/hide Claude key row
+  const isClaude=resolved.startsWith('claude');
+  document.getElementById('set-ckrow').style.display=isClaude?'':'none';
+  // Show hint for settings dropdown
+  const hint=document.getElementById('set-llm-hint');
+  const opt=document.getElementById('set-llm').selectedOptions[0];
+  if(opt&&opt.dataset.hint){ hint.textContent=opt.dataset.hint; hint.style.display=''; }
+}
+
 // ── SETTINGS ─────────────────────────────────────
 function loadSettings(){
   document.getElementById('set-url').value=localStorage.getItem('lh_api')||DEF_API;
-  const llm=localStorage.getItem('lh_llm')||'ollama';
-  document.getElementById('set-llm').value=llm;
-  if(llm==='claude') document.getElementById('set-ckrow').style.display='';
+  // model value is set by loadModels() — just restore API key row visibility here
+  const llm=localStorage.getItem('lh_llm')||'';
+  if(llm.startsWith('claude')) document.getElementById('set-ckrow').style.display='';
 }
 document.getElementById('set-llm').addEventListener('change',e=>{
-  document.getElementById('set-ckrow').style.display=e.target.value==='claude'?'':'none';
+  const val = e.target.value;
+  const isClaude = val.startsWith('claude');
+  document.getElementById('set-ckrow').style.display=isClaude?'':'none';
+  // Live-sync the other two dropdowns
+  document.getElementById('jd-llm').value=val;
+  document.getElementById('tlr-llm').value=val;
+  const hint=document.getElementById('set-llm-hint');
+  const opt=e.target.selectedOptions[0];
+  if(opt&&opt.dataset.hint){ hint.textContent=opt.dataset.hint; hint.style.display=''; }
+  else { hint.style.display='none'; }
 });
 document.getElementById('saveSettingsBtn').addEventListener('click',async()=>{
   const url=document.getElementById('set-url').value.trim();
   const llm=document.getElementById('set-llm').value;
   const key=document.getElementById('set-ck').value.trim();
   localStorage.setItem('lh_api',url||DEF_API); localStorage.setItem('lh_llm',llm);
-  if(llm==='claude'&&key){
+  // Sync the model selection to the other two dropdowns
+  document.getElementById('jd-llm').value=llm;
+  document.getElementById('tlr-llm').value=llm;
+  if(llm.startsWith('claude')&&key){
     try{await fetch(url+'/set-claude-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});}catch{}
   }
   toast('Settings saved!'); checkApi();
@@ -1258,8 +1351,6 @@ document.getElementById('saveSettingsBtn').addEventListener('click',async()=>{
 
 // ── ANALYZE JD ────────────────────────────────────
 let currentAnalysis = null;
-
-document.getElementById('jd-llm').value = localStorage.getItem('lh_llm') || 'ollama';
 
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
   const jd = document.getElementById('jd-text').value.trim();
@@ -1379,6 +1470,28 @@ let tlrAnalysis = null;
 let tlrSelectedSkills = new Set();
 let tlrSelectedProjects = new Set();
 
+function tlrShowJdQualityBanner(q) {
+  const el = document.getElementById('tlr-jd-quality');
+  if (!el) return;
+  if (!q || q.ok !== false) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.style.background = '#fef3c7';
+  el.style.borderLeft = '3px solid #f59e0b';
+  el.style.color = '#92400e';
+  const reason = (q.reasons && q.reasons[0]) || 'Verify or paste the full job description below.';
+  el.innerHTML = `<strong>Extension JD may be incomplete</strong> (${q.score || '?'}/100): ${reason}`;
+}
+
+async function tlrRunPreflight(payload) {
+  const r = await fetch((localStorage.getItem('lh_api')||DEF_API)+'/preflight-check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Profile-ID': getActivePid() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error('Preflight check failed');
+  return r.json();
+}
+
 function tlrSetStep(n) {
   ['stp1','stp2','stp3'].forEach((id,i)=>{
     const el=document.getElementById(id);
@@ -1416,9 +1529,13 @@ function updateSelCount() {
 function tlrBuildProjectChoices() {
   const wrap = document.getElementById('tlr-projectChoices');
   if (!wrap) return;
-  const library = profile.project_library || profile.projects || [];
+  // Exclude publications — they're already shown in the frozen Research section
+  const pubTitles = new Set((profile.publications || []).map(p => (p.title || '').toLowerCase().trim()));
+  const library = (profile.project_library || profile.projects || [])
+    .filter(p => !pubTitles.has((p.title || '').toLowerCase().trim()));
   const keywords = [
     ...(tlrAnalysis?.keywords || []),
+    ...(tlrAnalysis?.keywords_missing || []),
     ...(tlrAnalysis?.must_have_skills || []).map(s => s.skill),
     ...(tlrAnalysis?.nice_to_have_skills || []).map(s => s.skill),
   ].map(s => (s || '').toLowerCase());
@@ -1528,8 +1645,8 @@ function tlrRenderPreview(res) {
             <span contenteditable="true" data-edit-path="experience.${eIdx}.bullets.${bIdx}.text">${esc(b.text||'')}</span>
           </li>`;
         } else if (b.status === 'edited') {
-          html += `<li style="background:#fefce8;border-left:3px solid #ca8a04;list-style:none;margin:3px 0 3px -16px;padding:4px 8px;border-radius:0 3px 3px 0">
-            <span style="font-size:9pt;font-weight:700;color:#92400e">~ EDITED  </span>
+          html += `<li style="background:#dcfce7;border-left:3px solid #16a34a;list-style:none;margin:3px 0 3px -16px;padding:4px 8px;border-radius:0 3px 3px 0">
+            <span style="font-size:9pt;font-weight:700;color:#166534">~ EDITED  </span>
             <span contenteditable="true" data-edit-path="experience.${eIdx}.bullets.${bIdx}.text">${esc(b.text||'')}</span>
             <div style="font-size:10pt;color:#9ca3af;text-decoration:line-through;margin-top:2px">${esc(b.original||'')}</div>
           </li>`;
@@ -1579,7 +1696,9 @@ function tlrRenderPreview(res) {
           <span style="font-weight:700;font-size:11pt">${esc(p.title||'')}${stack ? ` <span style="font-weight:400;font-style:italic;font-size:10pt">| ${esc(stack)}</span>` : ''}</span>
           <span style="font-size:10pt;color:#555">${esc(p.date||p.year||'')}</span>
         </div>
-        ${p.description ? `<div style="font-size:10.5pt;color:#333;margin-top:2px">${esc(p.description)}</div>` : ''}
+        ${((p.bullets && p.bullets.length) ? p.bullets : (p.description ? [p.description] : [])).slice(0, 2).map(bl =>
+          `<div style="font-size:10.5pt;color:#333;margin-top:2px">• ${esc(bl)}</div>`
+        ).join('')}
       </div>`;
     }
   }
@@ -1652,6 +1771,14 @@ function tlrRenderPreview(res) {
     res.score_estimate ? `<div style="margin-top:8px;font-weight:700;color:var(--orange)">Estimated fit: ${res.score_estimate}%</div>` : '',
     overflowBanner,
     warnBanner,
+    (() => {
+      const pf = res._preflight || {};
+      const fatal = (pf.issues || []).filter(i => i.severity === 'fatal');
+      const warn = (pf.issues || []).filter(i => i.severity === 'warn');
+      if (fatal.length) return `<div style="margin-top:8px;padding:8px;background:#fee2e2;border-left:3px solid #dc2626;border-radius:4px;font-size:11.5px;color:#991b1b"><b>Fix before PDF:</b> ${fatal.map(i => i.message).join('; ')}</div>`;
+      if (warn.length) return `<div style="margin-top:8px;padding:8px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;font-size:11.5px;color:#92400e"><b>Review before PDF:</b> ${warn.slice(0,3).map(i => i.message).join(' · ')}</div>`;
+      return '';
+    })(),
   ].filter(Boolean).join('');
 
   // Skills diff
@@ -1757,6 +1884,35 @@ function renderTlrSkills(){
   });
 }
 
+function tlrShowExtensionCustomizeBanner(res) {
+  const old = document.getElementById('ext-cta-banner');
+  if (old) old.remove();
+  const matched = (res.must_have_skills||[]).filter(s=>s.matched).length;
+  const total   = (res.must_have_skills||[]).length;
+  const gaps    = (res.gaps||[]).length;
+  const score   = res.match_score || 0;
+  const scoreColor = score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626';
+  const banner = document.createElement('div');
+  banner.id = 'ext-cta-banner';
+  banner.style.cssText = 'background:linear-gradient(135deg,#fff7ed,#fff);border:1.5px solid #fed7aa;border-radius:10px;padding:16px 20px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap';
+  banner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:28px;font-weight:800;color:${scoreColor};line-height:1">${score}%</div>
+      <div>
+        <div style="font-weight:700;font-size:13.5px;color:#1f2937">Match Score</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:1px">${matched}/${total} required skills matched · ${gaps} gap${gaps!==1?'s':''} found</div>
+      </div>
+    </div>
+    <button id="extCustomizeBtn" style="background:#f97316;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer;white-space:nowrap;font-family:inherit;letter-spacing:-.1px">
+      Continue to Align Resume →
+    </button>`;
+  document.getElementById('tlr-results')?.after(banner);
+  document.getElementById('extCustomizeBtn')?.addEventListener('click', () => {
+    banner.remove();
+    document.getElementById('tlr-s1-next')?.click();
+  });
+}
+
 document.getElementById('tlr-analyzeBtn').addEventListener('click', async () => {
   const jd = document.getElementById('tlr-jd').value.trim();
   if (!jd) { toast('Paste a job description first', 'err'); return; }
@@ -1785,8 +1941,18 @@ document.getElementById('tlr-analyzeBtn').addEventListener('click', async () => 
     document.getElementById('tlr-jdExtracted').textContent = jdRaw;
     document.getElementById('tlr-jdLen').textContent = `(${jdRaw.length} chars)`;
     const kwEl = document.getElementById('tlr-keywords');
-    kwEl.innerHTML = (res.keywords||[]).map(k=>`<span style="padding:3px 9px;background:#e0e7ff;color:#3730a3;border-radius:10px;font-size:12px;font-weight:500">${k}</span>`).join('')
-      || '<span style="font-size:12px;color:var(--t4)">None extracted</span>';
+    const kwMissing = res.keywords_missing || [];
+    const kwCovered = res.keywords_covered || [];
+    const kwAll = res.keywords || [];
+    // If backend returned split lists, use them; otherwise fall back to full list
+    const hasSplit = kwMissing.length || kwCovered.length;
+    kwEl.innerHTML = hasSplit
+      ? [
+          ...kwMissing.map(k=>`<span title="Missing — add to resume" style="padding:3px 9px;background:#fee2e2;color:#991b1b;border-radius:10px;font-size:12px;font-weight:600;cursor:default">✗ ${k}</span>`),
+          ...kwCovered.map(k=>`<span title="Already in your profile" style="padding:3px 9px;background:#dcfce7;color:#166534;border-radius:10px;font-size:12px;font-weight:500;cursor:default">✓ ${k}</span>`),
+        ].join('') || '<span style="font-size:12px;color:var(--t4)">None extracted</span>'
+      : kwAll.map(k=>`<span style="padding:3px 9px;background:#e0e7ff;color:#3730a3;border-radius:10px;font-size:12px;font-weight:500">${k}</span>`).join('')
+        || '<span style="font-size:12px;color:var(--t4)">None extracted</span>';
     const gapEl = document.getElementById('tlr-gaps');
     gapEl.innerHTML = (res.gaps||[]).map(g=>`<span style="padding:4px 10px;background:#fee2e2;color:#991b1b;border-radius:10px;font-size:12px">⚠ ${g}</span>`).join('')
       || '<span style="font-size:12px;color:#166534">No gaps — great match!</span>';
@@ -1795,10 +1961,8 @@ document.getElementById('tlr-analyzeBtn').addEventListener('click', async () => 
     document.getElementById('tlr-results').style.display = 'block';
     tlrBuildStep2();
     toast('Analysis complete!');
-    // Fire one-time callback (used by extension auto-flow)
-    if (typeof window._analyzeCompleteCb === 'function') {
-      window._analyzeCompleteCb(res);
-      window._analyzeCompleteCb = null;
+    if (window._extensionImportMode) {
+      tlrShowExtensionCustomizeBanner(res);
     }
   } catch (e) {
     toast('Analyze failed: ' + e.message, 'err');
@@ -1894,6 +2058,19 @@ document.getElementById('tlr-selAll')?.addEventListener('click', () => {
 function renderTlrOut(res){
   window.tlrLastResult = res;
   document.getElementById('tlr-est').textContent = res.score_estimate ? `Estimated fit: ${res.score_estimate}%` : '';
+  // Show which model was used
+  const meta = res._meta || {};
+  if(meta.model_used){
+    const existing = document.getElementById('tlr-model-pill');
+    const pill = existing || document.createElement('span');
+    pill.id = 'tlr-model-pill';
+    pill.style.cssText = 'display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0e7ff;color:#3730a3;margin-left:8px';
+    pill.textContent = '🤖 ' + meta.model_used;
+    if(!existing){
+      const est = document.getElementById('tlr-est');
+      est.parentNode.insertBefore(pill, est.nextSibling);
+    }
+  }
   const sd = res.summary_diff || {};
   document.getElementById('tlr-sumOrig').textContent = sd.original || '(no prior summary)';
   document.getElementById('tlr-sumNew').textContent = sd.tailored || res.tailored_summary || '';
@@ -1959,9 +2136,25 @@ document.getElementById('tlr-pdfBtn').addEventListener('click', async () => {
   if(!window.tlrLastResult) { toast('Generate first', 'err'); return; }
   tlrApplyPreviewEdits();
   const btn = document.getElementById('tlr-pdfBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinning">↻</span> Generating…';
+  btn.disabled = true; btn.innerHTML = '<span class="spinning">↻</span> Checking…';
   try {
     const res = window.tlrLastResult;
+    try {
+      const pf = await tlrRunPreflight(res);
+      res._preflight = pf;
+      window.tlrLastResult._preflight = pf;
+      if (!pf.ok) {
+        const fatal = (pf.issues || []).filter(i => i.severity === 'fatal');
+        const msg = fatal.map(i => i.message).join('\n');
+        if (fatal.length && !confirm('Pre-PDF issues:\n' + msg + '\n\nGenerate PDF anyway?')) {
+          tlrRenderPreview(res);
+          return;
+        }
+      }
+    } catch (e) {
+      tlrLog('⚠ Preflight skipped: ' + e.message, 'warn');
+    }
+    btn.innerHTML = '<span class="spinning">↻</span> Generating…';
     const company = document.getElementById('tlr-co')?.value || '';
     const role = document.getElementById('tlr-role')?.value || '';
     const jd = document.getElementById('tlr-jd')?.value || '';
@@ -1979,7 +2172,20 @@ document.getElementById('tlr-pdfBtn').addEventListener('click', async () => {
     });
     if(!r.ok) {
       const errText = await r.text();
-      throw new Error('PDF failed: ' + errText.slice(0,200));
+      let errMsg = 'PDF failed';
+      try {
+        const d = JSON.parse(errText).detail;
+        if (d && typeof d === 'object' && d.preflight) {
+          const fatal = (d.preflight.issues || []).filter(i => i.severity === 'fatal');
+          errMsg = fatal.map(i => i.message).join('; ') || d.error || errMsg;
+          tlrLog('✗ Pre-PDF check: ' + errMsg, 'err');
+        } else {
+          errMsg = typeof d === 'string' ? d : (d?.error || errText.slice(0, 200));
+        }
+      } catch (_) {
+        errMsg = errText.slice(0, 200);
+      }
+      throw new Error(errMsg);
     }
     const ct = r.headers.get('content-type') || '';
     const variant = r.headers.get('x-pdf-variant-id') || '';
@@ -2029,6 +2235,10 @@ document.getElementById('tlr-pdfBtn').addEventListener('click', async () => {
         jd = data.jd || '';
         role = data.role || '';
         company = data.company || '';
+        tlrShowJdQualityBanner(data.jd_quality);
+        if (data.jd_quality && data.jd_quality.ok === false) {
+          toast('Extension JD quality is low — verify or paste the full job description', 'err');
+        }
       }
     } catch (e) {}
   } else if (urlJd) {
@@ -2052,41 +2262,14 @@ document.getElementById('tlr-pdfBtn').addEventListener('click', async () => {
     const tailorPg = document.getElementById('pg-tailor');
     if (tailorPg) tailorPg.classList.add('active');
 
-    // Only auto-analyze if we have a real JD
+    window._extensionImportMode = true;
     if (jd && jd.length >= 50) {
-      // After analyze completes, inject a prominent one-click "Customize My Resume" CTA
-      // so the user only needs ONE click to go from score → diff preview
-      window._analyzeCompleteCb = (res) => {
-        const old = document.getElementById('ext-cta-banner');
-        if (old) old.remove();
-        const matched = (res.must_have_skills||[]).filter(s=>s.matched).length;
-        const total   = (res.must_have_skills||[]).length;
-        const gaps    = (res.gaps||[]).length;
-        const score   = res.match_score || 0;
-        const scoreColor = score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626';
-        const banner = document.createElement('div');
-        banner.id = 'ext-cta-banner';
-        banner.style.cssText = 'background:linear-gradient(135deg,#fff7ed,#fff);border:1.5px solid #fed7aa;border-radius:10px;padding:16px 20px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap';
-        banner.innerHTML = `
-          <div style="display:flex;align-items:center;gap:14px">
-            <div style="font-size:28px;font-weight:800;color:${scoreColor};line-height:1">${score}%</div>
-            <div>
-              <div style="font-weight:700;font-size:13.5px;color:#1f2937">Match Score</div>
-              <div style="font-size:12px;color:#6b7280;margin-top:1px">${matched}/${total} required skills matched · ${gaps} gap${gaps!==1?'s':''} found</div>
-            </div>
-          </div>
-          <button id="extCustomizeBtn" style="background:#f97316;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer;white-space:nowrap;font-family:inherit;letter-spacing:-.1px">
-            Customize My Resume →
-          </button>`;
-        document.getElementById('tlr-results')?.after(banner);
-        document.getElementById('extCustomizeBtn')?.addEventListener('click', () => {
-          banner.remove();
-          // Trigger tailor-resume directly (skills already pre-selected from analysis)
-          document.getElementById('tlr-genBtn')?.click();
-        });
-      };
-
-      document.getElementById('tlr-analyzeBtn')?.click();
+      const hint = document.createElement('div');
+      hint.id = 'ext-jd-hint';
+      hint.style.cssText = 'background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#1e40af;line-height:1.5';
+      hint.textContent = 'Job description loaded from the extension. Review it below, then click "Analyze Match" when you are ready.';
+      const card = document.getElementById('tlr-jd')?.closest('.card');
+      if (card && !document.getElementById('ext-jd-hint')) card.insertAdjacentElement('afterend', hint);
     } else {
       // Show a helper message so the user knows to paste the JD manually
       const hint = document.createElement('div');
@@ -2159,7 +2342,8 @@ document.getElementById('resVerRefreshBtn')?.addEventListener('click', loadResum
 // ── INIT ──────────────────────────────────────────
 async function init(){
   if(!initProfileHeader()) return;
-  loadSettings(); checkApi(); await Promise.all([loadProfile(),loadApps()]);
+  loadSettings(); checkApi();
+  await Promise.all([loadModels(), loadProfile(), loadApps()]);
   tlrSetStep(1);
   loadResumeVersions();
 }

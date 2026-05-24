@@ -70,7 +70,175 @@ SUSPICIOUS_PHRASES = [
     r"\bgranular\b.*\bvisibility\b",
     r"\bholistic\b.*\bapproach\b",
     r"\bend[- ]to[- ]end\b.*\bsolution\b",
+    r"\bresults[- ]driven\b",
+    r"\bpassionate\b",
+    r"\bdynamic\b.*\bprofessional\b",
+    r"\bproven track record\b",
+    r"\bspearheaded\b.*\btransform",
+    r"\bthought leader\b",
+    r"\bvalue[- ]add(ed)?\b",
+    r"\butiliz(e|ing)\b.*\bcutting",
+    r"\bexcited to\b",
+    r"\bthrilled to\b",
 ]
+
+# Strip or soften common LLM resume clichés (keep sentence readable)
+HUMANIZE_REPLACEMENTS = [
+    (r"\bcutting[- ]edge\b", ""),
+    (r"\bworld[- ]class\b", ""),
+    (r"\benterprise[- ]grade\b", "production"),
+    (r"\bsynerg(y|ize|ized|ies)\b", "collaboration"),
+    (r"\bleverag(e|d|ing)\b", "used"),
+    (r"\butiliz(e|d|ing)\b", "used"),
+    (r"\bresults[- ]driven\b", ""),
+    (r"\bpassionate\b", ""),
+    (r"\bproven track record of\b", ""),
+    (r"\bspearheaded\b", "Led"),
+    (r"\s{2,}", " "),
+]
+
+
+def humanize_text(text: str) -> str:
+    """Remove obvious AI-resume clichés while preserving facts."""
+    if not text:
+        return text
+    out = text
+    for pattern, repl in HUMANIZE_REPLACEMENTS:
+        out = re.sub(pattern, repl, out, flags=re.IGNORECASE)
+    return re.sub(r"\s+([,.;])", r"\1", out).strip()
+
+
+def humanize_tailored_output(tailored: dict) -> dict:
+    """Post-process LLM output for natural, human tone."""
+    import copy
+    out = copy.deepcopy(tailored)
+    if out.get("tailored_summary"):
+        out["tailored_summary"] = humanize_text(out["tailored_summary"])
+        if out.get("summary_diff"):
+            out["summary_diff"]["tailored"] = out["tailored_summary"]
+    for exp in out.get("experience") or []:
+        for b in exp.get("bullets") or []:
+            if isinstance(b, dict) and b.get("text"):
+                b["text"] = humanize_text(b["text"])
+    return out
+
+
+def preflight_tailored_resume(
+    candidate_profile: dict,
+    tailored_output: dict,
+) -> dict:
+    """Pre-PDF checks: overlap, length, formatting risks. Returns {ok, issues[]}."""
+    issues: list[dict] = []
+
+    summary = (
+        tailored_output.get("tailored_summary")
+        or (tailored_output.get("summary_diff") or {}).get("tailored")
+        or ""
+    )
+    orig_summary = candidate_profile.get("summary", "")
+    sw = count_words(summary)
+    if sw > 85:
+        issues.append({
+            "severity": "fatal",
+            "kind": "summary_length",
+            "message": f"Summary is {sw} words (max ~80). Shorten before PDF.",
+        })
+    elif sw > 75:
+        issues.append({
+            "severity": "warn",
+            "kind": "summary_length",
+            "message": f"Summary is {sw} words — may crowd the page.",
+        })
+
+    for v in detect_authenticity_issues(summary):
+        issues.append({
+            "severity": v.severity,
+            "kind": v.kind,
+            "message": v.message,
+            "location": "summary",
+        })
+
+    seen_bullets: set[str] = set()
+    total_bullet_growth = 0
+    for exp in tailored_output.get("experience") or []:
+        for b in exp.get("bullets") or []:
+            text = (b.get("text") if isinstance(b, dict) else str(b)) or ""
+            if not text.strip():
+                issues.append({
+                    "severity": "fatal",
+                    "kind": "empty_bullet",
+                    "message": "An experience bullet is empty.",
+                    "location": "experience",
+                })
+                continue
+            norm = re.sub(r"\s+", " ", text.lower().strip())[:100]
+            if norm in seen_bullets:
+                issues.append({
+                    "severity": "warn",
+                    "kind": "duplicate_bullet",
+                    "message": "Duplicate or near-duplicate bullet text.",
+                    "location": "experience",
+                })
+            seen_bullets.add(norm)
+
+            if isinstance(b, dict) and b.get("status") == "edited" and b.get("original"):
+                ow = count_words(b["original"])
+                nw = count_words(text)
+                growth = nw - ow
+                total_bullet_growth += max(0, growth)
+                if growth > 12:
+                    issues.append({
+                        "severity": "warn",
+                        "kind": "bullet_growth",
+                        "message": f"Bullet grew by {growth} words — may cause page overflow.",
+                        "location": "experience",
+                    })
+            for v in detect_authenticity_issues(text):
+                issues.append({
+                    "severity": v.severity,
+                    "kind": v.kind,
+                    "message": v.message,
+                    "location": "experience",
+                })
+
+    if total_bullet_growth > 25:
+        issues.append({
+            "severity": "warn",
+            "kind": "page_overflow",
+            "message": f"Experience section grew ~{total_bullet_growth} words total — 1-page PDF at risk.",
+        })
+
+    # Skills line length (LaTeX single-line categories)
+    for key, items in (tailored_output.get("tailored_skills") or {}).items():
+        if not isinstance(items, list):
+            continue
+        line = ", ".join(str(s) for s in items)
+        if len(line) > 130:
+            issues.append({
+                "severity": "warn",
+                "kind": "skills_overflow",
+                "message": f"Skills line '{key}' is very long ({len(line)} chars) — may wrap or overflow.",
+                "location": f"skills.{key}",
+            })
+
+    # Summary ↔ bullet keyword overlap (stuffing)
+    if summary and tailored_output.get("experience"):
+        sum_tokens = set(re.findall(r"\b[a-z]{5,}\b", summary.lower()))
+        for exp in tailored_output["experience"]:
+            for b in exp.get("bullets") or []:
+                bt = (b.get("text") if isinstance(b, dict) else str(b)) or ""
+                overlap = sum(1 for t in sum_tokens if t in bt.lower())
+                if overlap >= 6:
+                    issues.append({
+                        "severity": "warn",
+                        "kind": "keyword_stuffing",
+                        "message": "Summary and bullets repeat many of the same keywords.",
+                        "location": "summary+experience",
+                    })
+                    break
+
+    ok = not any(i["severity"] == "fatal" for i in issues)
+    return {"ok": ok, "issues": issues}
 
 
 def detect_authenticity_issues(text: str) -> list[Violation]:

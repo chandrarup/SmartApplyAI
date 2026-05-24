@@ -73,15 +73,48 @@ def load_pdata(pid: str) -> dict:
         except:
             return {}
 
+_RESUME_CONFIG_DEFAULTS = {
+    "preferred_model": "ollama",
+    "resume": {
+        "max_bullets_per_role": 6,
+        "max_words_per_bullet": 35,
+        "tone": "technical",
+        "project_priority_keywords": [],
+    },
+    "skills_display_categories": {},
+    "skills_jd_additions": {},
+}
+
+def load_profile_config(pid: str) -> dict:
+    """Load per-profile resume config. Falls back to defaults if not present."""
+    import copy
+    path = os.path.join(_profile_dir(pid), "resume_config.json")
+    try:
+        with open(path) as f:
+            cfg = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        cfg = {}
+    # Deep-merge with defaults so missing keys always have a value
+    merged = copy.deepcopy(_RESUME_CONFIG_DEFAULTS)
+    for key, val in cfg.items():
+        if isinstance(val, dict) and isinstance(merged.get(key), dict):
+            merged[key].update(val)
+        else:
+            merged[key] = val
+    return merged
+
+
 def _enrich_profile_with_resume_sources(data: dict) -> dict:
     """Merge resume source files into the working profile without mutating disk state."""
     enriched = json.loads(json.dumps(data or {}))
     bundle = resume_source.build_resume_source_bundle()
     if bundle.get("base_summary") and not enriched.get("summary"):
         enriched["summary"] = bundle["base_summary"]
-    enriched["project_library"] = resume_source.merge_project_libraries(
-        enriched.get("projects", []),
-        bundle.get("base_projects", []) + bundle.get("cv_projects", []),
+    enriched["project_library"] = _ensure_project_bullets(
+        resume_source.merge_project_libraries(
+            enriched.get("projects", []),
+            bundle.get("base_projects", []) + bundle.get("cv_projects", []),
+        )
     )
     enriched["_resume_source"] = {
         "base_resume_path": bundle.get("base_resume_path", ""),
@@ -228,13 +261,15 @@ class CoverLetterRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # LLM ABSTRACTION — try Ollama; fall back to Claude; raise if both fail
 # ─────────────────────────────────────────────────────────────────
-def call_ollama(messages: list, temperature: float = 0.3, timeout: int = 600) -> str:
+def call_ollama(messages: list, temperature: float = 0.3, timeout: int = 600,
+                model: str = None) -> str:
+    active_model = model or OLLAMA_MODEL
     t0 = _time.time()
-    log.debug(f"Calling Ollama — model={OLLAMA_MODEL} messages={len(messages)} temp={temperature}")
-    data = {"model": OLLAMA_MODEL, "messages": messages, "stream": False, "temperature": temperature}
+    log.debug(f"Calling Ollama — model={active_model} messages={len(messages)} temp={temperature}")
+    data = {"model": active_model, "messages": messages, "stream": False, "temperature": temperature}
     response = http_requests.post(OLLAMA_API_URL, json=data, timeout=timeout)
     result = response.json()["choices"][0]["message"]["content"]
-    log_event(log, "INFO", "llm_call", provider="ollama", model=OLLAMA_MODEL,
+    log_event(log, "INFO", "llm_call", provider="ollama", model=active_model,
               latency_ms=int((_time.time()-t0)*1000), response_chars=len(result))
     return result
 
@@ -274,14 +309,25 @@ def call_claude(messages: list, temperature: float = 0.3, system: str = "") -> s
     return result
 
 def call_llm(messages: list, temperature: float = 0.3, system: str = "",
-             prefer: str = "ollama", timeout: int = 600) -> str:
-    """Try preferred provider first, auto-fallback to the other."""
-    providers = ["claude", "ollama"] if prefer == "claude" else ["ollama", "claude"]
+             prefer: str = "ollama", timeout: int = 600, model: str = None) -> str:
+    """Try preferred provider first, auto-fallback to the other.
+
+    prefer: "ollama" | "claude" | "ollama/<model-name>" (e.g. "ollama/llama3:8b")
+    model: explicit Ollama model name override (overrides OLLAMA_MODEL default)
+    """
+    # Parse provider and optional model from prefer string like "ollama/llama3:8b"
+    ollama_model_override = model
+    provider_key = prefer
+    if prefer and prefer.startswith("ollama/"):
+        provider_key = "ollama"
+        ollama_model_override = prefer[len("ollama/"):]
+
+    providers = ["claude", "ollama"] if provider_key == "claude" else ["ollama", "claude"]
     last_err = None
     for provider in providers:
         try:
             if provider == "ollama":
-                return call_ollama(messages, temperature, timeout)
+                return call_ollama(messages, temperature, timeout, model=ollama_model_override)
             else:
                 return call_claude(messages, temperature, system)
         except Exception as e:
@@ -544,6 +590,7 @@ def set_pending_jd(payload: dict, request: Request):
         "jd": payload.get("jd", ""),
         "role": payload.get("role", ""),
         "company": payload.get("company", ""),
+        "jd_quality": payload.get("jd_quality"),
         "pid": pid,
         "ts": __import__("time").time(),
     }
@@ -713,25 +760,9 @@ def render_resume_html(master: dict) -> str:
 
 @app.post("/resume-html")
 async def resume_html(data: dict, request: Request):
-    """Render an ATS-formatted HTML resume merging tailored data into the profile."""
+    """Render HTML from the same merged resume state used by PDF export."""
     master = _enrich_profile_with_resume_sources(load_pdata(get_pid(request)))
-    # Merge tailored summary + tailored experience bullets if provided
-    if data.get("tailored_summary"):
-        master["summary"] = data["tailored_summary"]
-    elif data.get("summary_diff", {}).get("tailored"):
-        master["summary"] = data["summary_diff"]["tailored"]
-    if data.get("experience"):
-        # Replace bullets with tailored versions
-        tailored_by_co = {(e.get("company","") + "::" + e.get("title","")): e for e in data["experience"]}
-        for src in master.get("experience", []):
-            key = src.get("company","") + "::" + src.get("title","")
-            t = tailored_by_co.get(key)
-            if t:
-                src["bullets"] = [b.get("text","") for b in (t.get("bullets") or []) if b.get("text")]
-    if data.get("selected_projects") and master.get("projects"):
-        keep = {p.lower().strip() for p in data["selected_projects"]}
-        master["projects"] = [p for p in master["projects"] if p.get("title","").lower().strip() in keep]
-    html = render_resume_html(master)
+    html = render_resume_html(_merge_tailored_into_master(master, data))
     return HTMLResponse(content=html)
 
 class LearnRequest(BaseModel):
@@ -790,6 +821,99 @@ def llm_status():
             "pdfinfo": bool(subprocess.which("pdfinfo")),
         },
     }
+
+
+@app.get("/models")
+def list_models(request: Request):
+    """Return all models available for use, grouped by provider.
+
+    Ollama models come from the Ollama /api/tags endpoint.
+    Claude is added as a provider if an API key is configured.
+    Each model entry: { id, label, provider, default, size_gb, note }
+    """
+    # Models that are NOT for text generation — exclude from this list
+    _EXCLUDE_PATTERNS = ["embed", "ocr", "clip", "vision-only", "whisper"]
+
+    # Recommended notes for known models
+    _MODEL_NOTES = {
+        "qwen2.5-coder:7b":      "Best for structured JSON + code output (recommended)",
+        "deepseek-r1:7b":        "Strong reasoning — good for nuanced bullet rewriting",
+        "qwen3:32b":             "Highest quality — slower, needs more RAM",
+        "qwen3-coder-next:latest": "Latest Qwen3 coder — highest quality, very large (51GB)",
+        "llama3.2:3b":           "Fast and lightweight — lower output quality",
+        "qwen2.5:3b":            "Fast and lightweight — lower output quality",
+        "gemma4:e4b":            "Google Gemma 4 — good general-purpose model",
+    }
+
+    # Preferred display order
+    _ORDER = [
+        "qwen2.5-coder:7b",
+        "deepseek-r1:7b",
+        "qwen3:32b",
+        "gemma4:e4b",
+        "qwen2.5:3b",
+        "llama3.2:3b",
+        "qwen3-coder-next:latest",
+    ]
+
+    models = []
+    # Ollama models
+    try:
+        r = http_requests.get(OLLAMA_HEALTH_URL, timeout=3)
+        if r.status_code == 200:
+            raw = r.json().get("models", [])
+            # Filter out non-text-gen models
+            filtered = [
+                m for m in raw
+                if not any(pat in m.get("name", "").lower() for pat in _EXCLUDE_PATTERNS)
+            ]
+            # Sort by preferred order; unknowns go to end
+            def _sort_key(m):
+                name = m.get("name", "")
+                try:
+                    return _ORDER.index(name)
+                except ValueError:
+                    return len(_ORDER)
+            filtered.sort(key=_sort_key)
+            for m in filtered:
+                name = m.get("name", "")
+                models.append({
+                    "id": f"ollama/{name}",
+                    "label": name,
+                    "provider": "ollama",
+                    "default": name == OLLAMA_MODEL,
+                    "size_gb": round(m.get("size", 0) / 1e9, 1),
+                    "note": _MODEL_NOTES.get(name, ""),
+                })
+    except Exception:
+        # Ollama not reachable — return the configured default as fallback entry
+        models.append({
+            "id": "ollama", "label": OLLAMA_MODEL, "provider": "ollama",
+            "default": True, "size_gb": None,
+            "note": _MODEL_NOTES.get(OLLAMA_MODEL, ""),
+        })
+
+    # Claude (cloud — always available if key set)
+    if get_anthropic_key():
+        for claude_model, note in [
+            ("claude-sonnet-4-6", "Latest Claude Sonnet — highest quality cloud model"),
+            ("claude-haiku-4-5-20251001", "Claude Haiku — fast and cost-efficient cloud model"),
+        ]:
+            models.append({
+                "id": f"claude/{claude_model}",
+                "label": claude_model,
+                "provider": "claude",
+                "default": False,
+                "size_gb": None,
+                "note": note,
+            })
+
+    # Profile default model from config
+    pid = get_pid(request)
+    cfg = load_profile_config(pid)
+    profile_default = cfg.get("preferred_model", "ollama")
+
+    return {"models": models, "profile_default": profile_default, "system_default": OLLAMA_MODEL}
 
 # ─────────────────────────────────────────────────────────────────
 # PAGES
@@ -1412,8 +1536,10 @@ HARD RULES:
                 "ml pipelines": ["pipeline", "mlops", "airflow", "kubeflow"],
                 "advanced degree": ["m.s", "master", "ms ", "phd", "ph.d", "doctorate"],
             }
-            def is_matched(skill_name: str) -> bool:
-                s = skill_name.lower().strip()
+            def is_matched(skill_name) -> bool:
+                if isinstance(skill_name, dict):
+                    skill_name = skill_name.get("skill", "")
+                s = str(skill_name or "").lower().strip()
                 if not s: return False
                 # direct token check
                 for tok in re.split(r"[/,\s]+", s):
@@ -1439,6 +1565,11 @@ HARD RULES:
             if not result.get("company") or len(result.get("company","")) < 3:
                 result["company"] = inferred_company or req.company or ""
             result["jd_extracted"] = req.jd_text[:4000]
+
+            # Split keywords into covered (already in profile) vs missing (gaps to fill)
+            keywords = result.get("keywords") or []
+            result["keywords_covered"] = [kw for kw in keywords if is_matched(kw)]
+            result["keywords_missing"] = [kw for kw in keywords if not is_matched(kw)]
             return result
         except Exception as e:
             log.error(f"POST /analyze-deep failed — pid={pid}: {e}", exc_info=True)
@@ -1476,76 +1607,182 @@ def _build_style_fingerprint(user_data: dict) -> dict:
     }
 
 
-def _rank_projects_for_jd(project_library: list, jd_text: str, hint_titles: list = None, n: int = 3) -> list:
+def _skill_base(s: str) -> str:
+    """Normalize a skill name for dedup/comparison.
+
+    'Python (Expert)' → 'python'
+    'PostgreSQL (pgvector)' → 'postgresql'
+    'Machine Learning' → 'machine learning'
+    """
+    return re.sub(r'\s*\(.*?\)', '', s).lower().strip()
+
+
+def _rank_projects_for_jd(project_library: list, jd_text: str,
+                          hint_titles: list = None, n: int = 3,
+                          priority_keywords: list = None) -> list:
     """Score every project against the JD via keyword overlap and return top-n.
 
-    Priority boosts:
-      - Explicitly requested projects (hint_titles) always rank first.
-      - GPT-2 SLM from Scratch is a top-tier LLM project → +5 bonus for any AI/ML/LLM JD.
+    Generic — no profile-specific hardcoding.
+    priority_keywords: loaded from resume_config.json, empty list by default.
+      If a project's corpus contains any of these, it gets +3 per match.
+    hint_titles: explicit user selections → always included first.
     """
     jd_lower = jd_text.lower()
-    hint_set = {t.lower().strip() for t in (hint_titles or [])}
+    hint_titles = [t.strip() for t in (hint_titles or []) if (t or "").strip()]
+    priority_kw = [kw.lower() for kw in (priority_keywords or [])]
+    if hint_titles:
+        matched = []
+        used = set()
+        for hint in hint_titles:
+            hint_lower = hint.lower().strip()
+            for proj in project_library:
+                title_lower = (proj.get("title") or "").lower().strip()
+                if not title_lower or title_lower in used:
+                    continue
+                if hint_lower == title_lower or hint_lower in title_lower or title_lower in hint_lower:
+                    matched.append(proj)
+                    used.add(title_lower)
+                    break
+        if matched:
+            return matched[:n]
     scored = []
     for proj in project_library:
         title_lower = (proj.get("title") or "").lower().strip()
-        # Explicit user selection → always include
-        if any(h in title_lower or title_lower in h for h in hint_set):
-            scored.append((1000, proj))
-            continue
         tech_text = " ".join(proj.get("tech_stack") or [])
-        corpus = (title_lower + " " + tech_text.lower() + " " + (proj.get("description") or "").lower())
+        url_text  = (proj.get("url") or "").lower()
+        corpus = title_lower + " " + tech_text.lower() + " " + (proj.get("description") or "").lower() + " " + url_text
         tokens = re.findall(r"\b[a-z][a-z0-9_-]{2,}\b", corpus)
+        # JD keyword overlap (primary score)
         score = sum(1 for t in tokens if t in jd_lower)
-        # Bonus: GPT-2/SLM project is uniquely strong for any LLM-related JD
-        if "build-slm" in (proj.get("url") or "").lower() or "gpt" in title_lower or "language model" in title_lower:
-            if any(kw in jd_lower for kw in ["llm", "language model", "transformer", "fine-tun", "rag", "generative"]):
-                score += 5
+        # Multi-word JD phrases (stronger signal than single tokens)
+        for a, b in re.findall(r"\b([a-z]{3,})\s+([a-z]{3,})\b", jd_lower):
+            phrase = f"{a} {b}"
+            if phrase in corpus:
+                score += 3
+        # Profile-defined priority keywords (loaded from resume_config.json)
+        for pkw in priority_kw:
+            if pkw in corpus:
+                score += 3
         scored.append((score, proj))
     scored.sort(key=lambda x: -x[0])
     return [p for _, p in scored[:n]]
 
 
-def _assemble_tailored_skills(master_skills: dict, jd_text: str, selected_skill_names: list = None) -> dict:
-    """Build the 5-category skills block for the resume.
+def _ensure_project_bullets(projects: list) -> list:
+    """Ensure each project has up to 2 bullets (from LaTeX source or --- split description)."""
+    for p in projects or []:
+        if p.get("bullets"):
+            p["bullets"] = [b for b in p["bullets"] if (b or "").strip()][:2]
+            continue
+        desc = (p.get("description") or "").strip()
+        if " --- " in desc:
+            p["bullets"] = [x.strip() for x in desc.split(" --- ") if x.strip()][:2]
+        elif desc:
+            p["bullets"] = [desc]
+        else:
+            p["bullets"] = []
+    return projects
+
+
+def _trim_skills_lists(
+    skills: dict,
+    jd_text: str,
+    selected_skill_names: list | None = None,
+    max_per_category: int = 11,
+) -> tuple[dict, list]:
+    """Trim skill lists for one-page PDF; drop lowest-priority items. Returns (trimmed, removed)."""
+    jd_lower = (jd_text or "").lower()
+    selected_set = {_skill_base(s) for s in (selected_skill_names or [])}
+    removed: list[str] = []
+    out: dict = {}
+
+    for key, items in (skills or {}).items():
+        if not isinstance(items, list):
+            out[key] = items
+            continue
+        scored: list[tuple[int, int, str]] = []
+        for idx, s in enumerate(items):
+            if not (s or "").strip():
+                continue
+            base = _skill_base(s)
+            score = 0
+            if base in selected_set:
+                score += 12
+            if base in jd_lower:
+                score += 8
+            for token in re.split(r"[/,\s]+", s.lower()):
+                if len(token) >= 3 and token in jd_lower:
+                    score += 4
+                    break
+            scored.append((score, idx, str(s).strip()))
+        scored.sort(key=lambda x: (-x[0], x[1]))
+        kept = [s for _, _, s in scored[:max_per_category]]
+        for _, _, s in scored[max_per_category:]:
+            removed.append(s)
+        out[key] = kept
+    return out, removed
+
+
+def _assemble_tailored_skills(master_skills: dict, jd_text: str,
+                              selected_skill_names: list = None,
+                              jd_additions_map: dict = None) -> dict:
+    """Build the skills block for the resume (generic — works with any profile).
 
     Strategy:
-      - Start from the FULL master skills (never truncate).
-      - Promote selected_skills to the front of the appropriate category.
-      - Optionally surface a few JD keywords that aren't already present.
-    Returns a dict with keys: domains, frameworks, tools, databases, languages.
+      - Detect skill categories from whatever keys exist in master_skills.
+      - Promote selected_skills to front of the appropriate category.
+      - Surface JD-relevant keywords not already present (from jd_additions_map
+        loaded from resume_config.json, NOT hardcoded here).
+    Returns a dict matching master_skills category keys.
     """
     import copy
     skills = copy.deepcopy(master_skills)
     jd_lower = jd_text.lower()
 
-    # The 5 display categories (template keys → label)
-    display_keys = ["domains", "frameworks", "tools", "databases", "languages"]
+    # Derive display keys from master profile (generic — any set of categories)
+    display_keys = [k for k in skills if isinstance(skills[k], list)]
 
-    # Promote selected_skills to front of appropriate category
-    selected_set = {s.lower().strip() for s in (selected_skill_names or [])}
+    # Promote selected_skills to front using normalized comparison (_skill_base strips parentheticals)
+    selected_set = {_skill_base(s) for s in (selected_skill_names or [])}
     for key in display_keys:
         cat = skills.get(key) or []
-        # Move selected ones to front, deduplicated
-        front = [s for s in cat if s.lower().strip() in selected_set]
-        rest  = [s for s in cat if s.lower().strip() not in selected_set]
+        front = [s for s in cat if _skill_base(s) in selected_set]
+        rest  = [s for s in cat if _skill_base(s) not in selected_set]
         skills[key] = front + rest
 
-    # Surface highly-relevant JD keywords not already in any category
-    all_existing = {s.lower().strip() for key in display_keys for s in (skills.get(key) or [])}
-    # Keyword → category mapping for common ML/AI skills
-    jd_additions = {
-        "domains": ["llm", "rag", "fine-tuning", "prompt engineering", "langchain", "llamaindex", "openai", "claude", "gemini", "autogen", "crewai"],
-        "frameworks": ["pytorch", "tensorflow", "keras", "hugging face", "scikit-learn", "fastapi", "langchain", "llama-index"],
-        "tools": ["docker", "kubernetes", "aws", "azure", "mlflow", "airflow", "fastapi", "git"],
-        "databases": ["pinecone", "chromadb", "pgvector", "neo4j", "mongodb", "redis"],
-        "languages": ["python", "sql", "typescript", "javascript"],
-    }
-    for key, candidates in jd_additions.items():
-        for kw in candidates:
-            if kw in jd_lower and kw not in all_existing:
-                # Only add if not already present (case-insensitive)
-                skills.setdefault(key, []).append(kw.capitalize() if key == "languages" else kw)
-                all_existing.add(kw)
+    # Surface JD-relevant extras using profile-defined keyword map
+    if jd_additions_map:
+        all_existing = {_skill_base(s) for key in display_keys for s in (skills.get(key) or [])}
+        for key, candidates in jd_additions_map.items():
+            if key not in display_keys:
+                continue
+            for kw in candidates:
+                if kw.lower() in jd_lower and _skill_base(kw) not in all_existing:
+                    display_label = kw.capitalize() if key == "languages" else kw
+                    skills.setdefault(key, []).append(display_label)
+                    all_existing.add(_skill_base(kw))
+
+    # Add selected skills that are genuinely NEW (not in any category after normalization)
+    all_existing_norm = {_skill_base(s) for key in display_keys for s in (skills.get(key) or [])}
+    for skill_name in (selected_skill_names or []):
+        base = _skill_base(skill_name)
+        if base in all_existing_norm:
+            continue  # already present (after normalising away parentheticals)
+        # Try to place in the most fitting category via jd_additions_map
+        placed = False
+        if jd_additions_map:
+            for key, candidates in jd_additions_map.items():
+                if key not in display_keys:
+                    continue
+                if any(_skill_base(c) == base or base in c.lower() or c.lower() in base for c in candidates):
+                    skills.setdefault(key, []).append(skill_name)
+                    all_existing_norm.add(base)
+                    placed = True
+                    break
+        if not placed and display_keys:
+            # Default: first category (typically domains/LLMs)
+            skills.setdefault(display_keys[0], []).append(skill_name)
+            all_existing_norm.add(base)
 
     return {k: skills.get(k) or [] for k in display_keys}
 
@@ -1563,13 +1800,29 @@ async def tailor_resume(req: TailorResumeRequest, request: Request):
         project_library = user_data.get("project_library", user_data.get("projects", []))
         master_skills   = user_data.get("skills", {})
 
-        # ── STEP 1: Deterministic project selection + skills assembly ────
+        # ── STEP 1: Load profile config, then deterministic project + skills ──
+        cfg = load_profile_config(pid)
+        resume_cfg = cfg.get("resume", {})
+        active_model = req.llm or cfg.get("preferred_model", "ollama")
+
+        # Exclude publications from project ranking — they appear in the frozen Research section
+        pub_titles_excl = {p.get("title","").lower().strip() for p in user_data.get("publications", [])}
+        project_pool = [p for p in project_library if p.get("title","").lower().strip() not in pub_titles_excl]
+
         selected_projects = _rank_projects_for_jd(
-            project_library, req.jd_text, hint_titles=req.selected_projects, n=3
+            project_pool, req.jd_text,
+            hint_titles=req.selected_projects, n=3,
+            priority_keywords=resume_cfg.get("project_priority_keywords", []),
         )
         tailored_skills = _assemble_tailored_skills(
-            master_skills, req.jd_text, selected_skill_names=req.selected_skills
+            master_skills, req.jd_text,
+            selected_skill_names=req.selected_skills,
+            jd_additions_map=cfg.get("skills_jd_additions", {}),
         )
+        tailored_skills, skills_removed = _trim_skills_lists(
+            tailored_skills, req.jd_text, req.selected_skills,
+        )
+        selected_projects = _ensure_project_bullets(selected_projects)
         print(f"[tailor-resume] Selected projects: {[p.get('title','') for p in selected_projects]}")
 
         # ── STEP 2: Build evidence for constraint validation ─────────────
@@ -1579,48 +1832,108 @@ async def tailor_resume(req: TailorResumeRequest, request: Request):
             for b in (e.get("details") or e.get("bullets") or [])
         ))
 
-        # ── STEP 3: Focused LLM call — only summary + bullets ────────────
-        # Build bullet list for experience[0] only (the dynamic section)
+        # ── STEP 3: Section-specific LLM calls ─────────────────────────────
+        # Keep high-risk sections isolated: deterministic project/skills selection,
+        # then separate prompts for summary and experience bullets.
         exp0 = user_data.get("experience", [{}])[0]
         exp0_bullets = exp0.get("details") or exp0.get("bullets") or []
-        bullets_json = json.dumps([{"text": b, "original": b, "status": "unchanged"} for b in exp0_bullets], indent=2)
+        bullets_json = json.dumps(
+            [{"text": b, "original": b, "status": "unchanged"} for b in exp0_bullets],
+            indent=2,
+        )
+        emphasis = ", ".join(req.selected_skills) if req.selected_skills else "choose from JD"
 
-        prompt = f"""You are a technical resume editor. Edit the candidate's resume summary and experience bullets for the target role.
+        style_block = (
+            f"Candidate voice (match this): median bullet ~{style.get('median_words', 15)} words, "
+            f"max ~{style.get('max_words', 25)}; "
+            f"{style.get('starts_with_verb_pct', 90)}% of bullets start with strong verbs; "
+            f"metrics appear in ~{style.get('metric_pct', 50)}% of bullets."
+        )
+        humanity_rules = """
+HUMAN / NATURAL WRITING (critical):
+- Sound like a strong engineer wrote this, not a cover-letter bot.
+- Prefer small phrase swaps over full-sentence rewrites.
+- Keep original sentence rhythm, em-dashes, and numbers exactly when possible.
+- NEVER use: cutting-edge, world-class, synergize, leverage, passionate, results-driven,
+  proven track record, spearheaded transformative, holistic, paradigm, thrilled, excited to.
+- No filler openers ("Highly motivated", "Proven ability to").
+- Do not stack more than 2 JD keywords in one sentence."""
 
-TASK 1 — Write a new summary (2-3 sentences, 50-80 words, implied first-person, no pronouns):
-- Highlight skills most relevant to the JD
-- Keep the candidate's direct writing style (no buzzwords, no filler)
-- If mentioning target company use the FULL name "{req.company}"
-- DO NOT write "...rewritten..." or any placeholder — write actual sentences
+        summary_prompt = f"""You are a technical resume editor rewriting ONLY the summary section.
 
-TASK 2 — Edit experience bullets for maximum JD keyword match:
-- VALID edit: rephrase to front-load a JD skill, add a JD keyword inline where supported by the existing text, reorder clauses to lead with the JD-relevant achievement
-- INVALID edit: invent new metrics, change facts, change company/title/dates
-- Status "edited" = text changed. "unchanged" = text is IDENTICAL to original. "added" = new bullet backed by existing evidence.
-- REQUIREMENT: at least 3 bullets must be "edited" or "added" — otherwise the output is rejected.
+GOAL:
+- Improve ATS alignment for the target JD without changing the candidate's facts.
+- Keep the same direct tone and similar density as the source summary.
+- This should feel like a bounded replacement, not a new bio.
+
+RULES:
+- 2-3 sentences, 45-80 words.
+- Implied first person, no pronouns.
+- Keep wording grounded in the candidate evidence below.
+- If mentioning target company use the FULL name "{req.company}".
+- Do NOT use placeholders or commentary.
+{humanity_rules}
+{style_block}
 
 JOB DESCRIPTION:
-\"\"\"{req.jd_text[:4000]}\"\"\"
+\"\"\"{req.jd_text[:3500]}\"\"\"
 
 TARGET ROLE: {req.role}
 TARGET COMPANY: {req.company}
-SKILLS TO EMPHASIZE: {", ".join(req.selected_skills) if req.selected_skills else "choose from JD"}
+SKILLS TO EMPHASIZE: {emphasis}
 OPTIONAL INSTRUCTION: {req.user_instruction or "(none)"}
 
-CANDIDATE SUMMARY (rewrite this):
+SOURCE SUMMARY:
 {user_data.get("summary", "")}
+
+EVIDENCE SNIPPET:
+{evidence_text[:1800]}
+
+OUTPUT JSON ONLY:
+{{
+  "tailored_summary": "<actual rewritten summary>",
+  "summary_diff": {{"original": "{user_data.get("summary", "")[:200]}", "tailored": "<same as tailored_summary>"}},
+  "keywords_inserted": ["keywords added in the summary"],
+  "score_estimate": 0
+}}"""
+
+        experience_prompt = f"""You are a technical resume editor rewriting ONLY one experience section.
+
+GOAL:
+- Improve ATS alignment for this JD using only the existing facts from the bullets below.
+- Treat each bullet as a bounded rewrite. Replace phrases; do not invent scope.
+
+RULES:
+- Keep company, title, and dates unchanged.
+- Status "edited" = text changed. "unchanged" = identical to original. "added" = new bullet backed by candidate evidence.
+- Preserve the original sentence skeleton and technical facts wherever possible.
+- Length budget: each edited bullet should stay within roughly the same footprint as the source bullet (target <= 1.15x original words).
+- Only insert keywords directly supported by the original bullet or the candidate evidence below.
+- Prefer 2-4 phrase-level edits per bullet; mark "unchanged" if the bullet already fits the JD.
+- If a bullet already mentions a JD skill, leave it unchanged rather than rephrase for style.
+{humanity_rules}
+{style_block}
+
+JOB DESCRIPTION:
+\"\"\"{req.jd_text[:3500]}\"\"\"
+
+TARGET ROLE: {req.role}
+TARGET COMPANY: {req.company}
+SKILLS TO EMPHASIZE: {emphasis}
+OPTIONAL INSTRUCTION: {req.user_instruction or "(none)"}
 
 EXPERIENCE ENTRY TO EDIT:
 Company: {exp0.get("company", "")}
 Title: {exp0.get("role") or exp0.get("title", "")}
 Dates: {exp0.get("duration", "")}
-Bullets (edit these):
+Bullets:
 {bullets_json}
+
+CANDIDATE EVIDENCE:
+{evidence_text[:2600]}
 
 OUTPUT JSON ONLY:
 {{
-  "tailored_summary": "<actual 2-3 sentence summary here — not a placeholder>",
-  "summary_diff": {{"original": "{user_data.get("summary", "")[:200]}", "tailored": "<same as tailored_summary>"}},
   "experience": [
     {{
       "company": "{exp0.get("company", "")}",
@@ -1631,18 +1944,80 @@ OUTPUT JSON ONLY:
       ]
     }}
   ],
-  "keywords_inserted": ["list of JD keywords you wove in"]
+  "keywords_inserted": ["keywords added in experience bullets"]
 }}"""
 
-        try:
-            content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.4, prefer=req.llm, timeout=600)
-            result = json.loads(clean_json(content))
-        except Exception as e:
-            print(f"Tailor resume error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+        async def _llm_json(prompt_text: str, temperature: float = 0.35):
+            content = await asyncio.to_thread(
+                call_llm,
+                [{"role": "user", "content": prompt_text}],
+                temperature,
+                "",
+                active_model,
+                600,
+            )
+            return json.loads(clean_json(content))
 
-        # ── STEP 4: Post-process — validate summary, attach deterministic fields ──
+        summary_task = asyncio.create_task(_llm_json(summary_prompt, 0.3))
+        experience_task = asyncio.create_task(_llm_json(experience_prompt, 0.4))
+        summary_raw, experience_raw = await asyncio.gather(
+            summary_task, experience_task, return_exceptions=True
+        )
+
+        if isinstance(summary_raw, Exception) and isinstance(experience_raw, Exception):
+            print(f"Tailor resume error: summary={summary_raw} experience={experience_raw}")
+            raise HTTPException(status_code=500, detail="Both summary and experience tailoring failed.")
+
+        result = {
+            "tailored_summary": user_data.get("summary", ""),
+            "summary_diff": {
+                "original": user_data.get("summary", ""),
+                "tailored": user_data.get("summary", ""),
+            },
+            "experience": [],
+            "keywords_inserted": [],
+            "_sections": {},
+        }
+
+        if isinstance(summary_raw, Exception):
+            print(f"[tailor-resume] Summary call failed, keeping master summary: {summary_raw}")
+            result["_sections"]["summary"] = {"ok": False, "fallback": True}
+        else:
+            result["tailored_summary"] = summary_raw.get("tailored_summary", result["tailored_summary"])
+            result["summary_diff"] = summary_raw.get("summary_diff", result["summary_diff"])
+            result["keywords_inserted"].extend(summary_raw.get("keywords_inserted", []))
+            if summary_raw.get("score_estimate") is not None:
+                result["score_estimate"] = summary_raw.get("score_estimate")
+            result["_sections"]["summary"] = {"ok": True, "fallback": False}
+
+        if isinstance(experience_raw, Exception):
+            print(f"[tailor-resume] Experience call failed, keeping existing bullets: {experience_raw}")
+            result["experience"] = [{
+                "company": exp0.get("company", ""),
+                "title": exp0.get("role") or exp0.get("title", ""),
+                "dates": exp0.get("duration", ""),
+                "bullets": [{"text": b, "status": "unchanged", "original": b} for b in exp0_bullets],
+            }]
+            result["_sections"]["experience"] = {"ok": False, "fallback": True}
+        else:
+            result["experience"] = experience_raw.get("experience", [])
+            result["keywords_inserted"].extend(experience_raw.get("keywords_inserted", []))
+            result["_sections"]["experience"] = {"ok": True, "fallback": False}
+
+        # De-duplicate inserted keywords while preserving order.
+        seen_keywords = set()
+        deduped_keywords = []
+        for kw in result.get("keywords_inserted", []):
+            norm = str(kw).strip().lower()
+            if not norm or norm in seen_keywords:
+                continue
+            seen_keywords.add(norm)
+            deduped_keywords.append(str(kw).strip())
+        result["keywords_inserted"] = deduped_keywords
+
+        # ── STEP 4: Post-process — de-AI, validate summary, attach deterministic fields ──
+        result = constraints_engine.humanize_tailored_output(result)
+
         # Reject placeholder summaries
         summary = result.get("tailored_summary", "")
         placeholder_patterns = ["...rewritten...", "rewritten for this role", "<actual", "2-3 sentence summary"]
@@ -1650,12 +2025,28 @@ OUTPUT JSON ONLY:
             print(f"[tailor-resume] Summary placeholder detected, falling back to master: {summary!r}")
             result["tailored_summary"] = user_data.get("summary", "")
             result.setdefault("summary_diff", {})["tailored"] = result["tailored_summary"]
+        else:
+            company_lower = (req.company or "").strip().lower()
+            if company_lower:
+                initials = "".join(part[0] for part in re.findall(r"[A-Za-z]+", req.company)).lower()
+                collapsed_summary = re.sub(r"[^a-z]", "", result["tailored_summary"].lower())
+                if initials and len(initials) <= 4 and initials in collapsed_summary and company_lower not in result["tailored_summary"].lower():
+                    result["tailored_summary"] = f"{result['tailored_summary']} Targeted for {req.company}."
+                    result.setdefault("summary_diff", {})["tailored"] = result["tailored_summary"]
 
         # Attach deterministic projects + skills (override LLM guesses)
         result["selected_projects"] = [p.get("title", "") for p in selected_projects]
         result["tailored_skills"] = tailored_skills
-        result["skills_added"] = req.selected_skills or []
-        result["skills_removed"] = []
+
+        # Compute accurate skills_added: items in tailored_skills NOT in master (normalized)
+        master_flat = {_skill_base(s) for cat, lst in master_skills.items() if isinstance(lst, list) for s in lst}
+        actually_added = []
+        for lst in tailored_skills.values():
+            for s in (lst or []):
+                if _skill_base(s) not in master_flat and s not in actually_added:
+                    actually_added.append(s)
+        result["skills_added"] = actually_added
+        result["skills_removed"] = skills_removed
 
         # ── STEP 5: Constraint validation ────────────────────────────────
         validation = constraints_engine.validate_tailored_resume(
@@ -1679,7 +2070,18 @@ OUTPUT JSON ONLY:
             "style_fingerprint": style,
             "editable_regions": bundle.get("editable_regions", []),
         }
+        result["_preflight"] = constraints_engine.preflight_tailored_resume(user_data, result)
+        result["_meta"] = {"model_used": active_model, "profile": pid}
         return result
+
+
+@app.post("/preflight-check")
+async def preflight_check(data: dict, request: Request):
+    """Re-run pre-PDF checks after dashboard edits (no LLM)."""
+    pid = get_pid(request)
+    master = load_pdata(pid)
+    data = constraints_engine.humanize_tailored_output(data)
+    return constraints_engine.preflight_tailored_resume(master, data)
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 7: PDF GENERATION
@@ -1732,18 +2134,30 @@ def _merge_tailored_into_master(master: dict, data: dict) -> dict:
             for key in ["domains", "frameworks", "tools", "databases", "languages"]:
                 master_list = master_skills.get(key) or []
                 tailored_list = ts.get(key) or []
-                # Union preserving order: tailored first (may reorder for emphasis), then any master extras
-                seen = {s.lower().strip() for s in tailored_list}
-                extras = [s for s in master_list if s.lower().strip() not in seen]
-                merged.setdefault("skills", {})[key] = tailored_list + extras
+                # Union preserving order: tailored first (may reorder for emphasis), then any master extras.
+                # Use _skill_base normalization to avoid duplicates like "Python" + "Python (Expert)".
+                merged.setdefault("skills", {})[key] = list(tailored_list)
         else:
             print(f"[merge] tailored_skills too sparse ({non_empty} non-empty categories) — keeping master skills")
 
     # 4. Dedup: don't repeat publications under projects
-    if merged.get("publications") and merged.get("projects"):
+    pub_titles: set = set()
+    if merged.get("publications"):
         pub_titles = {p.get("title","").lower().strip() for p in merged["publications"]}
+    if merged.get("projects"):
+        merged["projects"] = _ensure_project_bullets(merged["projects"])
         merged["projects"] = [p for p in merged["projects"]
                               if p.get("title","").lower().strip() not in pub_titles]
+        # Pad back to 3 if publication dedup removed some entries
+        if len(merged["projects"]) < 3:
+            used = {p.get("title","").lower().strip() for p in merged["projects"]}
+            for p in project_library:
+                if len(merged["projects"]) >= 3:
+                    break
+                t = p.get("title","").lower().strip()
+                if t not in used and t not in pub_titles:
+                    merged["projects"].append(p)
+                    used.add(t)
     return merged
 
 
@@ -1780,6 +2194,19 @@ async def generate_pdf(data: dict, request: Request):
     async with processing_lock:
         profile_dir = _profile_dir(pid)
         master = _enrich_profile_with_resume_sources(load_pdata(pid))
+
+        # 0. Pre-PDF preflight (after user edits in dashboard)
+        preflight = constraints_engine.preflight_tailored_resume(master, data)
+        if not preflight.get("ok"):
+            fatal = [i for i in preflight.get("issues", []) if i.get("severity") == "fatal"]
+            log.warning(f"[generate-pdf] preflight blocked — {fatal}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Resume failed pre-PDF checks. Fix issues in the preview, then try again.",
+                    "preflight": preflight,
+                },
+            )
 
         # 1. Merge
         merged = _merge_tailored_into_master(master, data)
