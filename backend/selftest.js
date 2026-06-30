@@ -42,7 +42,7 @@ async function shot(page, name) {
 
 function apiGet(path) {
   return new Promise((resolve, reject) => {
-    http.get({ hostname: '127.0.0.1', port: 5000, path,
+    http.get({ hostname: '127.0.0.1', port: 5001, path,
       headers: { 'X-Profile-ID': 'default' } }, res => {
       let out = '';
       res.on('data', d => out += d);
@@ -54,7 +54,7 @@ function apiGet(path) {
 function apiPost(endpoint, body) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
-    const req = http.request({ hostname: '127.0.0.1', port: 5000, path: endpoint, method: 'POST',
+    const req = http.request({ hostname: '127.0.0.1', port: 5001, path: endpoint, method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Profile-ID': 'default',
                  'Content-Length': Buffer.byteLength(data) }
     }, res => {

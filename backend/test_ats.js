@@ -9,7 +9,7 @@ const fs   = require("fs");
 const path = require("path");
 const http = require("http");
 
-const API = "http://127.0.0.1:5000";
+const API = "http://127.0.0.1:5001";
 const PAGES_DIR = path.join(__dirname, "test_pages");
 const CONTENT_JS = path.join(__dirname, "../extension/content.js");
 const GREEN = "\x1b[32m", RED = "\x1b[31m", YELLOW = "\x1b[33m", RESET = "\x1b[0m", BOLD = "\x1b[1m", DIM = "\x1b[2m";
@@ -104,7 +104,7 @@ const TESTS = [
   {
     id: "generic",
     file: "test_generic.html",
-    url: "http://127.0.0.1:5000/test/generic",
+    url: "http://127.0.0.1:5001/test/generic",
     hostname: "127.0.0.1",
     expectedPlatform: "generic",
     jdSignals: ["linkedin", "indeed"], jdMinSignals: 1,
@@ -160,7 +160,7 @@ function buildDOM(htmlPath, urlOverride, hostname) {
 function apiPost(path, body) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
-    const req = http.request({ hostname: "127.0.0.1", port: 5000, path, method: "POST",
+    const req = http.request({ hostname: "127.0.0.1", port: 5001, path, method: "POST",
       headers: { "Content-Type": "application/json", "X-Profile-ID": "default",
                  "Content-Length": Buffer.byteLength(data) }
     }, res => {
@@ -175,7 +175,7 @@ function apiPost(path, body) {
 
 function apiGet(path) {
   return new Promise((resolve, reject) => {
-    http.get({ hostname: "127.0.0.1", port: 5000, path,
+    http.get({ hostname: "127.0.0.1", port: 5001, path,
       headers: { "X-Profile-ID": "default" } }, res => {
       let out = "";
       res.on("data", d => out += d);
