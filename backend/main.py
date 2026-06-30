@@ -20,6 +20,8 @@ import resume_versions
 import latex_ast
 import resume_source
 
+from knowledge import store as knowledge_store
+
 # Logging — must come after imports, before app
 from logger import get_logger, log_event, is_logging_enabled, set_logging_enabled, set_log_level, get_config as get_log_config, LOGS_DIR
 log = get_logger("api")
@@ -62,6 +64,12 @@ def _pin_hash(pin: str) -> str:
     return hashlib.sha256(pin.encode()).hexdigest() if pin else ""
 
 def load_pdata(pid: str) -> dict:
+    pid = _safe_pid(pid)
+    if knowledge_store.profile_exists(pid):
+        return knowledge_store.get_profile(pid)
+    return _load_pdata_json_only(pid)
+
+def _load_pdata_json_only(pid: str) -> dict:
     path = os.path.join(_profile_dir(pid), "master_data.json")
     try:
         with open(path) as f:
@@ -72,6 +80,24 @@ def load_pdata(pid: str) -> dict:
                 return json.load(f)
         except:
             return {}
+
+def _ensure_profile_in_store(pid: str):
+    """Bootstrap SQLite from JSON mirror on first partial write (pre-migrate safety)."""
+    pid = _safe_pid(pid)
+    if knowledge_store.profile_exists(pid):
+        return
+    data = _load_pdata_json_only(pid)
+    if data:
+        knowledge_store.save_profile(pid, data)
+
+def _mirror_pdata_json(pid: str):
+    """Keep master_data.json in sync with the SQLite store (rollback / direct readers)."""
+    pid = _safe_pid(pid)
+    d = _profile_dir(pid)
+    os.makedirs(d, exist_ok=True)
+    data = knowledge_store.get_profile(pid) if knowledge_store.profile_exists(pid) else {}
+    with open(os.path.join(d, "master_data.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 _RESUME_CONFIG_DEFAULTS = {
     "preferred_model": "ollama",
@@ -124,10 +150,9 @@ def _enrich_profile_with_resume_sources(data: dict) -> dict:
     return enriched
 
 def save_pdata(pid: str, data: dict):
-    d = _profile_dir(pid)
-    os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, "master_data.json"), "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+    pid = _safe_pid(pid)
+    knowledge_store.save_profile(pid, data)
+    _mirror_pdata_json(pid)
 
 def load_papps(pid: str) -> list:
     path = os.path.join(_profile_dir(pid), "applications.json")
@@ -774,20 +799,15 @@ class LearnRequest(BaseModel):
 def autofill_learn(req: LearnRequest, request: Request):
     """Save a user correction so we use it next time on the same domain."""
     pid = get_pid(request)
-    data = load_pdata(pid)
-    learned = data.get("learned_answers", {})
-    key = f"{req.host}::{req.label.strip().lower()}"
-    learned[key] = req.value
-    data["learned_answers"] = learned
-    save_pdata(pid, data)
-    return {"ok": True, "saved": key}
+    _ensure_profile_in_store(pid)
+    saved = knowledge_store.set_learned_answer(pid, req.host, req.label, req.value)
+    _mirror_pdata_json(pid)
+    return {"ok": True, "saved": saved}
 
 @app.get("/autofill/learned")
 def autofill_learned(host: str, request: Request):
     pid = get_pid(request)
-    data = load_pdata(pid)
-    learned = data.get("learned_answers", {})
-    return {k.split("::", 1)[1]: v for k, v in learned.items() if k.startswith(host + "::")}
+    return knowledge_store.get_learned_answers(pid, host)
 
 class ClaudeKeyRequest(BaseModel):
     key: str
@@ -953,8 +973,8 @@ def create_profile(payload: dict):
                    "created_at": str(_date.today()), "pin_hash": _pin_hash(pin)}
     os.makedirs(_profile_dir(pid), exist_ok=True)
     # Start with empty profile data
-    save_pdata(pid, {"contact_info": {"name": name}, "autofill": {}, "experience": [],
-                     "education": [], "skills": {}, "common_answers": {}, "summary": ""})
+    knowledge_store.create_stub(pid, name)
+    _mirror_pdata_json(pid)
     save_papps(pid, [])
     meta.append(new_profile)
     save_profiles_meta(meta)
@@ -1012,55 +1032,61 @@ def get_profile(request: Request):
 @app.put("/profile/contact")
 def update_contact(request: Request, payload: dict):
     pid = get_pid(request)
-    data = load_pdata(pid)
+    _ensure_profile_in_store(pid)
     if "contact_info" in payload:
-        data["contact_info"] = {**data.get("contact_info", {}), **payload["contact_info"]}
+        knowledge_store.merge_section(pid, "contact_info", payload["contact_info"])
     if "summary" in payload:
-        data["summary"] = payload["summary"]
-    save_pdata(pid, data)
+        knowledge_store.replace_section(pid, "summary", payload["summary"])
+    _mirror_pdata_json(pid)
     return {"ok": True}
 
 @app.put("/profile/autofill")
 def update_autofill(request: Request, payload: dict):
     pid = get_pid(request)
-    data = load_pdata(pid)
+    _ensure_profile_in_store(pid)
     if "autofill" in payload:
-        data["autofill"] = {**data.get("autofill", {}), **payload["autofill"]}
-    save_pdata(pid, data)
+        knowledge_store.merge_section(pid, "autofill", payload["autofill"])
+    _mirror_pdata_json(pid)
     return {"ok": True}
 
 @app.put("/profile/experience")
 def update_experience(request: Request, payload: dict):
     pid = get_pid(request)
+    _ensure_profile_in_store(pid)
     data = load_pdata(pid)
-    data["experience"] = payload.get("experience", data.get("experience", []))
-    save_pdata(pid, data)
+    knowledge_store.replace_section(
+        pid, "experience", payload.get("experience", data.get("experience", []))
+    )
+    _mirror_pdata_json(pid)
     return {"ok": True}
 
 @app.put("/profile/education")
 def update_education(request: Request, payload: dict):
     pid = get_pid(request)
+    _ensure_profile_in_store(pid)
     data = load_pdata(pid)
-    data["education"] = payload.get("education", data.get("education", []))
-    save_pdata(pid, data)
+    knowledge_store.replace_section(
+        pid, "education", payload.get("education", data.get("education", []))
+    )
+    _mirror_pdata_json(pid)
     return {"ok": True}
 
 @app.put("/profile/skills")
 def update_skills(request: Request, payload: dict):
     pid = get_pid(request)
-    data = load_pdata(pid)
+    _ensure_profile_in_store(pid)
     if "skills" in payload:
-        data["skills"] = {**data.get("skills", {}), **payload["skills"]}
-    save_pdata(pid, data)
+        knowledge_store.merge_section(pid, "skills", payload["skills"])
+    _mirror_pdata_json(pid)
     return {"ok": True}
 
 @app.put("/profile/answers")
 def update_answers(request: Request, payload: dict):
     pid = get_pid(request)
-    data = load_pdata(pid)
+    _ensure_profile_in_store(pid)
     if "common_answers" in payload:
-        data["common_answers"] = {**data.get("common_answers", {}), **payload["common_answers"]}
-    save_pdata(pid, data)
+        knowledge_store.merge_section(pid, "common_answers", payload["common_answers"])
+    _mirror_pdata_json(pid)
     return {"ok": True}
 
 # ─────────────────────────────────────────────────────────────────
