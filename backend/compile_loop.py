@@ -263,10 +263,20 @@ def compile_pdf(tex_content: str, work_dir: str, name: str = "tailored_resume") 
     with open(tex_path, "w") as f:
         f.write(tex_content)
 
+    # Constrained compile (defense in depth behind LaTeX escaping):
+    #  -no-shell-escape        — never run shell commands (\write18), even if one slips through
+    #  openout_any/openin_any=p — restrict file writes/reads to "paths" mode, so
+    #                             \input{/etc/passwd} / \openin to arbitrary paths is denied
+    restricted_env = dict(os.environ)
+    restricted_env["openout_any"] = "p"
+    restricted_env["openin_any"] = "p"
+    # Pass the file by basename: cwd is already work_dir, so the main .tex resolves
+    # under "paths" mode while an absolute \input{/etc/passwd} stays blocked.
     try:
         proc = subprocess.run(
-            [PDFLATEX_BIN, "-interaction=nonstopmode", "-halt-on-error=false", tex_path],
-            capture_output=True, cwd=work_dir, timeout=120,
+            [PDFLATEX_BIN, "-no-shell-escape", "-interaction=nonstopmode",
+             "-halt-on-error=false", f"{name}.tex"],
+            capture_output=True, cwd=work_dir, timeout=120, env=restricted_env,
         )
     except subprocess.TimeoutExpired:
         result.errors.append({"type": "timeout", "line": None, "message": "pdflatex timed out after 120s"})

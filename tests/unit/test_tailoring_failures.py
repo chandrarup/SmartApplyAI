@@ -76,16 +76,16 @@ def test_latex_metacharacters_render_or_compile(master, has_pdflatex, field, val
     hygiene = compile_loop.inspect_tex_hygiene(tex)
     assert hygiene["ok"], hygiene
 
-    # Document escape coverage gaps
+    # Escaper now neutralizes the full TeX special set (see fix/latex-injection).
     if field == "summary":
         escaped = main.escape_latex_chars(value)
         assert r"\%" in escaped
         assert r"\$" in escaped
         assert r"\#" in escaped
         assert r"\_" in escaped
-        # Known gap: backslash not escaped — may emit raw LaTeX commands
+        # Backslash commands are now neutralized — no live \textbf survives.
         if r"\textbf" in value:
-            assert r"\textbf" in tex  # injection survives into .tex
+            assert r"\textbf{INJECT}" not in tex
 
     if not has_pdflatex:
         pytest.skip("pdflatex not installed")
@@ -102,21 +102,24 @@ def test_escape_latex_chars_covers_documented_set():
     assert out == r"\% \$ \& \# \_ \{ \}"
 
 
-def test_escape_latex_chars_does_not_escape_backslash_caret_tilde():
-    """Documents incomplete escaper — command injection surface."""
+def test_escape_latex_chars_escapes_backslash_caret_tilde():
+    """Escaper is complete — backslash/caret/tilde are neutralized."""
     raw = r"\textbf{x} ^ ~"
     out = main.escape_latex_chars(raw)
-    assert r"\textbf" in out
-    assert "^" in out and "~" in out
+    assert r"\textbackslash{}" in out
+    assert r"\textasciicircum{}" in out
+    assert r"\textasciitilde{}" in out
+    assert r"\textbf{x}" not in out  # no live command remains
 
 
-def test_project_url_not_passed_through_latex_filter(master):
-    """proj.url is raw in template \\href{...} — underscores can break."""
+def test_project_url_is_filtered_in_template(master):
+    """proj.url now flows through the url filter — underscores kept, no break."""
     m = json.loads(json.dumps(master))
     m["projects"][0]["url"] = "https://example.com/my_under_score"
     tex = main._render_tex_from_master(m)
-    assert "my_under_score" in tex
-    assert r"my\_under\_score" not in tex
+    # Underscore is valid inside \href's argument, so it stays literal (not \_).
+    assert "https://example.com/my_under_score" in tex
+    assert r"\href{https://example.com/my_under_score}" in tex
 
 
 @pytest.mark.skipif(not shutil.which("pdflatex"), reason="pdflatex required")
@@ -143,7 +146,7 @@ CLEAN_JSON_GOOD = [
     ('Here you go:\n{"a": 1}\nThanks!', {"a": 1}),
     ('{"a": 1} trailing prose', {"a": 1}),
     ('```json\n{"outer": {"inner": 1}}\n```\nextra', {"outer": {"inner": 1}}),
-    ('[{"x": 1}]', {"x": 1}),  # depth tracker prefers inner object over root array
+    ('[{"x": 1}]', [{"x": 1}]),  # root array preserved (first-opener selection)
 ]
 
 CLEAN_JSON_BAD = [

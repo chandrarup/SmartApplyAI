@@ -150,29 +150,31 @@ def validate_balanced(tex: str) -> tuple[bool, list[str]]:
     return (len(problems) == 0, problems)
 
 
+# Single-pass so the braces in replacements like \textbackslash{} are never
+# re-escaped. Mirrors main.escape_latex_chars (kept here to avoid a circular import).
+_LATEX_ESCAPE_MAP = {
+    "\\": r"\textbackslash{}",  # must be a form with no live command
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
+_LATEX_ESCAPE_RE = re.compile("|".join(re.escape(c) for c in _LATEX_ESCAPE_MAP))
+
 def latex_escape(text: str) -> str:
-    """Escape LaTeX special characters. Use ONLY on plain-text content."""
+    """Escape every LaTeX special so text renders literally. Use on plain-text content.
+
+    No 'already escaped' shortcut — that heuristic is an injection bypass (hostile
+    ``\\&\\textbf{x}`` would match and skip escaping entirely).
+    """
     if not isinstance(text, str):
         return str(text) if text is not None else ""
-    replacements = [
-        ("\\", r"\textbackslash{}"),  # MUST be first
-        ("&", r"\&"),
-        ("%", r"\%"),
-        ("$", r"\$"),
-        ("#", r"\#"),
-        ("_", r"\_"),
-        ("{", r"\{"),
-        ("}", r"\}"),
-        ("~", r"\textasciitilde{}"),
-        ("^", r"\textasciicircum{}"),
-    ]
-    # Handle the special case where input may already have escaped chars
-    # If it looks pre-escaped (has \&, \%, etc), don't double-escape.
-    if re.search(r"\\[&%$#_{}]", text):
-        return text  # already escaped
-    for src, dst in replacements:
-        text = text.replace(src, dst)
-    return text
+    return _LATEX_ESCAPE_RE.sub(lambda m: _LATEX_ESCAPE_MAP[m.group(0)], text)
 
 
 def count_words(text: str) -> int:

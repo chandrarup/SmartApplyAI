@@ -550,13 +550,94 @@ def load_master_data():
     except Exception:
         return {}
 
+# LaTeX special characters → their escaped, literal-rendering forms. Backslash and
+# the two math accents must become \textbackslash/\textasciitilde/\textasciicircum so
+# that hostile input like \write18{...} or \input{/etc/passwd} renders as visible text
+# instead of executing. Applied in a single pass (see escape_latex_chars) so the {}
+# introduced by these replacements are never themselves re-escaped.
+_LATEX_ESCAPE_MAP = {
+    "\\": r"\textbackslash{}",  # must map backslash to a form that has no live command
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "^": r"\textasciicircum{}",
+    "~": r"\textasciitilde{}",
+}
+_LATEX_ESCAPE_RE = re.compile("|".join(re.escape(c) for c in _LATEX_ESCAPE_MAP))
+
 def escape_latex_chars(text):
+    """Escape every TeX special so untrusted text renders as literal characters.
+
+    Single-pass regex: each special is replaced exactly once, so the braces in
+    replacements like ``\\textbackslash{}`` are never re-processed. There is
+    deliberately NO 'already escaped' shortcut — that heuristic is itself an injection
+    bypass (hostile ``\\&\\textbf{x}`` would skip escaping entirely).
+    """
     if not isinstance(text, str):
         return text
-    chars = {"&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_", "{": r"\{", "}": r"\}"}
-    for char, replacement in chars.items():
-        text = text.replace(char, replacement)
-    return text
+    return _LATEX_ESCAPE_RE.sub(lambda m: _LATEX_ESCAPE_MAP[m.group(0)], text)
+
+
+# Schemes permitted inside \href — anything else (javascript:, data:, a raw \command,
+# a bare word) is treated as hostile and the link is dropped.
+_SAFE_URL_SCHEME_RE = re.compile(r"^(?:https?://|mailto:)", re.IGNORECASE)
+# Chars that must be escaped inside \href's first (URL) argument so a crafted URL
+# cannot break out of the braces or start a command.
+_HREF_ESCAPE_MAP = {
+    "\\": r"\textbackslash{}",
+    "%": r"\%",
+    "#": r"\#",
+    "{": r"\{",
+    "}": r"\}",
+    "^": r"\textasciicircum{}",
+    "~": r"\textasciitilde{}",
+    "&": r"\&",
+}
+_HREF_ESCAPE_RE = re.compile("|".join(re.escape(c) for c in _HREF_ESCAPE_MAP))
+
+def _safe_href_url(url):
+    """Return a \\href-safe URL, or "" if the URL is missing or not a trusted scheme.
+
+    Only http(s):// and mailto: survive; the surviving URL is escaped for the \\href
+    argument. Callers/template render the project title as plain text when this is "".
+    """
+    if not isinstance(url, str):
+        return ""
+    u = url.strip()
+    if not u or not _SAFE_URL_SCHEME_RE.match(u):
+        return ""
+    return _HREF_ESCAPE_RE.sub(lambda m: _HREF_ESCAPE_MAP[m.group(0)], u)
+
+
+# Control characters (C0 minus tab/newline, plus DEL and C1) that should never reach
+# the template — they can corrupt the .tex stream or hide content.
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+def sanitize_untrusted_text(value, max_len=20000):
+    """Normalize untrusted free-text before it enters the tailoring/PDF path.
+
+    Strips control chars/NULs, collapses whitespace runs, and caps length. This is
+    defense-in-depth ahead of escape_latex_chars (the hard guarantee) — it keeps raw
+    control bytes and pathological lengths out of stored/merged profile data.
+    Recurses into lists/dicts so callers can hand it a whole payload subtree.
+    """
+    if isinstance(value, str):
+        s = _CONTROL_CHAR_RE.sub("", value)
+        s = re.sub(r"[ \t]+", " ", s)
+        s = re.sub(r"\n{3,}", "\n\n", s)
+        s = s.strip()
+        if max_len is not None and len(s) > max_len:
+            s = s[:max_len]
+        return s
+    if isinstance(value, list):
+        return [sanitize_untrusted_text(v, max_len) for v in value]
+    if isinstance(value, dict):
+        return {k: sanitize_untrusted_text(v, max_len) for k, v in value.items()}
+    return value
 
 # ─────────────────────────────────────────────────────────────────
 # STATIC ROUTES
@@ -2248,7 +2329,9 @@ OUTPUT JSON ONLY:
                 600,
                 fallback_model,
             )
-            return json.loads(clean_json(content))
+            # LLM output is untrusted: strip control chars / cap length before it
+            # flows into diffs, merges, and eventually the .tex template.
+            return sanitize_untrusted_text(json.loads(clean_json(content)))
 
         summary_task = asyncio.create_task(_llm_json(summary_prompt, 0.3))
         experience_task = asyncio.create_task(_llm_json(experience_prompt, 0.4))
@@ -2563,6 +2646,7 @@ def _render_tex_from_master(master: dict) -> str:
         loader=BaseLoader(),
     )
     env.filters['latex'] = escape_latex_chars
+    env.filters['url'] = _safe_href_url
     return env.from_string(template_str).render(**master)
 
 
@@ -2611,6 +2695,10 @@ async def generate_pdf(data: dict, request: Request):
     async with processing_lock:
         profile_dir = _profile_dir(pid)
         master = _enrich_profile_with_resume_sources(load_pdata(pid))
+        # Untrusted inbound payload (JD-derived edits, user text): strip control
+        # chars and cap lengths before it is merged/rendered. Escaping at render time
+        # (escape_latex_chars) remains the hard guarantee; this bounds blast radius.
+        data = sanitize_untrusted_text(data)
         effective_data = _filter_payload_to_accepted(master, data)
 
         # 0. Pre-PDF preflight (after user edits in dashboard)
