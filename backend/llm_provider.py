@@ -124,9 +124,17 @@ def clean_json(raw: str) -> str:
             return candidate
         except (json.JSONDecodeError, ValueError):
             continue
-    # 2. Depth-track to find first balanced { or [ — handles preamble/postamble text
+    # 2. Depth-track to find the first balanced { or [ — handles preamble/postamble.
+    # Try whichever opener appears FIRST in the text, so a root array like [{"x":1}]
+    # returns the whole array instead of the inner object.
     raw_s = raw.strip()
-    for start_ch, end_ch in [('{', '}'), ('[', ']')]:
+    obj_at = raw_s.find('{')
+    arr_at = raw_s.find('[')
+    if arr_at != -1 and (obj_at == -1 or arr_at < obj_at):
+        bracket_order = [('[', ']'), ('{', '}')]
+    else:
+        bracket_order = [('{', '}'), ('[', ']')]
+    for start_ch, end_ch in bracket_order:
         start = raw_s.find(start_ch)
         if start == -1:
             continue

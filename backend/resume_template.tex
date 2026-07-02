@@ -161,7 +161,7 @@
 % LH_REGION_BEGIN: id=projects, type=projects, max_items=3
 \BLOCK{ for proj in projects[:3] }
   \resumeProjectHeading
-    {\BLOCK{ if proj.url }\href{\VAR{ proj.url }}{\textbf{\VAR{ proj.title | latex }}}\BLOCK{ else }\textbf{\VAR{ proj.title | latex }}\BLOCK{ endif }\BLOCK{ if proj.tech_stack } $|$ \VAR{ proj.tech_stack | join(', ') | latex }\BLOCK{ endif }}{\VAR{ (proj.date or proj.year or '') | latex }}
+    {\BLOCK{ if proj.url | url }\href{\VAR{ proj.url | url }}{\textbf{\VAR{ proj.title | latex }}}\BLOCK{ else }\textbf{\VAR{ proj.title | latex }}\BLOCK{ endif }\BLOCK{ if proj.tech_stack } $|$ \VAR{ proj.tech_stack | join(', ') | latex }\BLOCK{ endif }}{\VAR{ (proj.date or proj.year or '') | latex }}
   \resumeItemListStart
 \BLOCK{ for bullet in (proj.bullets if proj.bullets else ([proj.description] if proj.description else []))[:2] }
     \resumeItem{\VAR{ bullet | latex }}
