@@ -12,12 +12,15 @@
     "test:smoke": "pytest tests/smoke -q",
     "test": "npm run test:js && npm run test:py && npm run test:smoke",
     "test:integration": "pytest tests/integration -q",
+    "test:jd-extraction": "node tests/jd_extraction/build-fixtures.mjs && cd tests/jd_extraction && playwright test --config=playwright.config.mjs",
+    "test:autofill": "node tests/autofill/build-fixtures.mjs && cd tests/autofill && playwright test --config=playwright.config.mjs",
     "test:resume-pipeline": "python3 backend/test_resume_pipeline.py"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "jsdom": "^29.1.1"
   },
   "dependencies": {

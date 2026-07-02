@@ -1,0 +1,17 @@
+{
+  "platform": "generic",
+  "must_map_labels": ["First Name", "Email", "Phone"],
+  "must_not_overwrite": {
+    "First Name": "UserTyped",
+    "Email": "user@example.com"
+  },
+  "fill": {
+    "First Name": "ShouldNotApply",
+    "Email": "overwrite@example.com",
+    "Phone": "5551234567"
+  },
+  "expect_values": {
+    "Phone": "5551234567"
+  },
+  "expect_clobber": ["First Name", "Email"]
+}

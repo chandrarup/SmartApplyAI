@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Agentic AI Intern at Cotiviti | iCIMS Application</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; max-width: 760px; margin: 0 auto; padding: 20px; background: #f5f5f5; font-size: 13px; color: #333; }
+  .icims-header { background: #005ea6; color: white; padding: 16px 20px; margin-bottom: 16px; }
+  .icims-header h1 { margin: 0 0 4px; font-size: 18px; font-weight: normal; }
+  .icims-header p { margin: 0; font-size: 12px; opacity: 0.85; }
+  .badge { background: #e3eff9; color: #005ea6; padding: 3px 10px; border-radius: 3px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 12px; }
+  /* iCIMS uses table-based layout with specific classes */
+  .iCIMS_MainColumn { background: white; border: 1px solid #ccc; padding: 16px; margin-bottom: 12px; }
+  .iCIMS_SectionHeader { background: #005ea6; color: white; padding: 8px 12px; font-size: 13px; font-weight: bold; margin: 0 0 12px; }
+  table.iCIMS_TableFields { width: 100%; border-collapse: collapse; }
+  table.iCIMS_TableFields td { padding: 6px 8px; vertical-align: top; }
+  td.iCIMS_Label { width: 35%; font-weight: bold; color: #444; padding-top: 10px; }
+  td.iCIMS_Label label { font-size: 13px; }
+  .iCIMS_Required { color: #c00; }
+  /* iCIMS uses class iCIMS_Input on all fields */
+  .iCIMS_Input { width: 100%; padding: 6px 8px; border: 1px solid #aaa; font-size: 13px; box-sizing: border-box; font-family: Arial; outline: none; }
+  .iCIMS_Input:focus { border-color: #005ea6; }
+  select.iCIMS_Input { background: white; }
+  textarea.iCIMS_Input { resize: vertical; min-height: 70px; }
+  .iCIMS_ButtonsArea { padding: 12px; text-align: right; }
+  .iCIMS_Button { background: #005ea6; color: white; border: none; padding: 8px 20px; font-size: 13px; font-weight: bold; cursor: pointer; }
+  .result-overlay { display: none; position: fixed; top: 16px; right: 16px; background: white; border: 2px solid #005ea6; border-radius: 4px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 340px; z-index: 9999; font-size: 12px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 8px; color: #005ea6; }
+  .ri { padding: 2px 0; border-bottom: 1px solid #f0f0f0; }
+  .close-btn { float: right; background: none; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="icims-header">
+  <h1>Temporary Intern - Agentic AI &amp; Neural Symbolic Systems (Healthcare)</h1>
+  <p>Cotiviti · Remote · Internship · 12 weeks</p>
+</div>
+<div class="badge">Real iCIMS HTML Patterns — LocalHire Agent Test</div>
+
+<form id="icims-form">
+
+  <!-- iCIMS uses specific class names and name attributes like applicant.name.given -->
+  <div class="iCIMS_MainColumn">
+    <div class="iCIMS_SectionHeader">Personal Information</div>
+    <table class="iCIMS_TableFields">
+      <tr>
+        <td class="iCIMS_Label">
+          <label for="icims_first">First Name <span class="iCIMS_Required">*</span></label>
+        </td>
+        <td>
+          <!-- REAL iCIMS: name=applicant.name.given, class=iCIMS_Input -->
+          <input class="iCIMS_Input" id="icims_first" name="applicant.name.given" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label">
+          <label for="icims_last">Last Name <span class="iCIMS_Required">*</span></label>
+        </td>
+        <td>
+          <!-- REAL iCIMS: name=applicant.name.family -->
+          <input class="iCIMS_Input" id="icims_last" name="applicant.name.family" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label">
+          <label for="icims_email">Email Address <span class="iCIMS_Required">*</span></label>
+        </td>
+        <td>
+          <!-- REAL iCIMS: name=applicant.communications.email -->
+          <input class="iCIMS_Input" id="icims_email" name="applicant.communications.email" type="email" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label">
+          <label for="icims_phone">Phone Number</label>
+        </td>
+        <td>
+          <!-- REAL iCIMS: name=applicant.communications.phone -->
+          <input class="iCIMS_Input" id="icims_phone" name="applicant.communications.phone" type="tel" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label">
+          <label for="icims_city">City</label>
+        </td>
+        <td>
+          <!-- REAL iCIMS: name=applicant.address.city -->
+          <input class="iCIMS_Input" id="icims_city" name="applicant.address.city" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label">
+          <label for="icims_state">State / Province</label>
+        </td>
+        <td>
+          <input class="iCIMS_Input" id="icims_state" name="applicant.address.state" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label">
+          <label for="icims_country">Country <span class="iCIMS_Required">*</span></label>
+        </td>
+        <td>
+          <!-- REAL iCIMS: name=applicant.address.country -->
+          <select class="iCIMS_Input" id="icims_country" name="applicant.address.country">
+            <option value="">-- Select --</option>
+            <option value="United States">United States</option>
+            <option value="Canada">Canada</option>
+            <option value="India">India</option>
+          </select>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="iCIMS_MainColumn">
+    <div class="iCIMS_SectionHeader">Professional Profile</div>
+    <table class="iCIMS_TableFields">
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_linkedin">LinkedIn Profile</label></td>
+        <td><input class="iCIMS_Input" id="icims_linkedin" name="applicant.linkedIn" type="url" autocomplete="off"></td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_employer">Current Employer</label></td>
+        <td><input class="iCIMS_Input" id="icims_employer" name="applicant.currentEmployer" type="text" autocomplete="off"></td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_title">Current Title</label></td>
+        <td><input class="iCIMS_Input" id="icims_title" name="applicant.currentTitle" type="text" autocomplete="off"></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="iCIMS_MainColumn">
+    <div class="iCIMS_SectionHeader">Application Questions</div>
+    <table class="iCIMS_TableFields">
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_wa">Legally authorized to work in the US? <span class="iCIMS_Required">*</span></label></td>
+        <td>
+          <select class="iCIMS_Input" id="icims_wa" name="applicant.workAuthorization">
+            <option value="">-- Select --</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_visa">Require visa sponsorship? <span class="iCIMS_Required">*</span></label></td>
+        <td>
+          <select class="iCIMS_Input" id="icims_visa" name="applicant.requireSponsorship">
+            <option value="">-- Select --</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_salary">Expected Salary</label></td>
+        <td><input class="iCIMS_Input" id="icims_salary" name="applicant.expectedSalary" type="text" autocomplete="off"></td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_summary">Tell us about yourself</label></td>
+        <td><textarea class="iCIMS_Input" id="icims_summary" name="applicant.summary"></textarea></td>
+      </tr>
+      <tr>
+        <td class="iCIMS_Label"><label for="icims_referral">How did you hear about this position?</label></td>
+        <td>
+          <select class="iCIMS_Input" id="icims_referral" name="applicant.referralSource">
+            <option value="">-- Select --</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Indeed">Indeed</option>
+            <option value="Referral">Employee Referral</option>
+            <option value="Other">Other</option>
+          </select>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="iCIMS_ButtonsArea">
+    <button type="submit" class="iCIMS_Button">Next &gt;</button>
+  </div>
+</form>
+
+<div class="result-overlay" id="ro">
+  <button class="close-btn" onclick="document.getElementById('ro').style.display='none'">✕</button>
+  <h3>Fields Filled</h3><div id="rl"></div>
+</div>
+<script>
+document.getElementById("icims-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const rl = document.getElementById("rl"); rl.innerHTML = "";
+  let filled = 0, total = 0;
+  document.querySelectorAll(".iCIMS_Input").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const lbl = document.querySelector('label[for="'+f.id+'"]');
+      const d = document.createElement("div"); d.className="ri";
+      d.innerHTML = `<b>${lbl?.textContent?.replace('*','').trim()||f.name}:</b> ${f.value.substring(0,50)}`;
+      rl.appendChild(d);
+    }
+  });
+  const s = document.createElement("div");
+  s.style = "margin-top:6px;padding-top:6px;border-top:2px solid #005ea6;font-weight:700;color:#005ea6";
+  s.textContent = `${filled}/${total} filled`; rl.appendChild(s);
+  document.getElementById("ro").style.display="block";
+});
+</script>
+</body>
+</html>

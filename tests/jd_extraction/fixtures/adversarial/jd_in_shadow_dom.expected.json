@@ -1,0 +1,10 @@
+{
+  "must_include": [
+    "PyTorch",
+    "retrieval-augmented generation"
+  ],
+  "must_exclude": [],
+  "min_len": 40,
+  "max_len": 50000,
+  "expected_platform": "generic"
+}

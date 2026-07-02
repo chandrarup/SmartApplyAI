@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Shadow DOM Fields</title></head>
+<body>
+<h1>Workday-style Shadow Form</h1>
+<div id="host"></div>
+<script>
+  const host = document.getElementById("host");
+  const root = host.attachShadow({ mode: "open" });
+  root.innerHTML = `
+    <style>label{display:block;margin:8px 0 4px;font-weight:600}</style>
+    <div data-automation-id="personalInfoSection">
+      <label for="wd-first">First Name</label>
+      <input data-automation-id="legalNameSection_firstName" id="wd-first" type="text" />
+      <label for="wd-email">Email</label>
+      <input data-automation-id="email" id="wd-email" type="email" />
+    </div>
+  `;
+</script>
+</body>
+</html>

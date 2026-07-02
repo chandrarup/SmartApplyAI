@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Senior AI Engineer at Acme Corp | Lever</title>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 680px; margin: 0 auto; padding: 28px 20px; background: #fff; color: #333; }
+  .lever-header { border-bottom: 3px solid #00a0e9; padding-bottom: 16px; margin-bottom: 20px; }
+  .lever-header h1 { margin: 0 0 4px; font-size: 22px; color: #1a1a2e; }
+  .lever-header p { margin: 0; color: #666; font-size: 14px; }
+  .badge { background: #e3f4fd; color: #00669b; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 16px; }
+  .section { margin-bottom: 20px; }
+  .section-title { font-size: 12px; font-weight: 700; color: #00a0e9; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+  .application-field { margin-bottom: 14px; }
+  .application-field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 5px; color: #333; }
+  .application-field label .req { color: #e00; }
+  /* LEVER uses name attribute - key Lever field names */
+  input[type=text], input[type=email], input[type=tel], input[type=url], select, textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; font-family: inherit; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #00a0e9; box-shadow: 0 0 0 3px rgba(0,160,233,0.1); }
+  textarea { resize: vertical; min-height: 90px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .submit-btn { background: #00a0e9; color: white; border: none; padding: 12px 32px; border-radius: 4px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .submit-btn:hover { background: #0080bb; }
+  .result-overlay { display: none; position: fixed; top: 16px; right: 16px; background: white; border: 2px solid #00a0e9; border-radius: 6px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 320px; z-index: 9999; font-size: 12.5px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 8px; color: #00a0e9; }
+  .ri { padding: 2px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .close-btn { float: right; background: none; border: none; cursor: pointer; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="lever-header">
+  <h1>Senior AI Engineer</h1>
+  <p>Acme Corp · Austin, TX · Full-time · $130k–$180k</p>
+</div>
+<div class="badge">Real Lever HTML Patterns — LocalHire Agent Test</div>
+
+<form id="lever-form" action="#" method="post">
+
+  <div class="section">
+    <div class="section-title">Submit Your Application</div>
+
+    <!-- REAL Lever: name=name (FULL name, not split) -->
+    <div class="application-field">
+      <label for="lv_name">Full Name <span class="req">*</span></label>
+      <input type="text" id="lv_name" name="name" placeholder="First and last name" autocomplete="off">
+    </div>
+
+    <!-- REAL Lever: name=email -->
+    <div class="application-field">
+      <label for="lv_email">Email <span class="req">*</span></label>
+      <input type="email" id="lv_email" name="email" placeholder="your@email.com" autocomplete="off">
+    </div>
+
+    <!-- REAL Lever: name=phone -->
+    <div class="application-field">
+      <label for="lv_phone">Phone</label>
+      <input type="tel" id="lv_phone" name="phone" placeholder="+1 (555) 000-0000" autocomplete="off">
+    </div>
+
+    <!-- REAL Lever: name=org (current company) -->
+    <div class="application-field">
+      <label for="lv_org">Current Company</label>
+      <input type="text" id="lv_org" name="org" placeholder="Company name" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Links</div>
+    <!-- REAL Lever: name=urls[LinkedIn] -->
+    <div class="application-field">
+      <label for="lv_linkedin">LinkedIn URL</label>
+      <input type="url" id="lv_linkedin" name="urls[LinkedIn]" placeholder="https://linkedin.com/in/..." autocomplete="off">
+    </div>
+    <!-- REAL Lever: name=urls[GitHub] -->
+    <div class="application-field">
+      <label for="lv_github">GitHub URL</label>
+      <input type="url" id="lv_github" name="urls[GitHub]" placeholder="https://github.com/..." autocomplete="off">
+    </div>
+    <!-- REAL Lever: name=urls[Portfolio] -->
+    <div class="application-field">
+      <label for="lv_portfolio">Portfolio</label>
+      <input type="url" id="lv_portfolio" name="urls[Portfolio]" placeholder="https://..." autocomplete="off">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Additional Information</div>
+    <!-- REAL Lever: name=comments (open text, used for cover letter / additional info) -->
+    <div class="application-field">
+      <label for="lv_comments">Additional Information / Cover Letter</label>
+      <textarea id="lv_comments" name="comments" placeholder="Anything else you'd like to share..."></textarea>
+    </div>
+
+    <!-- Lever custom questions - name=cards[QFIELD_ID][field0] pattern -->
+    <div class="application-field">
+      <label for="lv_q1">Are you legally authorized to work in the United States? <span class="req">*</span></label>
+      <select id="lv_q1" name="cards[work_authorization][field0]">
+        <option value="">-- Select --</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="application-field">
+      <label for="lv_q2">Do you require visa sponsorship now or in the future? <span class="req">*</span></label>
+      <select id="lv_q2" name="cards[visa_sponsorship][field0]">
+        <option value="">-- Select --</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="application-field">
+      <label for="lv_q3">Years of experience with Python and ML?</label>
+      <select id="lv_q3" name="cards[years_experience][field0]">
+        <option value="">-- Select --</option>
+        <option value="0-1">Less than 1 year</option>
+        <option value="1-2">1-2 years</option>
+        <option value="2-4">2-4 years</option>
+        <option value="4+">4+ years</option>
+      </select>
+    </div>
+    <div class="application-field">
+      <label for="lv_salary">What are your salary expectations?</label>
+      <input type="text" id="lv_salary" name="cards[salary_expectation][field0]" placeholder="e.g. $140,000" autocomplete="off">
+    </div>
+  </div>
+
+  <button type="submit" class="submit-btn">Apply for this job</button>
+</form>
+
+<div class="result-overlay" id="ro">
+  <button class="close-btn" onclick="document.getElementById('ro').style.display='none'">✕</button>
+  <h3>Fields Filled</h3>
+  <div id="rl"></div>
+</div>
+<script>
+document.getElementById("lever-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const rl = document.getElementById("rl"); rl.innerHTML = "";
+  let filled = 0, total = 0;
+  document.querySelectorAll("input:not([type=submit]),select,textarea").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const lbl = document.querySelector('label[for="'+f.id+'"]');
+      const d = document.createElement("div"); d.className="ri";
+      d.innerHTML = `<b>${lbl?.textContent?.replace('*','').trim()||f.name}:</b> ${f.value.substring(0,50)}`;
+      rl.appendChild(d);
+    }
+  });
+  const s = document.createElement("div");
+  s.style = "margin-top:6px;padding-top:6px;border-top:2px solid #e3f4fd;font-weight:700;color:#00a0e9";
+  s.textContent = `${filled}/${total} filled`; rl.appendChild(s);
+  document.getElementById("ro").style.display="block";
+});
+document.querySelectorAll("input,select,textarea").forEach(el =>
+  el.addEventListener("change",()=>console.log(`[Lever] name="${el.name}" val="${el.value}"`))
+);
+</script>
+</body>
+</html>

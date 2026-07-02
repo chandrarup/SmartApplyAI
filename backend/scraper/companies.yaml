@@ -1,0 +1,34 @@
+# H1B-sponsoring public ATS candidates for AI/ML internships.
+# Each token is a candidate; runtime drops tokens that 404 or return zero jobs.
+# Mega-sponsors (Google, Amazon, Meta, Microsoft, Apple, Nvidia, consultancies)
+# are NOT on these public feeds — they come via Tier B later.
+
+companies:
+  - { ats: greenhouse, token: stripe }
+  - { ats: greenhouse, token: databricks }
+  - { ats: greenhouse, token: figma }
+  - { ats: greenhouse, token: airbnb }
+  - { ats: greenhouse, token: coinbase }
+  - { ats: greenhouse, token: robinhood }
+  - { ats: greenhouse, token: pinterest }
+  - { ats: greenhouse, token: reddit }
+  - { ats: greenhouse, token: plaid }
+  - { ats: greenhouse, token: brex }
+  - { ats: greenhouse, token: ramp }
+  - { ats: greenhouse, token: instacart }
+  - { ats: greenhouse, token: doordash }
+  - { ats: greenhouse, token: gitlab }
+  - { ats: greenhouse, token: hashicorp }
+  - { ats: greenhouse, token: confluent }
+  - { ats: greenhouse, token: datadog }
+  - { ats: greenhouse, token: asana }
+  - { ats: greenhouse, token: discord }
+  - { ats: greenhouse, token: anthropic }
+  - { ats: greenhouse, token: samsara }
+  - { ats: greenhouse, token: anduril }
+  - { ats: greenhouse, token: affirm }
+  - { ats: greenhouse, token: dropbox }
+  - { ats: greenhouse, token: cloudflare }
+  - { ats: ashby, token: scale }
+  - { ats: ashby, token: notion }
+  - { ats: lever, token: netflix }

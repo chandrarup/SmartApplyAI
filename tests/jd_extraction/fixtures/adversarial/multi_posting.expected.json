@@ -1,0 +1,12 @@
+{
+  "must_include": [
+    "TARGET_MARKER",
+    "PyTorch"
+  ],
+  "must_exclude": [
+    "Data Analyst"
+  ],
+  "min_len": 30,
+  "max_len": 50000,
+  "expected_platform": "generic"
+}

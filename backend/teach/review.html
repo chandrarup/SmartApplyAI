@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teach Review</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 40px auto;
+      padding: 0 20px 40px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      margin-bottom: 16px;
+    }
+    .muted {
+      color: #475569;
+      font-size: 14px;
+    }
+    .lesson {
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+    button[data-grade="again"] { background: #ef4444; color: #fff; }
+    button[data-grade="hard"]  { background: #f59e0b; color: #111827; }
+    button[data-grade="good"]  { background: #10b981; color: #fff; }
+    button[data-grade="easy"]  { background: #2563eb; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Teach Review</h1>
+    <p class="muted">Reviews due today are shown first. Grade your recall to schedule the next repetition.</p>
+    <div id="state" class="card">Loading due skills...</div>
+    <div id="lesson" class="card" style="display:none;"></div>
+    <div id="actions" class="card" style="display:none;">
+      <strong>How well did you recall it?</strong>
+      <div style="margin-top: 12px;">
+        <button data-grade="again">Again</button>
+        <button data-grade="hard">Hard</button>
+        <button data-grade="good">Good</button>
+        <button data-grade="easy">Easy</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const stateEl = document.getElementById("state");
+    const lessonEl = document.getElementById("lesson");
+    const actionsEl = document.getElementById("actions");
+    let activeSkill = "";
+
+    async function loadDue() {
+      const res = await fetch("/teach/due");
+      const data = await res.json();
+      const due = data.due || [];
+      if (!due.length) {
+        stateEl.textContent = "No due skills for today.";
+        lessonEl.style.display = "none";
+        actionsEl.style.display = "none";
+        return;
+      }
+      const first = due[0];
+      activeSkill = first.skill;
+      stateEl.innerHTML = `<strong>Next skill:</strong> ${first.skill}<br><span class="muted">Due: ${first.due_date || "today"}</span>`;
+      await loadLesson(activeSkill);
+    }
+
+    async function loadLesson(skill) {
+      const res = await fetch(`/teach/lesson/${encodeURIComponent(skill)}`);
+      const data = await res.json();
+      lessonEl.style.display = "block";
+      actionsEl.style.display = "block";
+      lessonEl.innerHTML = `<div class="lesson">${(data.lesson || "").replaceAll("<","&lt;")}</div>`;
+    }
+
+    async function grade(gradeName) {
+      if (!activeSkill) return;
+      await fetch("/teach/review", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({skill: activeSkill, grade: gradeName})
+      });
+      await loadDue();
+    }
+
+    actionsEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-grade]");
+      if (!btn) return;
+      grade(btn.dataset.grade);
+    });
+
+    loadDue();
+  </script>
+</body>
+</html>

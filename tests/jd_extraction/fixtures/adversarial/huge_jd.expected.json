@@ -1,0 +1,10 @@
+{
+  "must_include": [
+    "HUGE_JD_TAIL",
+    "PyTorch"
+  ],
+  "must_exclude": [],
+  "min_len": 20000,
+  "max_len": 40000,
+  "expected_platform": "generic"
+}

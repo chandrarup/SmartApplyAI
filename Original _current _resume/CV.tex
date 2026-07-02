@@ -1,0 +1,280 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[margin=0.75in]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+% Formatting
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlist[itemize]{leftmargin=*,noitemsep,topsep=3pt}
+
+% Section formatting
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+
+% Hyperlink setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+% Custom commands
+\newcommand{\CVItem}[1]{\item{#1}}
+\newcommand{\CVSubheading}[4]{
+  \vspace{2pt}
+  \textbf{#1} \hfill #2 \\
+  \textit{#3} \hfill \textit{#4}
+  \vspace{3pt}
+}
+
+\begin{document}
+
+% Header
+\begin{center}
+    {\Huge \textbf{CHANDRA RUP DAKA}} \\[5pt]
+    Email: \href{mailto:chandrarupdaka@gmail.com}{chandrarupdaka@gmail.com} $|$ 
+    Phone: +1 (253) 632-3181 \\
+    LinkedIn: \href{https://linkedin.com/in/chandra-rup-daka}{linkedin.com/in/chandra-rup-daka} $|$ 
+    PortFolio: \href{https://chandrarup.github.io/Portfolio_New/}{portfolio} $|$ 
+    Location: Houston, Texas
+\end{center}
+
+% Research Interests
+\section{RESEARCH INTERESTS}
+Natural Language Processing, Large Language Models, Agentic AI Systems, Retrieval-Augmented Generation, Deep Learning, Computer Vision, Speech Processing, Low-Resource Language Technologies, AI for Social Impact
+
+% Education
+\section{EDUCATION}
+
+\CVSubheading
+{Master of Science in Engineering Data Science and Artificial Intelligence}
+{Aug 2025 -- May 2027}
+{University of Houston, Houston, Texas}
+{}
+
+\CVSubheading
+{Bachelor of Technology in Computer Science and Engineering (Artificial Intelligence)}
+{Jun 2019 -- May 2023}
+{Amrita Vishwa Vidyapeetham, Bangalore, India}
+{}
+
+\textbf{Relevant Coursework:} Deep Learning for Signal and Image Processing, AI in Natural Language Processing, Reinforcement Learning, Deep Reinforcement Learning, Robotics Vision, Computer Vision, Speech Processing, Big Data Analytics, Machine Learning, Data Structures and Algorithms, Operating Systems, Database Management
+
+% Professional Experience
+\section{PROFESSIONAL EXPERIENCE}
+
+\CVSubheading
+{Advanced App Engineering Analyst - GenAI Specialist}
+{Aug 2023 -- Aug 2025}
+{Accenture (GenWizard Platform), Chennai, India}
+{}
+\begin{itemize}
+    \CVItem{Architected and deployed production-grade LLM-based solutions for reverse engineering SDLC workflows including Change Impact Analysis, Code Translation, Dependency Graph Generation, and automated User Story/Test Case Generation}
+    \CVItem{Achieved 89\% coverage in Technical Analysis phase with 9\% efficiency improvement at 46\% code coverage across 30,000+ file codebases}
+    \CVItem{Designed custom RAG pipelines using LangChain and AutoGen frameworks with advanced techniques including BERTopic for topic modeling, sentence transformers for semantic search, and knowledge graphs with Neo4j for relationship mapping}
+    \CVItem{Implemented multi-database architecture utilizing ChromaDB, PostgreSQL, and Pinecone vector stores for optimal retrieval performance}
+    \CVItem{Gained hands-on expertise with GPT-4, Claude, and Gemini APIs; customized authentication mechanisms using certificates, custom tokens, and APIM endpoints}
+    \CVItem{Mentored 30+ junior engineers on Python, agentic frameworks, and GenAI best practices through structured training sessions}
+    \CVItem{Recognized with Wall of Fame Award (Q4 FY24) and Client Recognition Award for exceptional delivery and technical innovation}
+\end{itemize}
+
+% Publications
+\section{PUBLICATIONS}
+
+\textbf{Daka, C.R.} et al. (2024). Detection of Real and Manipulated Videos using Transfer Learning. \textit{Global Conference for Advancement in Technology (GCAT)}, October 2024.
+\begin{itemize}
+    \CVItem{Proposed deep learning framework combining transfer learning architectures with temporal models for deepfake detection, contributing to digital media integrity and AI-assisted misinformation detection}
+\end{itemize}
+
+\textbf{Daka, C.R.} et al. (2023). Indian Sign Language Generation from Live Audio/Text (Tamil). \textit{International Conference on Advanced Computing and Communication Systems (ICACCS)}, March 2023.
+\begin{itemize}
+    \CVItem{Developed real-time speech-to-sign translation pipeline integrating NLP and computer vision, enhancing accessibility for Tamil-speaking hearing-impaired users}
+\end{itemize}
+
+% Research Experience
+\section{RESEARCH EXPERIENCE}
+\textbf{Research Collaborator --- AI \& Spatial Proteomics} \hfill 2026 -- Present \\
+\textit{Prof. Badri Roysam's Lab, University of Houston, Houston, TX}
+\begin{itemize}
+  \item Implemented \textbf{CellPose} and \textbf{StarDist} deep learning pipelines for automated cell segmentation and classification on large-scale multichannel DAPI-stained fluorescence microscopy images (\textasciitilde5GB TIFFs) of Alzheimer's disease mouse model (TgCRND8) and human brain tissue samples.
+  \item Reproduced and reverse-engineered spatial transcriptomics analysis of published Alzheimer's Xenium dataset — including cell type proportion analysis, DAM microglia identification, reactive astrocyte profiling, and amyloid plaque hotspot spatial distributions using Python-based analysis pipelines.
+  \item Trained a \textbf{domain-specific BioGPT-style generative language model} from scratch on public biomedical corpora, inspired by Microsoft's BioGPT architecture — demonstrating domain-adapted natural language generation for biomedical reasoning tasks.
+  \item Acquired working knowledge of \textbf{spatial proteomics} workflows, multi-channel biological image analysis, and the intersection of AI and neurodegenerative disease research.
+\end{itemize}
+\CVSubheading
+{Undergraduate Research Assistant}
+{Jan 2023 -- May 2023}
+{Amrita Vishwa Vidyapeetham}
+{}
+\begin{itemize}
+    \CVItem{Developed deep learning framework for deepfake video detection using transfer learning with ResNet, XceptionNet, and VGG16 combined with LSTM/Bi-LSTM architectures, achieving 96\% accuracy on 6,500-video dataset}
+    \CVItem{Published findings in Global Conference for Advancement in Technology (GCAT), October 2024}
+    \CVItem{Conducted comprehensive literature review on state-of-the-art deepfake detection methodologies and AI-generated media forensics}
+\end{itemize}
+
+\CVSubheading
+{Research Project: Indian Sign Language Generation for Tamil}
+{Aug 2022 -- Mar 2023}
+{Amrita Vishwa Vidyapeetham}
+{}
+\begin{itemize}
+    \CVItem{Designed real-time speech-to-sign language translation system integrating NLP and computer vision to address communication barriers for Tamil-speaking hearing-impaired community}
+    \CVItem{Built web application with custom GIF repository for commonly used sentences; experimented with BiLSTM transformers before integrating Google Translate API for production reliability}
+    \CVItem{Published in International Conference on Advanced Computing and Communication Systems (ICACCS), March 2023}
+\end{itemize}
+% Selected Technical Projects
+\section{SELECTED TECHNICAL PROJECTS}
+\textbf{GPT-2 Style Small Language Model --- Built from Scratch} \hfill 2026 \\
+\textit{PyTorch, Transformer Architecture, BPE Tokenization, TinyStories Dataset}
+\begin{itemize}
+  \item Implemented a \textbf{100M+ parameter} GPT-2 style language model from scratch including token embeddings, positional encodings, stacked transformer blocks with multi-head self-attention, layer normalization, and autoregressive next-token prediction training loop.
+  \item Applied Byte Pair Encoding (BPE) tokenization on Microsoft's TinyStories dataset; optimized model to converge to theoretical loss curves, generating grammatically coherent and domain-relevant English prose.
+  \item Demonstrates end-to-end understanding of modern LLM internals applicable across any domain requiring custom language model development.
+\end{itemize}
+\CVSubheading
+{Speech Emotion Recognition System}
+{May 2022}
+{Amrita Vishwa Vidyapeetham}
+{}
+\begin{itemize}
+    \CVItem{Designed CNN-based emotion recognition system achieving 81.11\% accuracy on RAVDESS dataset (1,440 audio files)}
+    \CVItem{Implemented acoustic feature extraction pipeline using librosa (MFCCs, chroma, mel-spectrograms, tonnetz)}
+    \CVItem{Demonstrated system at college exhibition showcasing applications in customer service automation}
+\end{itemize}
+
+
+\vspace{5mm}
+\CVSubheading
+{Telugu News Article Classification}
+{May 2022}
+{Amrita Vishwa Vidyapeetham}
+{}
+\begin{itemize}
+    \CVItem{Addressed low-resource NLP challenges by developing custom Word2Vec embeddings for Telugu language corpus}
+    \CVItem{Compared MLP, CNN, LSTM, RNN, and Bi-LSTM architectures; achieved 82\% accuracy with Bi-LSTM model}
+    \CVItem{Conducted comprehensive data preprocessing and feature engineering for regional language text}
+\end{itemize}
+
+\CVSubheading
+{Ball Tracking and 3D Visualization for Sports Analytics}
+{Dec 2021}
+{Amrita Vishwa Vidyapeetham}
+{}
+\begin{itemize}
+    \CVItem{Implemented real-time object tracking system using OpenCV for ball trajectory analysis in sports videos}
+    \CVItem{Developed 3D motion visualization using Matplotlib for enhanced analytical insights}
+\end{itemize}
+
+\CVSubheading
+{4-DOF Digit Writing Robotic Manipulator}
+{May 2021}
+{Amrita Vishwa Vidyapeetham}
+{}
+\begin{itemize}
+    \CVItem{Engineered robotic manipulator with 4 degrees of freedom to autonomously write user-specified digits}
+    \CVItem{Integrated Python-based control system with ROS (Robot Operating System) for precise motion planning}
+\end{itemize}
+
+% \vspace{20mm}
+% Teaching and Mentoring Experience
+\section{TEACHING AND MENTORING EXPERIENCE}
+
+\CVSubheading
+{Technical Mentor and Trainer}
+{Jan 2024 -- Aug 2025}
+{Accenture, Chennai, India}
+{}
+\begin{itemize}
+    \CVItem{Conducted comprehensive training sessions on Python programming, agentic AI frameworks (LangChain, AutoGen, CrewAI), and GenAI best practices for 30+ junior engineers}
+    \CVItem{Developed structured curriculum covering fundamentals to advanced topics in LLM application development}
+    \CVItem{Provided hands-on mentorship for project implementations and troubleshooting}
+    \CVItem{Presented technical demonstrations to leadership and clients, translating complex AI concepts for diverse audiences}
+\end{itemize}
+
+% Technical Skills
+% \section{TECHNICAL SKILLS}
+
+% \textbf{AI/ML Specializations:} Large Language Models (GPT-4, Claude, Gemini), Agentic AI (LangChain, AutoGen, CrewAI), Natural Language Processing, Computer Vision, Speech Processing, Deep Learning, Reinforcement Learning, Transfer Learning, Prompt Engineering, RAG Systems
+
+% \textbf{Deep Learning Frameworks:} TensorFlow, PyTorch, Keras, Hugging Face Transformers
+
+% \textbf{Data Science and Analytics:} Statistical Analysis, Predictive Modeling, Feature Engineering, Data Wrangling, Pandas, NumPy, Scikit-learn, Matplotlib, Seaborn
+
+% \textbf{Vector and Graph Databases:} ChromaDB, Pinecone, PostgreSQL (pgvector), Neo4j, MongoDB
+
+% \textbf{Development Tools:} Git, Docker, FastAPI, Flask, REST APIs, Jupyter, VS Code
+
+% \textbf{Programming Languages:} Python (Expert), SQL, Java, C++
+
+% \textbf{Specialized Libraries:} OpenCV, librosa, spaCy, NLTK, Gensim, OpenAI API, Anthropic API, Google Generative AI
+\section*{Technical Skills}
+
+\textbf{AI/ML Specializations:} Large Language Models (GPT-4, Claude, Gemini), Agentic AI (LangChain, AutoGen, CrewAI), Natural Language Processing, Computer Vision, Speech Processing, Deep Learning, Reinforcement Learning, Transfer Learning, Generative Adversarial Networks (GANs), Prompt Engineering, RAG Systems, LoRA, PEFT \\
+% a\vspace{7mm}
+\textbf{LLM Internals \& Architecture:} Transformer Architecture, Multi-Head Self-Attention, BPE Tokenization, Positional Encoding, Next-Token Prediction, Autoregressive Training, Loss Curve Optimization \\
+\textbf{Biomedical AI:} CellPose, StarDist, Spatial Transcriptomics Analysis, Cell Segmentation \& Classification, Fluorescence Microscopy (DAPI, multichannel), Alzheimer's Disease Data Analysis, BioGPT-style Domain Language Models \\
+\textbf{Deep Learning Frameworks:} TensorFlow, PyTorch, Keras, Hugging Face Transformers \\
+\textbf{Data Science \& Analytics:} Statistical Analysis, Predictive Modeling, Feature Engineering, Data Wrangling, Pandas, NumPy, Scikit-learn, Matplotlib, Seaborn \\
+\textbf{Vector \& Graph Databases:} ChromaDB, Pinecone, PostgreSQL (pgvector), Neo4j, MongoDB \\
+\textbf{Development Tools:} Git, Docker, FastAPI, Flask, REST APIs, Jupyter, VS Code, Google Colab \\
+\textbf{Programming Languages:} Python (Expert), SQL, Java, C++ \\
+\textbf{Specialized Libraries:} OpenCV, librosa, spaCy, NLTK, Gensim, OpenAI API, Anthropic API, Google Generative AI, CellPose, StarDist
+% Certification
+\vspace{5mm}
+\section{CERTIFICATIONS}
+
+\begin{itemize}
+    \CVItem{AWS Certified Cloud Practitioner (Valid: June 2024 -- June 2027)}
+    \CVItem{Azure AI Fundamentals (March 2025)}
+    \CVItem{Azure AI Engineer Associate (Valid: April 2025 -- April 2026)}
+\end{itemize}
+
+% % Leadership and Extracurricular Activities
+% \section{LEADERSHIP AND EXTRACURRICULAR ACTIVITIES}
+
+% \CVSubheading
+% {Active Member, Art Club Kala and Photography Club Smriti}
+% {}
+% {Amrita Vishwa Vidyapeetham}
+% {}
+% \begin{itemize}
+%     \CVItem{Organized workshops and cultural events promoting creative expression and community engagement}
+%     \CVItem{Coordinated monthly photography competitions during COVID-19 to maintain community connection}
+% \end{itemize}
+
+% \CVSubheading
+% {Volunteer, Prakruthi Nature Club}
+% {}
+% {Amrita Vishwa Vidyapeetham}
+% {}
+% \begin{itemize}
+%     \CVItem{Participated in campus cleanliness drives and promoted organic farming awareness initiatives}
+% \end{itemize}
+
+% Honors and Awards
+\section{HONORS AND AWARDS}
+
+\begin{itemize}
+    \CVItem{Wall of Fame Award (Q4 FY24) - Accenture, for exceptional contribution to GenAI platform development}
+    \CVItem{Client Recognition Award - Accenture, for successful delivery of production-grade GenAI solutions meeting client requirements}
+    \CVItem{Best Team Award (FY24 Q4) - Accenture, for collaborative excellence in delivering complex AI projects}
+\end{itemize}
+
+% Research Statement
+\section{RESEARCH STATEMENT}
+
+My research interests lie at the intersection of Large Language Models, Agentic AI systems, Biomedical AI, and practical NLP for real-world problem solving. Through my professional experience deploying production-grade RAG systems and multi-agent workflows at Accenture, academic research on deepfake detection and accessibility technologies, and hands-on lab work applying AI to Alzheimer's disease spatial transcriptomics data with Prof. Badri Roysam at UH, I have built a strong foundation spanning both theoretical understanding and production implementation.
+
+I am particularly interested in: (1) advancing retrieval-augmented generation and agentic reasoning systems, (2) low-resource language processing for underrepresented communities, (3) applying deep learning to biomedical imaging and spatial proteomics, and (4) developing AI systems that bridge technological gaps for underserved populations globally. I have trained language models from scratch — including a 100M+ parameter GPT-2 style model and a domain-specific BioGPT — giving me rare hands-on understanding of LLM internals that complements my production engineering experience.
+
+I am open to Research Assistantship and Teaching Assistantship opportunities across departments, and to voluntary research collaboration where my background in generative AI, NLP, computer vision, and biomedical imaging can contribute meaningfully to ongoing research.
+
+\vspace{10pt}
+
+\end{document}

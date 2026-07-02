@@ -149,6 +149,16 @@
       Phase 2 surface: auto-detects form fields and fills them using your profile + AI.
     </div>
     <button id="autofillBtn" class="action-btn btn-success">Auto-Fill This Application</button>
+    <div class="settings-row" style="margin-top:2px">
+      <label>Approved Queue Item</label>
+      <select id="approvedMatchSelect">
+        <option value="">Loading approved items...</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button id="fillApprovedBtn" class="action-btn btn-outline" style="padding:8px">Fill from Approved Item</button>
+      <button id="refreshApprovedBtn" class="action-btn btn-outline" style="padding:8px;max-width:110px">Refresh Queue</button>
+    </div>
     <div id="autofillStatus" class="status-bar hidden"></div>
     <div id="progressWrap" class="hidden">
       <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>

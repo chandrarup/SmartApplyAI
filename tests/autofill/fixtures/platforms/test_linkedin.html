@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Engineer at TechCorp | LinkedIn Easy Apply</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f2ef; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; }
+  .li-backdrop { background: rgba(0,0,0,0.5); position: fixed; inset: 0; z-index: 100; }
+  /* LinkedIn Easy Apply Modal — matches real DOM structure */
+  .jobs-easy-apply-modal { position: relative; z-index: 200; background: white; border-radius: 10px; width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 24px rgba(0,0,0,0.25); }
+  [data-test-modal-id="easy-apply-modal"] { position: relative; z-index: 200; }
+  .li-modal-header { padding: 20px 24px 0; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e0e0e0; padding-bottom: 14px; }
+  .li-modal-header h2 { margin: 0; font-size: 20px; font-weight: 700; color: #1a1a1a; }
+  .li-modal-header p { margin: 4px 0 0; font-size: 13px; color: #666; }
+  .li-progress { height: 3px; background: #e0e0e0; margin: 0 24px; border-radius: 2px; }
+  .li-progress-bar { height: 100%; background: #0a66c2; border-radius: 2px; width: 40%; }
+  .li-modal-body { padding: 20px 24px; }
+  .li-section-title { font-size: 15px; font-weight: 700; color: #1a1a1a; margin: 0 0 14px; }
+  .badge { background: #dce6f1; color: #0a66c2; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 14px; }
+  /* LinkedIn Easy Apply uses class=form-element__input on fields */
+  .li-field { margin-bottom: 14px; }
+  .li-field label { display: block; font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 5px; }
+  .li-field .req { color: #c00; }
+  .form-element__input { width: 100%; padding: 9px 12px; border: 1.5px solid #bbb; border-radius: 4px; font-size: 14px; box-sizing: border-box; font-family: inherit; outline: none; }
+  .form-element__input:focus { border-color: #0a66c2; box-shadow: 0 0 0 2px rgba(10,102,194,0.15); }
+  select.form-element__input { background: white; }
+  textarea.form-element__input { resize: vertical; min-height: 80px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .li-footer { padding: 16px 24px; border-top: 1px solid #e0e0e0; display: flex; justify-content: flex-end; gap: 10px; }
+  .li-btn-primary { background: #0a66c2; color: white; border: none; padding: 10px 24px; border-radius: 24px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .li-btn-secondary { background: white; color: #0a66c2; border: 1.5px solid #0a66c2; padding: 10px 24px; border-radius: 24px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .result-overlay { display: none; position: fixed; top: 16px; right: 16px; background: white; border: 2px solid #0a66c2; border-radius: 8px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); max-width: 320px; z-index: 9999; font-size: 12.5px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 8px; color: #0a66c2; }
+  .ri { padding: 2px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .close-btn { float: right; background: none; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="li-backdrop"></div>
+
+<!-- REAL LinkedIn Easy Apply modal structure -->
+<div class="jobs-easy-apply-modal" data-test-modal-id="easy-apply-modal">
+  <div class="li-modal-header">
+    <div>
+      <h2>AI Engineer</h2>
+      <p>TechCorp · San Francisco, CA · Full-time</p>
+    </div>
+    <div class="badge">Real LinkedIn Easy Apply Patterns</div>
+  </div>
+  <div class="li-progress"><div class="li-progress-bar"></div></div>
+
+  <form id="li-form">
+    <div class="li-modal-body">
+      <div class="li-section-title">Contact info</div>
+
+      <!-- LinkedIn Easy Apply: aria-label is the primary label mechanism -->
+      <div class="two-col">
+        <div class="li-field">
+          <label for="li_first">First name <span class="req">*</span></label>
+          <!-- REAL: aria-label="First name", class=form-element__input -->
+          <input class="form-element__input" id="li_first" type="text" aria-label="First name" autocomplete="off">
+        </div>
+        <div class="li-field">
+          <label for="li_last">Last name <span class="req">*</span></label>
+          <!-- REAL: aria-label="Last name" -->
+          <input class="form-element__input" id="li_last" type="text" aria-label="Last name" autocomplete="off">
+        </div>
+      </div>
+      <div class="li-field">
+        <label for="li_email">Email address <span class="req">*</span></label>
+        <input class="form-element__input" id="li_email" type="email" aria-label="Email address" autocomplete="off">
+      </div>
+      <div class="two-col">
+        <div class="li-field">
+          <label for="li_phone">Mobile phone number</label>
+          <!-- REAL LinkedIn: id*=phoneNumber pattern, aria-label="Mobile phone number" -->
+          <input class="form-element__input" id="phoneNumber-nationalNumber" type="tel" aria-label="Mobile phone number" autocomplete="off">
+        </div>
+        <div class="li-field">
+          <label for="li_city">City, State, Zip Code</label>
+          <input class="form-element__input" id="li_city" type="text" aria-label="City, State, Zip Code" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="li-section-title" style="margin-top:18px">Additional questions</div>
+
+      <div class="li-field">
+        <label for="li_wa">Are you legally authorized to work in the United States? <span class="req">*</span></label>
+        <select class="form-element__input" id="li_wa" aria-label="Are you legally authorized to work in the United States?">
+          <option value="">Select an option</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div class="li-field">
+        <label for="li_sponsor">Will you now or in the future require sponsorship for employment visa status? <span class="req">*</span></label>
+        <select class="form-element__input" id="li_sponsor" aria-label="Will you now or in the future require sponsorship for employment visa status?">
+          <option value="">Select an option</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div class="li-field">
+        <label for="li_exp">Years of experience with Python and ML?</label>
+        <input class="form-element__input" id="li_exp" type="text" aria-label="Years of experience with Python and ML?" autocomplete="off">
+      </div>
+      <div class="li-field">
+        <label for="li_summary">How many years of experience do you have in a professional capacity? <span class="req">*</span></label>
+        <input class="form-element__input" id="li_summary" type="number" aria-label="How many years of experience do you have in a professional capacity?" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="li-footer">
+      <button type="button" class="li-btn-secondary">Back</button>
+      <button type="submit" class="li-btn-primary">Next</button>
+    </div>
+  </form>
+</div>
+
+<div class="result-overlay" id="ro">
+  <button class="close-btn" onclick="document.getElementById('ro').style.display='none'">✕</button>
+  <h3>Fields Filled</h3><div id="rl"></div>
+</div>
+<script>
+document.getElementById("li-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const rl = document.getElementById("rl"); rl.innerHTML = "";
+  let filled = 0, total = 0;
+  document.querySelectorAll(".form-element__input").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const name = f.getAttribute("aria-label") || f.id;
+      const d = document.createElement("div"); d.className="ri";
+      d.innerHTML = `<b>${name.substring(0,40)}:</b> ${f.value.substring(0,50)}`;
+      rl.appendChild(d);
+    }
+  });
+  const s = document.createElement("div");
+  s.style = "margin-top:6px;padding-top:6px;border-top:2px solid #dce6f1;font-weight:700;color:#0a66c2";
+  s.textContent = `${filled}/${total} filled`; rl.appendChild(s);
+  document.getElementById("ro").style.display="block";
+});
+</script>
+</body>
+</html>

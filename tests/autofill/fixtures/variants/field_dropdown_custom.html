@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Custom Dropdown</title>
+<style>
+  .custom-select { border:1px solid #999; padding:8px; cursor:pointer; width:240px; }
+  .menu { border:1px solid #ccc; display:none; }
+  .menu.open { display:block; }
+  .item { padding:8px; cursor:pointer; }
+</style></head>
+<body>
+<h1>Custom Div Select</h1>
+<div class="field">
+  <label id="work-auth-label">Work Authorization</label>
+  <div id="custom-dd" class="custom-select" role="button" aria-labelledby="work-auth-label" tabindex="0">Select...</div>
+  <div id="custom-menu" class="menu">
+    <div class="item" data-value="Yes">Yes</div>
+    <div class="item" data-value="No">No</div>
+  </div>
+</div>
+<script>
+  const dd = document.getElementById("custom-dd");
+  const menu = document.getElementById("custom-menu");
+  dd.addEventListener("click", () => menu.classList.toggle("open"));
+  menu.querySelectorAll(".item").forEach(el => {
+    el.addEventListener("click", () => {
+      dd.textContent = el.dataset.value;
+      dd.dataset.value = el.dataset.value;
+      menu.classList.remove("open");
+    });
+  });
+</script>
+</body>
+</html>

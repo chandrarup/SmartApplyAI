@@ -1,0 +1,10 @@
+{
+  "must_include": [
+    "Machine Learning Engineer",
+    "InnovateCo"
+  ],
+  "must_exclude": [],
+  "min_len": 80,
+  "max_len": 50000,
+  "expected_platform": "workday"
+}

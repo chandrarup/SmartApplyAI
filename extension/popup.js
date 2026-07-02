@@ -90,6 +90,7 @@ let lastDetectedCompany = "";
 let lastDetectedPlatform = "";
 let lastDetectedRole = "";
 let currentTabId = null;
+let approvedMatches = [];
 
 // ─────────────────────────────────────────────
 // SESSION PERSISTENCE (survives popup close/reopen)
@@ -172,6 +173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   } else {
     loadFAQs();
   }
+  loadApprovedMatches();
 
   // Listen for autofill progress from content script
   chrome.runtime.onMessage.addListener((msg) => {
@@ -207,6 +209,12 @@ function showEl(id) { document.getElementById(id)?.classList.remove("hidden"); }
 function getApiUrl() {
   return document.getElementById("apiUrlInput").value.trim() || "http://127.0.0.1:5001";
 }
+
+// Extension endpoint map (via main backend API URL):
+// - GET /profile                (knowledge-backed profile source)
+// - POST /autofill              (rule + LLM answer engine)
+// - POST /autofill/learn        (host-specific corrections)
+// - GET /matches/approved       (approved queue items for override fill)
 
 function getLlm() {
   return document.getElementById("llmSelect").value || currentLlm;
@@ -634,7 +642,7 @@ document.getElementById("customizeResumeBtn").addEventListener("click", async ()
 // ─────────────────────────────────────────────
 // AUTOFILL TAB
 // ─────────────────────────────────────────────
-document.getElementById("autofillBtn").addEventListener("click", () => {
+function startAutofillRun(extraPayload = {}) {
   const btn = document.getElementById("autofillBtn");
   btn.disabled = true; btn.textContent = "Filling...";
   fillLogEntries = [];
@@ -647,7 +655,7 @@ document.getElementById("autofillBtn").addEventListener("click", () => {
 
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
     chrome.tabs.sendMessage(tabs[0].id,
-      { action: "start_autofill", llm: getLlm() },
+      { action: "start_autofill", llm: getLlm(), ...extraPayload },
       response => {
         if (chrome.runtime.lastError) {
           showStatus("autofillStatus", "error", "Could not connect to page. Try reloading the tab.");
@@ -657,7 +665,98 @@ document.getElementById("autofillBtn").addEventListener("click", () => {
       }
     );
   });
+}
+
+document.getElementById("autofillBtn").addEventListener("click", () => {
+  startAutofillRun();
 });
+
+document.getElementById("fillApprovedBtn").addEventListener("click", () => {
+  const sel = document.getElementById("approvedMatchSelect");
+  const selectedId = sel?.value || "";
+  const selected = approvedMatches.find(item => String(item.id) === String(selectedId));
+  if (!selected) {
+    showStatus("autofillStatus", "warning", "Pick an approved queue item first.");
+    return;
+  }
+  const company = selected.company || selected.company_name || "Selected Company";
+  showStatus("autofillStatus", "info", `Using approved data for ${company}.`);
+  startAutofillRun({
+    approvedItemId: selected.id,
+    approvedData: selected.tailored_data || selected.profile_override || selected,
+  });
+});
+
+document.getElementById("refreshApprovedBtn").addEventListener("click", () => {
+  loadApprovedMatches(true);
+});
+
+function normalizeApprovedItem(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const item = { ...raw };
+  item.id = item.id ?? item.match_id ?? item.queue_id ?? item.uuid ?? null;
+  item.company = item.company ?? item.company_name ?? item.org ?? "";
+  item.role = item.role ?? item.title ?? item.job_title ?? "";
+  item.apply_url = item.apply_url ?? item.url ?? item.job_url ?? "";
+  if (!item.tailored_data && typeof item.profile_override === "object") {
+    item.tailored_data = item.profile_override;
+  }
+  if (!item.tailored_data && typeof item.tailored === "object") {
+    item.tailored_data = item.tailored;
+  }
+  return item.id ? item : null;
+}
+
+function renderApprovedMatches() {
+  const sel = document.getElementById("approvedMatchSelect");
+  if (!sel) return;
+  const existing = sel.value;
+  sel.innerHTML = "";
+  if (!approvedMatches.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No approved items available";
+    sel.appendChild(opt);
+    return;
+  }
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = `Select approved item (${approvedMatches.length})`;
+  sel.appendChild(placeholder);
+  approvedMatches.forEach(item => {
+    const opt = document.createElement("option");
+    opt.value = String(item.id);
+    const title = item.role || "Role";
+    const company = item.company || "Company";
+    opt.textContent = `${company} — ${title}`;
+    sel.appendChild(opt);
+  });
+  if (existing && approvedMatches.some(item => String(item.id) === String(existing))) {
+    sel.value = existing;
+  }
+}
+
+async function loadApprovedMatches(showToast = false) {
+  const apiUrl = getApiUrl();
+  try {
+    const res = await fetch(`${apiUrl}/matches/approved`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    const rows = Array.isArray(payload) ? payload : (Array.isArray(payload?.items) ? payload.items : []);
+    approvedMatches = rows.map(normalizeApprovedItem).filter(Boolean);
+    renderApprovedMatches();
+    if (showToast) {
+      showStatus("autofillStatus", "success", `Loaded ${approvedMatches.length} approved queue item(s).`);
+    }
+  } catch (e) {
+    approvedMatches = [];
+    renderApprovedMatches();
+    if (showToast) {
+      showStatus("autofillStatus", "warning", "Queue endpoint unavailable. Using regular profile fill.");
+    }
+    LHLog.warn("autofill", "Failed to load approved queue items", { err: e?.message });
+  }
+}
 
 function handleFillProgress(data) {
   const progressBar = document.getElementById("progressBar");

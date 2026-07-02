@@ -65,6 +65,42 @@ class CompileResult:
         }
 
 
+def inspect_tex_hygiene(tex_content: str) -> dict[str, Any]:
+    """Static checks for ATS-safe TeX hygiene (pre-compile)."""
+    issues: list[str] = []
+    tex_lower = (tex_content or "").lower()
+
+    hidden_text_patterns = [
+        r"\\phantom\{",
+        r"\\hphantom\{",
+        r"\\vphantom\{",
+        r"\\textcolor\{white\}",
+        r"\\color\{white\}",
+        r"\\transparent\{0",
+        r"\\opacity\{0",
+        r"\\fontsize\{0",
+    ]
+    for pattern in hidden_text_patterns:
+        if re.search(pattern, tex_lower):
+            issues.append(f"Hidden/zero-visibility text pattern found: {pattern}")
+
+    single_column_patterns = [
+        r"\\twocolumn",
+        r"\\begin\{multicols\}",
+        r"\\begin\{paracol\}",
+    ]
+    for pattern in single_column_patterns:
+        if re.search(pattern, tex_lower):
+            issues.append(f"Multi-column layout pattern found: {pattern}")
+
+    return {
+        "ok": len(issues) == 0,
+        "issues": issues,
+        "single_column_ok": not any("Multi-column" in i for i in issues),
+        "hidden_text_ok": not any("Hidden/zero-visibility" in i for i in issues),
+    }
+
+
 # ── LaTeX error classifier ─────────────────────────────────────────────────
 ERROR_PATTERNS = [
     (r"Undefined control sequence", "undefined_command"),

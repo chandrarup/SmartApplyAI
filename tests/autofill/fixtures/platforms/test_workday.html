@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ML Engineer — Workday Test | InnovateCo</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; max-width: 760px; margin: 0 auto; padding: 28px 20px; color: #333; background: #f5f5f5; }
+  .wd-header { background: #003d7a; color: white; padding: 24px 28px; border-radius: 0; margin-bottom: 0; }
+  .wd-header h1 { margin: 0 0 4px; font-size: 20px; font-weight: 300; letter-spacing: 0.5px; }
+  .wd-header p { margin: 0; font-size: 13px; opacity: 0.8; }
+  .wd-body { background: white; padding: 28px; border: 1px solid #ddd; }
+  .wd-section { margin-bottom: 28px; }
+  .wd-section-title { font-size: 13px; font-weight: 700; color: #003d7a; text-transform: uppercase; letter-spacing: 0.8px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0; margin-bottom: 16px; }
+  .wd-field { margin-bottom: 14px; }
+  .wd-field label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .wd-field label .req { color: #c00; }
+  /* Workday uses data-automation-id attributes */
+  input[type=text], input[type=email], input[type=tel], input[type=url], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #b0b0b0; border-radius: 3px; font-size: 14px; outline: none; box-sizing: border-box; font-family: inherit; background: #fff;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #003d7a; box-shadow: 0 0 0 2px rgba(0,61,122,0.15); }
+  textarea { resize: vertical; min-height: 80px; }
+  .wd-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .wd-btn { background: #003d7a; color: white; border: none; padding: 10px 28px; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 3px; margin-top: 12px; }
+  .wd-btn:hover { background: #002a57; }
+  .badge { display: inline-block; background: #e8f0fb; color: #003d7a; padding: 4px 12px; border-radius: 3px; font-size: 12px; font-weight: 700; margin-bottom: 16px; }
+  .result-overlay { display: none; position: fixed; top: 20px; right: 20px; background: white; border: 2px solid #003d7a; border-radius: 6px; padding: 16px 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); max-width: 340px; z-index: 9999; font-size: 13px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 10px; color: #003d7a; font-size: 14px; }
+  .result-item { padding: 3px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .close-btn { float: right; background: none; border: none; font-size: 16px; cursor: pointer; color: #666; margin-top: -4px; }
+</style>
+</head>
+<body>
+
+<div class="wd-header">
+  <h1>Machine Learning Engineer</h1>
+  <p>InnovateCo · Austin, TX · Full-time · Remote-friendly</p>
+</div>
+
+<div class="badge">Workday ATS — LocalHire Agent Test Page</div>
+
+<div class="wd-body">
+<form id="workday-form">
+
+  <div class="wd-section">
+    <div class="wd-section-title">Contact Information</div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>First Name <span class="req">*</span></label>
+        <!-- Workday uses data-automation-id -->
+        <input type="text" data-automation-id="legalNameSection_firstName" data-field="First Name" autocomplete="off">
+      </div>
+      <div class="wd-field">
+        <label>Last Name <span class="req">*</span></label>
+        <input type="text" data-automation-id="legalNameSection_lastName" data-field="Last Name" autocomplete="off">
+      </div>
+    </div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>Email <span class="req">*</span></label>
+        <input type="email" data-automation-id="email" data-field="Email" autocomplete="off">
+      </div>
+      <div class="wd-field">
+        <label>Phone</label>
+        <input type="tel" data-automation-id="phone" data-field="Phone" autocomplete="off">
+      </div>
+    </div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>City</label>
+        <input type="text" data-automation-id="addressSection_city" data-field="City" autocomplete="off">
+      </div>
+      <div class="wd-field">
+        <label>State</label>
+        <select data-automation-id="addressSection_countryRegion" data-field="State">
+          <option value="">Select State...</option>
+          <option value="TX">Texas</option>
+          <option value="CA">California</option>
+          <option value="NY">New York</option>
+          <option value="WA">Washington</option>
+          <option value="IL">Illinois</option>
+        </select>
+      </div>
+    </div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>Country</label>
+        <select data-automation-id="addressSection_country" data-field="Country">
+          <option value="">Select Country...</option>
+          <option value="United States">United States</option>
+          <option value="Canada">Canada</option>
+          <option value="India">India</option>
+        </select>
+      </div>
+      <div class="wd-field">
+        <label>LinkedIn Profile URL</label>
+        <input type="url" data-automation-id="linkedin" data-field="LinkedIn Profile URL" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div class="wd-section">
+    <div class="wd-section-title">Work Experience</div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>Current Company / Employer</label>
+        <input type="text" data-automation-id="currentEmployer" data-field="Current Company / Employer" autocomplete="off">
+      </div>
+      <div class="wd-field">
+        <label>Current Position</label>
+        <input type="text" data-automation-id="currentPosition" data-field="Current Position" autocomplete="off">
+      </div>
+    </div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>Years of Relevant Experience</label>
+        <select data-automation-id="yearsOfExperience" data-field="Years of Relevant Experience">
+          <option value="">Select...</option>
+          <option value="0-1">Less than 1 year</option>
+          <option value="1">1 year</option>
+          <option value="2">2 years</option>
+          <option value="3">3 years</option>
+          <option value="4">4 years</option>
+          <option value="5+">5+ years</option>
+        </select>
+      </div>
+      <div class="wd-field">
+        <label>Desired Salary</label>
+        <input type="text" data-automation-id="desiredSalary" data-field="Desired Salary" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div class="wd-section">
+    <div class="wd-section-title">Application Questions</div>
+    <div class="wd-field">
+      <label>Are you legally authorized to work in the US? <span class="req">*</span></label>
+      <select data-automation-id="workAuthorization" data-field="Are you legally authorized to work in the US?">
+        <option value="">Select...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="wd-field">
+      <label>Do you require visa sponsorship to work in the US? <span class="req">*</span></label>
+      <select data-automation-id="requireSponsorship" data-field="Do you require visa sponsorship to work in the US?">
+        <option value="">Select...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="wd-field">
+      <label>Please provide a brief professional summary</label>
+      <textarea data-automation-id="professionalSummary" data-field="Please provide a brief professional summary" rows="4"></textarea>
+    </div>
+    <div class="wd-field">
+      <label>Why are you interested in this Machine Learning Engineer role?</label>
+      <textarea data-automation-id="whyInterested" data-field="Why are you interested in this Machine Learning Engineer role?" rows="3"></textarea>
+    </div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>How did you hear about InnovateCo?</label>
+        <select data-automation-id="howDidYouHear" data-field="How did you hear about InnovateCo?">
+          <option value="">Select...</option>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="Indeed">Indeed</option>
+          <option value="Glassdoor">Glassdoor</option>
+          <option value="Company Website">Company Website</option>
+          <option value="Referral">Employee Referral</option>
+        </select>
+      </div>
+      <div class="wd-field">
+        <label>Are you willing to relocate?</label>
+        <select data-automation-id="willingToRelocate" data-field="Are you willing to relocate?">
+          <option value="">Select...</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+          <option value="Maybe">Open to discussion</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="wd-section">
+    <div class="wd-section-title">Demographic Information (Voluntary)</div>
+    <div class="wd-row">
+      <div class="wd-field">
+        <label>Gender Identity</label>
+        <select data-automation-id="gender" data-field="Gender Identity">
+          <option value="">Prefer not to answer</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Non-binary">Non-binary / third gender</option>
+        </select>
+      </div>
+      <div class="wd-field">
+        <label>Veteran Status</label>
+        <select data-automation-id="veteranStatus" data-field="Veteran Status">
+          <option value="">Prefer not to answer</option>
+          <option value="I am not a protected veteran">I am not a protected veteran</option>
+          <option value="I identify as one or more classifications">Protected veteran</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" class="wd-btn">Submit Application →</button>
+</form>
+</div>
+
+<div class="result-overlay" id="resultOverlay">
+  <button class="close-btn" onclick="document.getElementById('resultOverlay').style.display='none'">✕</button>
+  <h3>Fields Filled</h3>
+  <div id="resultList"></div>
+</div>
+
+<script>
+document.getElementById("workday-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const fields = document.querySelectorAll("[data-field]");
+  const list = document.getElementById("resultList");
+  list.innerHTML = "";
+  let filled = 0;
+  fields.forEach(f => {
+    if (f.value) {
+      filled++;
+      const div = document.createElement("div");
+      div.className = "result-item";
+      div.innerHTML = `<strong>${f.dataset.field}:</strong> ${f.value.substring(0,55)}${f.value.length>55?"...":""}`;
+      list.appendChild(div);
+    }
+  });
+  const s = document.createElement("div");
+  s.style.cssText = "margin-top:8px;padding-top:8px;border-top:2px solid #e0e0e0;font-weight:700;color:#003d7a";
+  s.textContent = `${filled}/${fields.length} fields filled`;
+  list.appendChild(s);
+  document.getElementById("resultOverlay").style.display = "block";
+});
+
+document.querySelectorAll("[data-field]").forEach(el => {
+  el.addEventListener("change", () => console.log(`[Workday Test] "${el.dataset.field}" = "${el.value}"`));
+});
+</script>
+</body>
+</html>

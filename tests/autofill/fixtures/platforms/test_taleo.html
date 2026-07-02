@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Software Engineer - Oracle Taleo | Apply</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; max-width: 760px; margin: 0 auto; padding: 16px; background: #f0f0f0; font-size: 13px; color: #333; }
+  .taleo-header { background: #e20000; color: white; padding: 12px 16px; margin-bottom: 12px; }
+  .taleo-header h1 { margin: 0; font-size: 16px; font-weight: bold; }
+  .taleo-header p { margin: 4px 0 0; font-size: 11px; }
+  .badge { background: #ffe8e8; color: #a00; padding: 3px 8px; border-radius: 2px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 10px; border: 1px solid #fcc; }
+  /* Taleo uses table-based layout with specific old-school CSS */
+  .pageContent { background: white; border: 1px solid #ccc; padding: 14px; margin-bottom: 10px; }
+  h2.sectionTitle { background: #6e6e6e; color: white; padding: 5px 10px; font-size: 13px; margin: 0 0 10px; }
+  table.searchFields { width: 100%; border-collapse: collapse; }
+  table.searchFields tr td { padding: 5px 6px; vertical-align: middle; }
+  td.fieldLabel { width: 35%; font-weight: bold; text-align: right; padding-right: 10px; }
+  td.fieldLabel label { font-size: 12px; color: #333; }
+  .mandatory { color: #c00; }
+  /* TALEO real input ids: ftlFirstName, ftlLastName, ftlEmail, ftlPhone */
+  input.ftlField, select.ftlField, textarea.ftlField {
+    width: 100%; padding: 4px 6px; border: 1px solid #aaa; font-size: 13px; box-sizing: border-box; font-family: Arial; background: #fffef5; outline: none;
+  }
+  input.ftlField:focus, select.ftlField:focus { border-color: #e20000; background: #fff; }
+  textarea.ftlField { resize: vertical; min-height: 65px; }
+  .btnContainer { text-align: right; padding: 10px 14px; }
+  input.saveButton { background: #e20000; color: white; border: none; padding: 7px 20px; font-size: 13px; font-weight: bold; cursor: pointer; }
+  .result-overlay { display: none; position: fixed; top: 16px; right: 16px; background: white; border: 2px solid #e20000; border-radius: 4px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 320px; z-index: 9999; font-size: 12px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 8px; color: #e20000; }
+  .ri { padding: 2px 0; border-bottom: 1px solid #f0f0f0; }
+  .close-btn { float: right; background: none; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="taleo-header">
+  <h1>AI Software Engineer</h1>
+  <p>Enterprise Corp | Taleo Application System</p>
+</div>
+<div class="badge">Real Taleo HTML Patterns — LocalHire Agent Test</div>
+
+<form id="taleo-form">
+
+  <div class="pageContent">
+    <h2 class="sectionTitle">Personal Information</h2>
+    <table class="searchFields">
+      <tr>
+        <td class="fieldLabel">
+          <!-- REAL Taleo: id=ftlFirstName -->
+          <label for="ftlFirstName">First Name <span class="mandatory">*</span></label>
+        </td>
+        <td>
+          <input class="ftlField" id="ftlFirstName" name="FirstName" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel">
+          <!-- REAL Taleo: id=ftlLastName -->
+          <label for="ftlLastName">Last Name <span class="mandatory">*</span></label>
+        </td>
+        <td>
+          <input class="ftlField" id="ftlLastName" name="LastName" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel">
+          <!-- REAL Taleo: id=ftlEmail -->
+          <label for="ftlEmail">Email Address <span class="mandatory">*</span></label>
+        </td>
+        <td>
+          <input class="ftlField" id="ftlEmail" name="Email" type="email" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel">
+          <!-- REAL Taleo: id=ftlPhone -->
+          <label for="ftlPhone">Phone Number</label>
+        </td>
+        <td>
+          <input class="ftlField" id="ftlPhone" name="Phone" type="tel" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel">
+          <label for="ftlCity">City</label>
+        </td>
+        <td>
+          <input class="ftlField" id="ftlCity" name="City" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel">
+          <label for="ftlState">State / Province</label>
+        </td>
+        <td>
+          <input class="ftlField" id="ftlState" name="State" type="text" autocomplete="off">
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel">
+          <label for="ftlCountry">Country <span class="mandatory">*</span></label>
+        </td>
+        <td>
+          <select class="ftlField" id="ftlCountry" name="Country">
+            <option value="">-- Select Country --</option>
+            <option value="United States">United States</option>
+            <option value="Canada">Canada</option>
+            <option value="India">India</option>
+          </select>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="pageContent">
+    <h2 class="sectionTitle">Professional Information</h2>
+    <table class="searchFields">
+      <tr>
+        <td class="fieldLabel"><label for="ftlCurrentEmployer">Current Employer</label></td>
+        <td><input class="ftlField" id="ftlCurrentEmployer" name="CurrentEmployer" type="text" autocomplete="off"></td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlCurrentTitle">Current Title</label></td>
+        <td><input class="ftlField" id="ftlCurrentTitle" name="CurrentTitle" type="text" autocomplete="off"></td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlLinkedIn">LinkedIn URL</label></td>
+        <td><input class="ftlField" id="ftlLinkedIn" name="LinkedIn" type="url" autocomplete="off"></td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlYearsExp">Years of Experience</label></td>
+        <td>
+          <select class="ftlField" id="ftlYearsExp" name="YearsExperience">
+            <option value="">-- Select --</option>
+            <option value="1">1 year</option>
+            <option value="2">2 years</option>
+            <option value="3">3 years</option>
+            <option value="4">4 years</option>
+            <option value="5+">5+ years</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlSalary">Desired Salary</label></td>
+        <td><input class="ftlField" id="ftlSalary" name="DesiredSalary" type="text" autocomplete="off"></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="pageContent">
+    <h2 class="sectionTitle">Eligibility &amp; EEO</h2>
+    <table class="searchFields">
+      <tr>
+        <td class="fieldLabel"><label for="ftlWorkAuth">Authorized to work in US? <span class="mandatory">*</span></label></td>
+        <td>
+          <select class="ftlField" id="ftlWorkAuth" name="WorkAuthorization">
+            <option value="">-- Select --</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlSponsorship">Require visa sponsorship? <span class="mandatory">*</span></label></td>
+        <td>
+          <select class="ftlField" id="ftlSponsorship" name="RequireSponsorship">
+            <option value="">-- Select --</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlGender">Gender (voluntary)</label></td>
+        <td>
+          <select class="ftlField" id="ftlGender" name="Gender">
+            <option value="">-- Select --</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Prefer Not to Disclose">Prefer Not to Disclose</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlVeteran">Veteran Status (voluntary)</label></td>
+        <td>
+          <select class="ftlField" id="ftlVeteran" name="VeteranStatus">
+            <option value="">-- Select --</option>
+            <option value="I am not a protected veteran">I am not a protected veteran</option>
+            <option value="I am a protected veteran">I am a protected veteran</option>
+            <option value="Prefer Not to Disclose">Prefer Not to Disclose</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="fieldLabel"><label for="ftlSummary">Tell us about yourself</label></td>
+        <td><textarea class="ftlField" id="ftlSummary" name="Summary"></textarea></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="btnContainer">
+    <input type="submit" class="saveButton" value="Save and Continue &gt;">
+  </div>
+</form>
+
+<div class="result-overlay" id="ro">
+  <button class="close-btn" onclick="document.getElementById('ro').style.display='none'">✕</button>
+  <h3>Fields Filled</h3><div id="rl"></div>
+</div>
+<script>
+document.getElementById("taleo-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const rl = document.getElementById("rl"); rl.innerHTML = "";
+  let filled = 0, total = 0;
+  document.querySelectorAll("input.ftlField,select.ftlField,textarea.ftlField").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const lbl = document.querySelector('label[for="'+f.id+'"]');
+      const d = document.createElement("div"); d.className="ri";
+      d.innerHTML = `<b>${lbl?.textContent?.replace('*','').trim()||f.name}:</b> ${f.value.substring(0,50)}`;
+      rl.appendChild(d);
+    }
+  });
+  const s = document.createElement("div");
+  s.style = "margin-top:6px;padding-top:6px;border-top:2px solid #ffe8e8;font-weight:700;color:#e20000";
+  s.textContent = `${filled}/${total} filled`; rl.appendChild(s);
+  document.getElementById("ro").style.display="block";
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+internship_patterns: ["intern", "internship", "co-op", "coop", "summer 20", "fall 20", "spring 20", "ms intern", "phd intern", "research intern", "student"]
+fulltime_only_excludes: ["senior", "staff", "principal", "lead", "manager", "director"]
+location_allow: ["california", "ca", "san francisco", "bay area", "palo alto", "mountain view", "san jose", "sunnyvale", "seattle", "washington", "wa", "texas", "tx", "houston", "dallas", "austin", "remote", "united states", "us"]
+sponsorship_knockout: ["u.s. citizen", "us citizen", "security clearance", "must be authorized to work.*without sponsorship", "no sponsorship", "not able to sponsor", "citizenship required", "green card required"]

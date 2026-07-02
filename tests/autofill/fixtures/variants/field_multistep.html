@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Multistep Form</title>
+<style>.step{display:none}.step.active{display:block}</style></head>
+<body>
+<h1>Multistep Application</h1>
+<div id="step1" class="step active">
+  <div class="field"><label for="ms-first">First Name</label><input id="ms-first" type="text" /></div>
+  <button type="button" id="next-btn">Next</button>
+</div>
+<div id="step2" class="step">
+  <div class="field"><label for="ms-last">Last Name</label><input id="ms-last" type="text" /></div>
+  <div class="field"><label for="ms-email">Email</label><input id="ms-email" type="email" /></div>
+</div>
+<script>
+  document.getElementById("next-btn").addEventListener("click", () => {
+    document.getElementById("step1").classList.remove("active");
+    document.getElementById("step2").classList.add("active");
+    window.dispatchEvent(new Event("lh-urlchange"));
+  });
+</script>
+</body>
+</html>

@@ -2219,18 +2219,46 @@ async function fillResumeUpload(userData) {
 // ─────────────────────────────────────────────
 // MAIN AUTOFILL ORCHESTRATOR
 // ─────────────────────────────────────────────
-async function runAutoFill(preferredLlm) {
+async function runAutoFill(preferredLlm, profileOverride = null) {
   // BUG 8: re-entrancy guard — prevent double fill during fill-triggered DOM mutations
   if (isCurrentlyFilling) {
     panelLog("⚠ Fill already in progress");
     return;
   }
   isCurrentlyFilling = true;
-  try { return await _runAutoFillInner(preferredLlm); }
+  try { return await _runAutoFillInner(preferredLlm, profileOverride); }
   finally { isCurrentlyFilling = false; }
 }
 
-async function _runAutoFillInner(preferredLlm) {
+function deepMergeProfile(base, patch) {
+  if (!patch || typeof patch !== "object") return base;
+  const out = Array.isArray(base) ? base.slice() : { ...(base || {}) };
+  for (const [key, value] of Object.entries(patch)) {
+    if (Array.isArray(value)) {
+      out[key] = value.slice();
+    } else if (value && typeof value === "object") {
+      out[key] = deepMergeProfile(out[key] && typeof out[key] === "object" ? out[key] : {}, value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+function normalizeApprovedOverride(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw.tailored_data && typeof raw.tailored_data === "object"
+    ? raw.tailored_data
+    : (raw.profile_override && typeof raw.profile_override === "object" ? raw.profile_override : raw);
+  const cleaned = JSON.parse(JSON.stringify(candidate));
+  [
+    "id", "match_id", "queue_id", "uuid", "company", "company_name", "role", "title",
+    "status", "apply_url", "url", "job_url", "created_at", "updated_at",
+  ].forEach(k => { delete cleaned[k]; });
+  return Object.keys(cleaned).length ? cleaned : null;
+}
+
+async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
   const platform = detectPlatform();
   const platformName = getPlatformName(platform);
 
@@ -2262,6 +2290,7 @@ async function _runAutoFillInner(preferredLlm) {
   const company = extractCompanyFromPage();
   const { apiUrl, llm } = await getSettings();
   const activeLlm = preferredLlm || llm;
+  const profileOverride = normalizeApprovedOverride(profileOverrideRaw);
 
   // Build descriptors for API
   const fieldDescriptors = fields.map((f, i) => ({
@@ -2291,7 +2320,14 @@ async function _runAutoFillInner(preferredLlm) {
     const res = await fetch(`${apiUrl}/autofill`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: fieldDescriptors, jd_text: jdText, company, host: location.host, llm: activeLlm }),
+      body: JSON.stringify({
+        fields: fieldDescriptors,
+        jd_text: jdText,
+        company,
+        host: location.host,
+        llm: activeLlm,
+        profile_override: profileOverride || {},
+      }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     answers = await res.json();
@@ -2350,7 +2386,8 @@ async function _runAutoFillInner(preferredLlm) {
     try {
       const { apiUrl } = await getSettings();
       const profileRes = await fetch(`${apiUrl}/profile`);
-      const userData = profileRes.ok ? await profileRes.json() : null;
+      const baseProfile = profileRes.ok ? await profileRes.json() : null;
+      const userData = profileOverride ? deepMergeProfile(baseProfile || {}, profileOverride) : baseProfile;
       if (userData) {
         // Country phone code chip widget
         const phoneCode = userData.autofill?.phone_country_code || "+1";
@@ -2444,7 +2481,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.action === "start_autofill") {
     const llm = message.llm || null;
-    runAutoFill(llm).catch(err => sendProgress({ status: "error", message: err.message }));
+    const profileOverride = message.approvedData || message.profileOverride || null;
+    runAutoFill(llm, profileOverride).catch(err => sendProgress({ status: "error", message: err.message }));
     sendResponse({ started: true });
     return true;
   }

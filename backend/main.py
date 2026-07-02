@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 import uuid, hashlib
 from datetime import date as _date
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import requests as http_requests
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import asyncio
 import time as _time
@@ -20,7 +21,15 @@ import resume_versions
 import latex_ast
 import resume_source
 
-from knowledge import store as knowledge_store
+from knowledge import client as knowledge_client
+from knowledge import capture as knowledge_capture
+from knowledge import rating as knowledge_rating
+from knowledge import rating as knowledge_rating
+from knowledge import semantic as knowledge_semantic
+from teach import fsrs as teach_fsrs
+from teach import lesson as teach_lesson
+from teach import store as teach_store
+import tailor_edits
 
 # Logging — must come after imports, before app
 from logger import get_logger, log_event, is_logging_enabled, set_logging_enabled, set_log_level, get_config as get_log_config, LOGS_DIR
@@ -65,8 +74,9 @@ def _pin_hash(pin: str) -> str:
 
 def load_pdata(pid: str) -> dict:
     pid = _safe_pid(pid)
-    if knowledge_store.profile_exists(pid):
-        return knowledge_store.get_profile(pid)
+    data = knowledge_client.get_profile(pid)
+    if data:
+        return data
     return _load_pdata_json_only(pid)
 
 def _load_pdata_json_only(pid: str) -> dict:
@@ -84,18 +94,18 @@ def _load_pdata_json_only(pid: str) -> dict:
 def _ensure_profile_in_store(pid: str):
     """Bootstrap SQLite from JSON mirror on first partial write (pre-migrate safety)."""
     pid = _safe_pid(pid)
-    if knowledge_store.profile_exists(pid):
+    if knowledge_client.get_profile(pid):
         return
     data = _load_pdata_json_only(pid)
     if data:
-        knowledge_store.save_profile(pid, data)
+        knowledge_client.save_profile(pid, data)
 
 def _mirror_pdata_json(pid: str):
     """Keep master_data.json in sync with the SQLite store (rollback / direct readers)."""
     pid = _safe_pid(pid)
     d = _profile_dir(pid)
     os.makedirs(d, exist_ok=True)
-    data = knowledge_store.get_profile(pid) if knowledge_store.profile_exists(pid) else {}
+    data = knowledge_client.get_profile(pid)
     with open(os.path.join(d, "master_data.json"), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
@@ -151,7 +161,7 @@ def _enrich_profile_with_resume_sources(data: dict) -> dict:
 
 def save_pdata(pid: str, data: dict):
     pid = _safe_pid(pid)
-    knowledge_store.save_profile(pid, data)
+    knowledge_client.save_profile(pid, data)
     _mirror_pdata_json(pid)
 
 def load_papps(pid: str) -> list:
@@ -170,6 +180,97 @@ def save_papps(pid: str, apps: list):
 
 def get_pid(request: Request) -> str:
     return _safe_pid(request.headers.get("X-Profile-ID", "default"))
+
+def _deep_merge_dict(base: dict, override: dict) -> dict:
+    merged = json.loads(json.dumps(base or {}))
+    for k, v in (override or {}).items():
+        if isinstance(v, dict) and isinstance(merged.get(k), dict):
+            merged[k] = _deep_merge_dict(merged[k], v)
+        else:
+            merged[k] = v
+    return merged
+
+def _coerce_json(value):
+    if isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, str):
+        txt = value.strip()
+        if not txt:
+            return None
+        try:
+            return json.loads(txt)
+        except Exception:
+            return None
+    return None
+
+def _matcher_db_path() -> str:
+    env_path = (os.getenv("MATCHER_DB_PATH") or "").strip()
+    if env_path:
+        return env_path
+    return os.path.join(os.path.dirname(__file__), "matcher", "matches.db")
+
+def _matcher_table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    rows = conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+    return {str(r[1]).lower() for r in rows}
+
+def _matcher_pick_table(conn: sqlite3.Connection) -> tuple[str | None, set[str]]:
+    tables = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+    ).fetchall()]
+    for table in tables:
+        cols = _matcher_table_columns(conn, table)
+        if ("id" in cols or "match_id" in cols) and (
+            "tailored_data" in cols or "profile_override" in cols or "company" in cols
+        ):
+            return table, cols
+    for table in tables:
+        cols = _matcher_table_columns(conn, table)
+        if "company" in cols and ("status" in cols or "approved" in cols):
+            return table, cols
+    return (tables[0], _matcher_table_columns(conn, tables[0])) if tables else (None, set())
+
+def _matcher_row_to_item(row: dict, cols: set[str]) -> dict:
+    rid = row.get("id", row.get("match_id", row.get("queue_id")))
+    status = str(row.get("status", row.get("match_status", row.get("state", ""))) or "").lower()
+    is_approved = row.get("approved")
+    approved_flag = None
+    if isinstance(is_approved, (int, float)):
+        approved_flag = int(is_approved) == 1
+    elif isinstance(is_approved, str):
+        approved_flag = is_approved.strip().lower() in {"1", "true", "yes", "approved"}
+
+    tailored = (
+        _coerce_json(row.get("tailored_data"))
+        or _coerce_json(row.get("profile_override"))
+        or _coerce_json(row.get("tailored"))
+        or {}
+    )
+    has_approval_markers = ("approved" in cols) or ("status" in cols) or ("match_status" in cols) or ("state" in cols)
+    computed_approved = approved_flag if approved_flag is not None else ("approved" in status)
+    if not has_approval_markers:
+        computed_approved = True
+    return {
+        "id": rid,
+        "company": row.get("company", row.get("company_name", "")),
+        "role": row.get("role", row.get("title", row.get("job_title", ""))),
+        "apply_url": row.get("apply_url", row.get("job_url", row.get("url", ""))),
+        "status": row.get("status", row.get("match_status", row.get("state", ""))),
+        "approved": computed_approved,
+        "tailored_data": tailored if isinstance(tailored, dict) else {},
+        "_raw": row,
+    }
+
+def _matcher_fetch_items(limit: int = 100) -> list[dict]:
+    path = _matcher_db_path()
+    if not os.path.exists(path):
+        return []
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        table, cols = _matcher_pick_table(conn)
+        if not table:
+            return []
+        rows = conn.execute(f'SELECT * FROM "{table}" LIMIT ?', (int(max(1, min(limit, 500))),)).fetchall()
+        return [_matcher_row_to_item(dict(r), cols) for r in rows]
 
 def migrate_to_profiles():
     """Idempotent migration: ensure a 'default' profile exists with master_data.json."""
@@ -276,12 +377,39 @@ class QuestionRequest(BaseModel):
     word_limit: int = 150
     llm: str = "ollama"
 
+
+class CaptureProposeRequest(BaseModel):
+    raw_text: str
+    source: str = "dashboard"
+
+
+class CaptureCommitRequest(BaseModel):
+    event_id: int
+    edited_delta: dict = {}
+
+
+class SkillRatingRequest(BaseModel):
+    proficiency: int
+    evidence: str | None = None
+
 class CoverLetterRequest(BaseModel):
     company: str
     role: str
     jd_text: str = ""
     hiring_manager: str = ""
     llm: str = "ollama"
+
+
+class TeachReviewRequest(BaseModel):
+    skill: str
+    grade: str  # again | hard | good | easy
+
+
+class TeachLearnedRequest(BaseModel):
+    skill: str
+    proficiency: int | None = None
+    evidence: str | None = None
+    category: str = "domains"
 
 # ─────────────────────────────────────────────────────────────────
 # LLM ABSTRACTION — try Ollama; fall back to Claude; raise if both fail
@@ -795,19 +923,42 @@ class LearnRequest(BaseModel):
     label: str
     value: str
 
+
+class KnowledgeSearchRequest(BaseModel):
+    query_text: str
+    k: int = 10
+    kind_filter: str | None = None
+
+
 @app.post("/autofill/learn")
 def autofill_learn(req: LearnRequest, request: Request):
     """Save a user correction so we use it next time on the same domain."""
     pid = get_pid(request)
     _ensure_profile_in_store(pid)
-    saved = knowledge_store.set_learned_answer(pid, req.host, req.label, req.value)
+    saved = knowledge_client.set_learned_answer(pid, req.host, req.label, req.value)
     _mirror_pdata_json(pid)
     return {"ok": True, "saved": saved}
 
 @app.get("/autofill/learned")
 def autofill_learned(host: str, request: Request):
     pid = get_pid(request)
-    return knowledge_store.get_learned_answers(pid, host)
+    return knowledge_client.get_learned_answers(pid, host)
+
+
+@app.post("/knowledge/search")
+def knowledge_search(req: KnowledgeSearchRequest, request: Request):
+    pid = get_pid(request)
+    try:
+        hits = knowledge_client.search(
+            pid=pid,
+            query_text=req.query_text,
+            k=req.k,
+            kind_filter=req.kind_filter,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"results": hits}
+
 
 class ClaudeKeyRequest(BaseModel):
     key: str
@@ -949,6 +1100,72 @@ def dashboard():
     with open(os.path.join(os.path.dirname(__file__), "dashboard.html"), "r") as f:
         return f.read()
 
+
+@app.get("/teach/review", response_class=HTMLResponse)
+def teach_review_page():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "teach", "review.html"))
+
+
+@app.get("/teach/due")
+def teach_due(request: Request):
+    pid = get_pid(request)
+    due = teach_store.due_today(pid)
+    return {"due": due, "count": len(due)}
+
+
+@app.get("/teach/lesson/{skill}")
+def teach_lesson_route(skill: str, request: Request, llm: str = "ollama"):
+    pid = get_pid(request)
+    return teach_lesson.lesson(
+        skill=skill,
+        pid=pid,
+        llm_callable=call_llm,
+        llm_prefer=llm,
+    )
+
+
+@app.post("/teach/review")
+def teach_review(payload: TeachReviewRequest, request: Request):
+    if payload.grade not in teach_fsrs.VALID_GRADES:
+        raise HTTPException(status_code=400, detail="grade must be one of again|hard|good|easy")
+    pid = get_pid(request)
+    base = teach_store.ensure_state(pid, payload.skill)
+    updated = teach_fsrs.apply_review(base, payload.grade)
+    saved = teach_store.save_state(pid, payload.skill, updated)
+    return {"ok": True, "review": saved}
+
+
+@app.post("/teach/learned")
+def teach_learned(payload: TeachLearnedRequest, request: Request):
+    pid = get_pid(request)
+    skill = (payload.skill or "").strip()
+    if not skill:
+        raise HTTPException(status_code=400, detail="skill is required")
+
+    before = knowledge_rating.get_proficiency(pid, skill)
+    target = payload.proficiency
+    if target is None:
+        target = min(5, (before or 2) + 1)
+    evidence = payload.evidence or f"self-study {_date.today().isoformat()}"
+
+    updated = knowledge_rating.set_rating_by_name(
+        pid=pid,
+        skill_name=skill,
+        proficiency=target,
+        evidence=evidence,
+        source="teach.learned",
+        category=payload.category or "domains",
+    )
+    _mirror_pdata_json(pid)
+    after = knowledge_rating.get_proficiency(pid, skill)
+    return {
+        "ok": True,
+        "skill": skill,
+        "before": before,
+        "after": after,
+        "evidence": updated.get("evidence", evidence),
+    }
+
 # ─────────────────────────────────────────────────────────────────
 # PROFILES API
 # ─────────────────────────────────────────────────────────────────
@@ -973,7 +1190,7 @@ def create_profile(payload: dict):
                    "created_at": str(_date.today()), "pin_hash": _pin_hash(pin)}
     os.makedirs(_profile_dir(pid), exist_ok=True)
     # Start with empty profile data
-    knowledge_store.create_stub(pid, name)
+    knowledge_client.create_stub(pid, name)
     _mirror_pdata_json(pid)
     save_papps(pid, [])
     meta.append(new_profile)
@@ -1029,14 +1246,52 @@ def rename_profile(pid: str, payload: dict):
 def get_profile(request: Request):
     return _enrich_profile_with_resume_sources(load_pdata(get_pid(request)))
 
+
+@app.post("/knowledge/capture/propose")
+def knowledge_capture_propose(request: Request, payload: CaptureProposeRequest):
+    pid = get_pid(request)
+    _ensure_profile_in_store(pid)
+    return knowledge_capture.propose(pid, payload.raw_text, payload.source)
+
+
+@app.post("/knowledge/capture/commit")
+def knowledge_capture_commit(request: Request, payload: CaptureCommitRequest):
+    pid = get_pid(request)
+    _ensure_profile_in_store(pid)
+    try:
+        result = knowledge_capture.commit(pid, payload.event_id, payload.edited_delta)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    _mirror_pdata_json(pid)
+    return result
+
+
+@app.get("/knowledge/skills/unrated")
+def knowledge_list_unrated_skills(request: Request):
+    pid = get_pid(request)
+    _ensure_profile_in_store(pid)
+    return {"skills": knowledge_rating.list_unrated(pid)}
+
+
+@app.post("/knowledge/skills/{skill_id}/rate")
+def knowledge_rate_skill(skill_id: int, request: Request, payload: SkillRatingRequest):
+    pid = get_pid(request)
+    _ensure_profile_in_store(pid)
+    try:
+        return knowledge_rating.set_rating(pid, skill_id, payload.proficiency, payload.evidence)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 @app.put("/profile/contact")
 def update_contact(request: Request, payload: dict):
     pid = get_pid(request)
     _ensure_profile_in_store(pid)
     if "contact_info" in payload:
-        knowledge_store.merge_section(pid, "contact_info", payload["contact_info"])
+        knowledge_client.merge_section(pid, "contact_info", payload["contact_info"])
     if "summary" in payload:
-        knowledge_store.replace_section(pid, "summary", payload["summary"])
+        knowledge_client.replace_section(pid, "summary", payload["summary"])
     _mirror_pdata_json(pid)
     return {"ok": True}
 
@@ -1045,7 +1300,7 @@ def update_autofill(request: Request, payload: dict):
     pid = get_pid(request)
     _ensure_profile_in_store(pid)
     if "autofill" in payload:
-        knowledge_store.merge_section(pid, "autofill", payload["autofill"])
+        knowledge_client.merge_section(pid, "autofill", payload["autofill"])
     _mirror_pdata_json(pid)
     return {"ok": True}
 
@@ -1054,7 +1309,7 @@ def update_experience(request: Request, payload: dict):
     pid = get_pid(request)
     _ensure_profile_in_store(pid)
     data = load_pdata(pid)
-    knowledge_store.replace_section(
+    knowledge_client.replace_section(
         pid, "experience", payload.get("experience", data.get("experience", []))
     )
     _mirror_pdata_json(pid)
@@ -1065,7 +1320,7 @@ def update_education(request: Request, payload: dict):
     pid = get_pid(request)
     _ensure_profile_in_store(pid)
     data = load_pdata(pid)
-    knowledge_store.replace_section(
+    knowledge_client.replace_section(
         pid, "education", payload.get("education", data.get("education", []))
     )
     _mirror_pdata_json(pid)
@@ -1076,7 +1331,7 @@ def update_skills(request: Request, payload: dict):
     pid = get_pid(request)
     _ensure_profile_in_store(pid)
     if "skills" in payload:
-        knowledge_store.merge_section(pid, "skills", payload["skills"])
+        knowledge_client.merge_section(pid, "skills", payload["skills"])
     _mirror_pdata_json(pid)
     return {"ok": True}
 
@@ -1085,7 +1340,7 @@ def update_answers(request: Request, payload: dict):
     pid = get_pid(request)
     _ensure_profile_in_store(pid)
     if "common_answers" in payload:
-        knowledge_store.merge_section(pid, "common_answers", payload["common_answers"])
+        knowledge_client.merge_section(pid, "common_answers", payload["common_answers"])
     _mirror_pdata_json(pid)
     return {"ok": True}
 
@@ -1136,6 +1391,41 @@ def delete_application(app_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Application not found")
     save_papps(pid, new_apps)
     return {"ok": True}
+
+# ─────────────────────────────────────────────────────────────────
+# MATCHER QUEUE (approved items for extension fill override)
+# ─────────────────────────────────────────────────────────────────
+@app.get("/matches/approved")
+def get_approved_matches(limit: int = 50):
+    items = _matcher_fetch_items(limit=max(10, limit * 3))
+    approved = [i for i in items if i.get("approved")]
+    approved.sort(key=lambda x: str(x.get("id", "")), reverse=True)
+    out = []
+    for item in approved[: max(1, min(limit, 200))]:
+        out.append({
+            "id": item.get("id"),
+            "company": item.get("company", ""),
+            "role": item.get("role", ""),
+            "apply_url": item.get("apply_url", ""),
+            "status": item.get("status", "approved"),
+            "tailored_data": item.get("tailored_data", {}),
+        })
+    return {"items": out, "source": _matcher_db_path()}
+
+@app.get("/matches/{match_id}")
+def get_match_item(match_id: str):
+    for item in _matcher_fetch_items(limit=500):
+        if str(item.get("id")) == str(match_id):
+            return {
+                "id": item.get("id"),
+                "company": item.get("company", ""),
+                "role": item.get("role", ""),
+                "apply_url": item.get("apply_url", ""),
+                "status": item.get("status", ""),
+                "approved": bool(item.get("approved")),
+                "tailored_data": item.get("tailored_data", {}),
+            }
+    raise HTTPException(status_code=404, detail="Match not found")
 
 @app.get("/test/greenhouse", response_class=HTMLResponse)
 def test_greenhouse():
@@ -1273,6 +1563,7 @@ class AutofillRequest2(BaseModel):
     company: str = ""
     host: str = ""
     llm: str = "ollama"
+    profile_override: dict = Field(default_factory=dict)
 
 def _build_compact_profile(user_data: dict) -> dict:
     """Compact profile for LLM — avoids truncation losing skills/education."""
@@ -1305,6 +1596,8 @@ async def autofill_fields(req: AutofillRequest2, request: Request):
               fields=len(req.fields), host=req.host or "?", llm=req.llm)
     # Phase 0 + 1 need no lock — pure Python, no I/O bottleneck
     user_data = load_pdata(get_pid(request))
+    if isinstance(req.profile_override, dict) and req.profile_override:
+        user_data = _deep_merge_dict(user_data, req.profile_override)
     autofill = user_data.get("autofill", {})
     learned = user_data.get("learned_answers", {})
 
@@ -1813,6 +2106,98 @@ def _assemble_tailored_skills(master_skills: dict, jd_text: str,
     return {k: skills.get(k) or [] for k in display_keys}
 
 
+def _build_grounded_edits(
+    *,
+    pid: str,
+    jd_text: str,
+    master: dict,
+    tailored: dict,
+) -> list[dict]:
+    """Create additive _edits with evidence grounding and review statuses."""
+    edits: list[dict] = []
+
+    # Summary edit
+    before_summary = (master.get("summary") or "").strip()
+    after_summary = (
+        tailored.get("tailored_summary")
+        or (tailored.get("summary_diff") or {}).get("tailored")
+        or ""
+    ).strip()
+    if after_summary and after_summary != before_summary:
+        edits.append(
+            {
+                "section": "summary",
+                "field": "summary",
+                "before": before_summary,
+                "after": after_summary,
+                "reason": "Summary aligned to JD terms",
+                "evidence_ref": None,
+                "confidence": 0.8,
+                "status": "accepted",
+            }
+        )
+
+    # Experience bullet edits
+    master_exp = master.get("experience") or []
+    for e_idx, exp in enumerate(tailored.get("experience") or []):
+        old_bullets = []
+        if e_idx < len(master_exp):
+            old_bullets = (master_exp[e_idx].get("details") or master_exp[e_idx].get("bullets") or [])
+        for b_idx, bullet in enumerate(exp.get("bullets") or []):
+            new_text = (bullet.get("text") or "").strip()
+            old_text = (bullet.get("original") or (old_bullets[b_idx] if b_idx < len(old_bullets) else "")).strip()
+            if not new_text:
+                continue
+            if new_text == old_text:
+                continue
+            edits.append(
+                {
+                    "section": "experience",
+                    "field": f"experience.{e_idx}.bullets.{b_idx}",
+                    "before": old_text,
+                    "after": new_text,
+                    "reason": "Bullet rewritten for JD relevance",
+                    "evidence_ref": None,
+                    "confidence": 0.78,
+                    "status": "accepted",
+                }
+            )
+
+    # Skills category-level edits
+    master_skills = master.get("skills") or {}
+    tailored_skills = tailored.get("tailored_skills") or {}
+    for key, new_items in tailored_skills.items():
+        if not isinstance(new_items, list):
+            continue
+        old_items = master_skills.get(key) or []
+        if old_items == new_items:
+            continue
+        edits.append(
+            {
+                "section": "skills",
+                "field": f"tailored_skills.{key}",
+                "before": ", ".join(old_items),
+                "after": ", ".join(new_items),
+                "reason": "Skills reordered/expanded for JD",
+                "evidence_ref": None,
+                "confidence": 0.74,
+                "status": "accepted",
+            }
+        )
+
+    grounded: list[dict] = []
+    for e in edits:
+        grounded.append(
+            tailor_edits.ground_edit(
+                e,
+                pid=pid,
+                jd_text=jd_text,
+                knowledge_search=knowledge_semantic.search,
+            )
+        )
+    return tailor_edits.validate_edits(grounded)
+
+
 @app.post("/tailor-resume")
 async def tailor_resume(req: TailorResumeRequest, request: Request):
     pid = get_pid(request)
@@ -1974,13 +2359,19 @@ OUTPUT JSON ONLY:
 }}"""
 
         async def _llm_json(prompt_text: str, temperature: float = 0.35):
+            # Prefer Claude for final edit quality; call_llm will fall back to local Ollama.
+            # Keep configured ollama model as fallback override when provided.
+            fallback_model = None
+            if active_model and active_model not in {"ollama", "claude"}:
+                fallback_model = active_model.split("/", 1)[1] if active_model.startswith("ollama/") else active_model
             content = await asyncio.to_thread(
                 call_llm,
                 [{"role": "user", "content": prompt_text}],
                 temperature,
                 "",
-                active_model,
+                "claude",
                 600,
+                fallback_model,
             )
             return json.loads(clean_json(content))
 
@@ -2097,7 +2488,17 @@ OUTPUT JSON ONLY:
             "editable_regions": bundle.get("editable_regions", []),
         }
         result["_preflight"] = constraints_engine.preflight_tailored_resume(user_data, result)
-        result["_meta"] = {"model_used": active_model, "profile": pid}
+        result["_edits"] = _build_grounded_edits(
+            pid=pid,
+            jd_text=req.jd_text,
+            master=user_data,
+            tailored=result,
+        )
+        result["_meta"] = {
+            "model_used": active_model,
+            "profile": pid,
+            "edit_preference": "claude_with_ollama_fallback",
+        }
         return result
 
 
@@ -2115,10 +2516,20 @@ async def preflight_check(data: dict, request: Request):
 def _merge_tailored_into_master(master: dict, data: dict) -> dict:
     """Apply tailor-resume output onto a copy of master profile data."""
     merged = json.loads(json.dumps(master))  # deep copy
+    accepted_edit_map = {
+        e["field"]: e
+        for e in tailor_edits.validate_edits(data.get("_edits"))
+        if e.get("status") == "accepted"
+    }
+    enforce_accept_only = bool(data.get("_edits"))
 
     # 1. Tailored summary
     tailored_sum = data.get("tailored_summary") or (data.get("summary_diff") or {}).get("tailored")
-    if tailored_sum:
+    if enforce_accept_only:
+        accepted_summary = accepted_edit_map.get("summary")
+        if accepted_summary and accepted_summary.get("after"):
+            merged["summary"] = accepted_summary["after"]
+    elif tailored_sum:
         merged["summary"] = tailored_sum
 
     # 2. Tailored experience bullets
@@ -2126,14 +2537,39 @@ def _merge_tailored_into_master(master: dict, data: dict) -> dict:
         tailored_by_company = {
             (te.get("company","").lower().strip()[:30]): te for te in data["experience"]
         }
-        for src_exp in merged.get("experience", []):
+        for exp_idx, src_exp in enumerate(merged.get("experience", [])):
             key = src_exp.get("company","").lower().strip()[:30]
             te = tailored_by_company.get(key)
             if te and te.get("bullets"):
-                new_bullets = [b.get("text","").strip() for b in te["bullets"] if (b.get("text") or "").strip()]
-                if new_bullets:
-                    src_exp["details"] = new_bullets
-                    src_exp["bullets"] = new_bullets
+                if enforce_accept_only:
+                    original_bullets = list(src_exp.get("details") or src_exp.get("bullets") or [])
+                    accepted_bullets: list[str] = []
+                    for b_idx, old_text in enumerate(original_bullets):
+                        field = f"experience.{exp_idx}.bullets.{b_idx}"
+                        accepted = accepted_edit_map.get(field)
+                        if accepted and (accepted.get("after") or "").strip():
+                            accepted_bullets.append(accepted["after"].strip())
+                        else:
+                            accepted_bullets.append(old_text)
+                    # accepted "added" bullets (index beyond original list)
+                    for field, edit in accepted_edit_map.items():
+                        m = re.match(rf"^experience\.{exp_idx}\.bullets\.(\d+)$", field)
+                        if not m:
+                            continue
+                        b_idx = int(m.group(1))
+                        if b_idx < len(original_bullets):
+                            continue
+                        text = (edit.get("after") or "").strip()
+                        if text:
+                            accepted_bullets.append(text)
+                    if accepted_bullets:
+                        src_exp["details"] = accepted_bullets
+                        src_exp["bullets"] = accepted_bullets
+                else:
+                    new_bullets = [b.get("text","").strip() for b in te["bullets"] if (b.get("text") or "").strip()]
+                    if new_bullets:
+                        src_exp["details"] = new_bullets
+                        src_exp["bullets"] = new_bullets
 
     # 3. Project selection — use pre-ranked titles from _rank_projects_for_jd
     project_library = merged.get("project_library") or merged.get("projects") or []
@@ -2153,18 +2589,27 @@ def _merge_tailored_into_master(master: dict, data: dict) -> dict:
     # Only override if it has non-empty values for at least 3 categories (guards against LLM truncation).
     if data.get("tailored_skills"):
         ts = data["tailored_skills"]
-        non_empty = sum(1 for v in ts.values() if isinstance(v, list) and len(v) > 1)
-        if non_empty >= 3:
-            # Merge: for each category keep master entries + any new items from tailored (no truncation)
-            master_skills = merged.get("skills", {})
+        if enforce_accept_only:
             for key in ["domains", "frameworks", "tools", "databases", "languages"]:
-                master_list = master_skills.get(key) or []
-                tailored_list = ts.get(key) or []
-                # Union preserving order: tailored first (may reorder for emphasis), then any master extras.
-                # Use _skill_base normalization to avoid duplicates like "Python" + "Python (Expert)".
-                merged.setdefault("skills", {})[key] = list(tailored_list)
+                field = f"tailored_skills.{key}"
+                accepted = accepted_edit_map.get(field)
+                if not accepted:
+                    continue
+                after = (accepted.get("after") or "").strip()
+                merged.setdefault("skills", {})[key] = (
+                    [s.strip() for s in after.split(",") if s.strip()] if after else []
+                )
         else:
-            print(f"[merge] tailored_skills too sparse ({non_empty} non-empty categories) — keeping master skills")
+            non_empty = sum(1 for v in ts.values() if isinstance(v, list) and len(v) > 1)
+            if non_empty >= 3:
+                # Merge: for each category keep master entries + any new items from tailored (no truncation)
+                for key in ["domains", "frameworks", "tools", "databases", "languages"]:
+                    tailored_list = ts.get(key) or []
+                    # Union preserving order: tailored first (may reorder for emphasis), then any master extras.
+                    # Use _skill_base normalization to avoid duplicates like "Python" + "Python (Expert)".
+                    merged.setdefault("skills", {})[key] = list(tailored_list)
+            else:
+                print(f"[merge] tailored_skills too sparse ({non_empty} non-empty categories) — keeping master skills")
 
     # 4. Dedup: don't repeat publications under projects
     pub_titles: set = set()
@@ -2187,6 +2632,50 @@ def _merge_tailored_into_master(master: dict, data: dict) -> dict:
     return merged
 
 
+def _filter_payload_to_accepted(master: dict, data: dict) -> dict:
+    """Project payload fields to accepted edits only (additive-safe fallback)."""
+    payload = json.loads(json.dumps(data or {}))
+    accepted = {
+        e["field"]: e
+        for e in tailor_edits.validate_edits(payload.get("_edits"))
+        if e.get("status") == "accepted"
+    }
+    if not payload.get("_edits"):
+        return payload
+
+    # Summary
+    s = accepted.get("summary")
+    summary_value = (s.get("after") if s else master.get("summary", "")) or ""
+    payload["tailored_summary"] = summary_value
+    payload.setdefault("summary_diff", {})["tailored"] = summary_value
+
+    # Experience bullets
+    for e_idx, exp in enumerate(payload.get("experience") or []):
+        orig = []
+        if e_idx < len(master.get("experience") or []):
+            orig = (master["experience"][e_idx].get("details") or master["experience"][e_idx].get("bullets") or [])
+        for b_idx, bullet in enumerate(exp.get("bullets") or []):
+            field = f"experience.{e_idx}.bullets.{b_idx}"
+            if field in accepted:
+                bullet["text"] = accepted[field].get("after") or bullet.get("text") or ""
+            elif b_idx < len(orig):
+                bullet["text"] = orig[b_idx]
+                bullet["status"] = "unchanged"
+
+    # Skills
+    ts = payload.get("tailored_skills") or {}
+    ms = master.get("skills") or {}
+    for key in list(ts.keys()):
+        field = f"tailored_skills.{key}"
+        if field in accepted:
+            after = accepted[field].get("after") or ""
+            ts[key] = [x.strip() for x in after.split(",") if x.strip()] if after else []
+        else:
+            ts[key] = list(ms.get(key) or [])
+    payload["tailored_skills"] = ts
+    return payload
+
+
 def _render_tex_from_master(master: dict) -> str:
     """Render resume_template.tex with master data via Jinja."""
     tpl_path = os.path.join(os.path.dirname(__file__), "resume_template.tex")
@@ -2200,6 +2689,33 @@ def _render_tex_from_master(master: dict) -> str:
     )
     env.filters['latex'] = escape_latex_chars
     return env.from_string(template_str).render(**master)
+
+
+def _sanitize_pdf_meta_value(value: str) -> str:
+    return re.sub(r"[{}\\\n\r]+", " ", str(value or "")).strip()
+
+
+def _inject_pdf_metadata(tex: str, *, author: str, title: str) -> str:
+    """Attach clean PDF metadata fields.
+
+    NOTE: These properties are hygiene-only and are not ATS scoring inputs.
+    """
+    safe_author = _sanitize_pdf_meta_value(author)
+    safe_title = _sanitize_pdf_meta_value(title)
+    if not safe_author:
+        return tex
+    metadata_block = (
+        "\n% Metadata hygiene only (not ATS scoring fields)\n"
+        "\\hypersetup{\n"
+        f"  pdfauthor={{{safe_author}}},\n"
+        f"  pdftitle={{{safe_title or (safe_author + ' - Resume')}}},\n"
+        "  pdfcreator={},\n"
+        "  pdfproducer={}\n"
+        "}\n"
+    )
+    if "\\begin{document}" in tex:
+        return tex.replace("\\begin{document}", metadata_block + "\\begin{document}", 1)
+    return metadata_block + tex
 
 
 @app.post("/generate-pdf")
@@ -2220,9 +2736,10 @@ async def generate_pdf(data: dict, request: Request):
     async with processing_lock:
         profile_dir = _profile_dir(pid)
         master = _enrich_profile_with_resume_sources(load_pdata(pid))
+        effective_data = _filter_payload_to_accepted(master, data)
 
         # 0. Pre-PDF preflight (after user edits in dashboard)
-        preflight = constraints_engine.preflight_tailored_resume(master, data)
+        preflight = constraints_engine.preflight_tailored_resume(master, effective_data)
         if not preflight.get("ok"):
             fatal = [i for i in preflight.get("issues", []) if i.get("severity") == "fatal"]
             log.warning(f"[generate-pdf] preflight blocked — {fatal}")
@@ -2235,12 +2752,19 @@ async def generate_pdf(data: dict, request: Request):
             )
 
         # 1. Merge
-        merged = _merge_tailored_into_master(master, data)
+        merged = _merge_tailored_into_master(master, effective_data)
         log.debug(f"[generate-pdf] merged data — projects={len(merged.get('projects',[]))}")
 
         # 2. Render LaTeX from template
         try:
             rendered_tex = _render_tex_from_master(merged)
+            contact = merged.get("contact_info", {}) or {}
+            author_name = contact.get("name", "") or master.get("contact_info", {}).get("name", "")
+            rendered_tex = _inject_pdf_metadata(
+                rendered_tex,
+                author=author_name,
+                title=f"{author_name} - Resume" if author_name else "Resume",
+            )
             log.debug(f"[generate-pdf] LaTeX rendered — chars={len(rendered_tex)}")
         except Exception as e:
             log.error(f"[generate-pdf] Template render failed — pid={pid}: {e}", exc_info=True)
@@ -2252,11 +2776,21 @@ async def generate_pdf(data: dict, request: Request):
             log.warning(f"[generate-pdf] LaTeX balance check warnings — {problems}")
             # don't reject — try to compile anyway (warnings are common)
 
+        hygiene = compile_loop.inspect_tex_hygiene(rendered_tex)
+        if not hygiene.get("ok"):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Resume failed PDF hygiene checks.",
+                    "hygiene": hygiene,
+                },
+            )
+
         # 4. Compile with retry + repair
         backend_dir = os.path.dirname(__file__)
         ats_expected = {
-            "name": master.get("contact_info", {}).get("name", ""),
-            "email": master.get("contact_info", {}).get("email", ""),
+            "name": merged.get("contact_info", {}).get("name", ""),
+            "email": merged.get("contact_info", {}).get("email", ""),
         }
         result = compile_loop.compile_with_retry(
             rendered_tex,
@@ -2299,6 +2833,7 @@ async def generate_pdf(data: dict, request: Request):
                         "repair_actions": result.repair_actions,
                         "page_count": result.page_count,
                         "ats_validation": result.ats_validation,
+                        "hygiene": hygiene,
                         "warnings": result.warnings,
                         "latex_balance_problems": problems,
                     },

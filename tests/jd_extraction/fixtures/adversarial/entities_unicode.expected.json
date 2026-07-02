@@ -1,0 +1,10 @@
+{
+  "must_include": [
+    "PyTorch",
+    "TensorFlow"
+  ],
+  "must_exclude": [],
+  "min_len": 20,
+  "max_len": 50000,
+  "expected_platform": "generic"
+}

@@ -1,0 +1,1393 @@
+[
+  {
+    "name": "platform/test_greenhouse_real",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "first_name"
+        },
+        {
+          "label": "Last Name",
+          "type": "text",
+          "name": "last_name"
+        },
+        {
+          "label": "Preferred First Name",
+          "type": "text",
+          "name": "preferred_name"
+        },
+        {
+          "label": "Email",
+          "type": "email",
+          "name": "email"
+        },
+        {
+          "label": "Phone",
+          "type": "tel",
+          "name": "phone"
+        },
+        {
+          "label": "Location (City)",
+          "type": "text",
+          "name": "candidate-location"
+        },
+        {
+          "label": "Country",
+          "type": "select-one",
+          "name": "country"
+        },
+        {
+          "label": "LinkedIn Profile",
+          "type": "url",
+          "name": "question_30609906003"
+        },
+        {
+          "label": "Website",
+          "type": "url",
+          "name": "question_30609907003"
+        },
+        {
+          "label": "Are you currently eligible to work in the country where this role is posted without visa sponsorship?",
+          "type": "select-one",
+          "name": "question_30609908003"
+        },
+        {
+          "label": "Do you now or in the future require visa sponsorship to continue working in the country where this role is posted?",
+          "type": "select-one",
+          "name": "question_30609909003"
+        },
+        {
+          "label": "Have you been referred by another G-P employee within the last 12 months?",
+          "type": "select-one",
+          "name": "question_30609910003"
+        },
+        {
+          "label": "What year will you graduate from university?",
+          "type": "text",
+          "name": "question_30610342003"
+        },
+        {
+          "label": "I identify my gender as:",
+          "type": "select-one",
+          "name": "4000994003"
+        },
+        {
+          "label": "I identify my ethnicity as (mark all that apply)",
+          "type": "select-one",
+          "name": "4017696003"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "Alex",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Last Name",
+          "value": "Tester",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email",
+          "value": "alex@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Location (City)",
+          "value": "Houston",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [
+        {
+          "label": "Preferred First Name",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Phone",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Country",
+          "reason": "no_answer"
+        },
+        {
+          "label": "LinkedIn Profile",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Website",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Are you currently eligible to work in the country where this role is posted without visa sponsorship?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Do you now or in the future require visa sponsorship to continue working in the country where this role is posted?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Have you been referred by another G-P employee within the last 12 months?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "What year will you graduate from university?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "I identify my gender as:",
+          "reason": "no_answer"
+        },
+        {
+          "label": "I identify my ethnicity as (mark all that apply)",
+          "reason": "no_answer"
+        }
+      ],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Last Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email": {
+          "input": 1,
+          "change": 1
+        },
+        "Location (City)": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "platform/test_lever",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "Full Name",
+          "type": "text",
+          "name": "name"
+        },
+        {
+          "label": "Email",
+          "type": "email",
+          "name": "email"
+        },
+        {
+          "label": "Phone",
+          "type": "tel",
+          "name": "phone"
+        },
+        {
+          "label": "Current Company",
+          "type": "text",
+          "name": "org"
+        },
+        {
+          "label": "LinkedIn URL",
+          "type": "url",
+          "name": "urls[LinkedIn]"
+        },
+        {
+          "label": "GitHub URL",
+          "type": "url",
+          "name": "urls[GitHub]"
+        },
+        {
+          "label": "Portfolio",
+          "type": "url",
+          "name": "urls[Portfolio]"
+        },
+        {
+          "label": "Tell us about yourself",
+          "type": "textarea",
+          "name": "comments"
+        },
+        {
+          "label": "Are you legally authorized to work in the United States?",
+          "type": "select-one",
+          "name": "cards[work_authorization][field0]"
+        },
+        {
+          "label": "Do you require visa sponsorship now or in the future?",
+          "type": "select-one",
+          "name": "cards[visa_sponsorship][field0]"
+        },
+        {
+          "label": "Years of experience with Python and ML?",
+          "type": "select-one",
+          "name": "cards[years_experience][field0]"
+        },
+        {
+          "label": "What are your salary expectations?",
+          "type": "text",
+          "name": "cards[salary_expectation][field0]"
+        }
+      ],
+      "filled": [
+        {
+          "label": "Full Name",
+          "value": "Alex Tester",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email",
+          "value": "alex@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Phone",
+          "value": "2536323181",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [
+        {
+          "label": "Current Company",
+          "reason": "no_answer"
+        },
+        {
+          "label": "LinkedIn URL",
+          "reason": "no_answer"
+        },
+        {
+          "label": "GitHub URL",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Portfolio",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Tell us about yourself",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Are you legally authorized to work in the United States?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Do you require visa sponsorship now or in the future?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Years of experience with Python and ML?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "What are your salary expectations?",
+          "reason": "no_answer"
+        }
+      ],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "Full Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email": {
+          "input": 1,
+          "change": 1
+        },
+        "Phone": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "platform/test_icims",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "applicant.name.given"
+        },
+        {
+          "label": "Last Name",
+          "type": "text",
+          "name": "applicant.name.family"
+        },
+        {
+          "label": "Email Address",
+          "type": "email",
+          "name": "applicant.communications.email"
+        },
+        {
+          "label": "Phone Number",
+          "type": "tel",
+          "name": "applicant.communications.phone"
+        },
+        {
+          "label": "City",
+          "type": "text",
+          "name": "applicant.address.city"
+        },
+        {
+          "label": "State / Province",
+          "type": "text",
+          "name": "applicant.address.state"
+        },
+        {
+          "label": "Country",
+          "type": "select-one",
+          "name": "applicant.address.country"
+        },
+        {
+          "label": "LinkedIn Profile",
+          "type": "url",
+          "name": "applicant.linkedIn"
+        },
+        {
+          "label": "Current Employer",
+          "type": "text",
+          "name": "applicant.currentEmployer"
+        },
+        {
+          "label": "Current Title",
+          "type": "text",
+          "name": "applicant.currentTitle"
+        },
+        {
+          "label": "Legally authorized to work in the US?",
+          "type": "select-one",
+          "name": "applicant.workAuthorization"
+        },
+        {
+          "label": "Require visa sponsorship?",
+          "type": "select-one",
+          "name": "applicant.requireSponsorship"
+        },
+        {
+          "label": "Expected Salary",
+          "type": "text",
+          "name": "applicant.expectedSalary"
+        },
+        {
+          "label": "Tell us about yourself",
+          "type": "textarea",
+          "name": "applicant.summary"
+        },
+        {
+          "label": "How did you hear about this position?",
+          "type": "select-one",
+          "name": "applicant.referralSource"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "Alex",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Last Name",
+          "value": "Tester",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email Address",
+          "value": "alex@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [
+        {
+          "label": "Phone Number",
+          "reason": "no_answer"
+        },
+        {
+          "label": "City",
+          "reason": "no_answer"
+        },
+        {
+          "label": "State / Province",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Country",
+          "reason": "no_answer"
+        },
+        {
+          "label": "LinkedIn Profile",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Current Employer",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Current Title",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Legally authorized to work in the US?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Require visa sponsorship?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Expected Salary",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Tell us about yourself",
+          "reason": "no_answer"
+        },
+        {
+          "label": "How did you hear about this position?",
+          "reason": "no_answer"
+        }
+      ],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Last Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email Address": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "platform/test_bamboohr",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "firstName"
+        },
+        {
+          "label": "Last Name",
+          "type": "text",
+          "name": "lastName"
+        },
+        {
+          "label": "Email Address",
+          "type": "email",
+          "name": "email"
+        },
+        {
+          "label": "Phone Number",
+          "type": "tel",
+          "name": "phoneNumber"
+        },
+        {
+          "label": "City",
+          "type": "text",
+          "name": "city"
+        },
+        {
+          "label": "State / Province",
+          "type": "text",
+          "name": "state"
+        },
+        {
+          "label": "LinkedIn Profile",
+          "type": "url",
+          "name": "linkedin"
+        },
+        {
+          "label": "Website or Portfolio",
+          "type": "url",
+          "name": "websitePortfolio"
+        },
+        {
+          "label": "Current Employer",
+          "type": "text",
+          "name": "currentEmployer"
+        },
+        {
+          "label": "Current Job Title",
+          "type": "text",
+          "name": "currentJobTitle"
+        },
+        {
+          "label": "Are you authorized to work in the US?",
+          "type": "select-one",
+          "name": "workAuthorization"
+        },
+        {
+          "label": "Do you require sponsorship to work in the US?",
+          "type": "select-one",
+          "name": "requireSponsorship"
+        },
+        {
+          "label": "Years of relevant experience",
+          "type": "select-one",
+          "name": "yearsExperience"
+        },
+        {
+          "label": "Desired Salary",
+          "type": "text",
+          "name": "desiredSalary"
+        },
+        {
+          "label": "How did you hear about this position?",
+          "type": "select-one",
+          "name": "howDidYouHearAboutUs"
+        },
+        {
+          "label": "Cover Letter / Tell us about yourself",
+          "type": "textarea",
+          "name": "coverLetter"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "Alex",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Last Name",
+          "value": "Tester",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email Address",
+          "value": "alex@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [
+        {
+          "label": "Phone Number",
+          "reason": "no_answer"
+        },
+        {
+          "label": "City",
+          "reason": "no_answer"
+        },
+        {
+          "label": "State / Province",
+          "reason": "no_answer"
+        },
+        {
+          "label": "LinkedIn Profile",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Website or Portfolio",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Current Employer",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Current Job Title",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Are you authorized to work in the US?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Do you require sponsorship to work in the US?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Years of relevant experience",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Desired Salary",
+          "reason": "no_answer"
+        },
+        {
+          "label": "How did you hear about this position?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Cover Letter / Tell us about yourself",
+          "reason": "no_answer"
+        }
+      ],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Last Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email Address": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "platform/test_generic",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "first_name"
+        },
+        {
+          "label": "Last Name",
+          "type": "text",
+          "name": "last_name"
+        },
+        {
+          "label": "Email",
+          "type": "email",
+          "name": "email"
+        },
+        {
+          "label": "Mobile Phone",
+          "type": "tel",
+          "name": "phone"
+        },
+        {
+          "label": "City",
+          "type": "text",
+          "name": "city"
+        },
+        {
+          "label": "Country",
+          "type": "select-one",
+          "name": "country"
+        },
+        {
+          "label": "LinkedIn URL",
+          "type": "url",
+          "name": "linkedin"
+        },
+        {
+          "label": "GitHub URL",
+          "type": "url",
+          "name": "github"
+        },
+        {
+          "label": "Portfolio / Website",
+          "type": "url",
+          "name": "website"
+        },
+        {
+          "label": "Current Employer",
+          "type": "text",
+          "name": "current_company"
+        },
+        {
+          "label": "Current Job Title",
+          "type": "text",
+          "name": "current_title"
+        },
+        {
+          "label": "Years of Experience",
+          "type": "select-one",
+          "name": "years_experience"
+        },
+        {
+          "label": "Expected Salary (USD/yr)",
+          "type": "text",
+          "name": "desired_salary"
+        },
+        {
+          "label": "Earliest Available Start Date",
+          "type": "text",
+          "name": "start_date"
+        },
+        {
+          "label": "Brief Professional Summary",
+          "type": "textarea",
+          "name": "summary"
+        },
+        {
+          "label": "Why are you interested in this role at StartupXYZ?",
+          "type": "textarea",
+          "name": "why_company"
+        },
+        {
+          "label": "What is your greatest strength?",
+          "type": "textarea",
+          "name": "greatest_strength"
+        },
+        {
+          "label": "How did you find this job?",
+          "type": "select-one",
+          "name": "referral_source"
+        },
+        {
+          "label": "Preferred Pronouns (optional)",
+          "type": "select-one",
+          "name": "pronouns"
+        },
+        {
+          "label": "Are you authorized to work in the United States?",
+          "type": "radio",
+          "name": "work_auth"
+        },
+        {
+          "label": "Do you require sponsorship now or in the future?",
+          "type": "radio",
+          "name": "sponsorship"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "Alex",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Last Name",
+          "value": "Tester",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email",
+          "value": "alex@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "City",
+          "value": "Houston",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [
+        {
+          "label": "Mobile Phone",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Country",
+          "reason": "no_answer"
+        },
+        {
+          "label": "LinkedIn URL",
+          "reason": "no_answer"
+        },
+        {
+          "label": "GitHub URL",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Portfolio / Website",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Current Employer",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Current Job Title",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Years of Experience",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Expected Salary (USD/yr)",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Earliest Available Start Date",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Brief Professional Summary",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Why are you interested in this role at StartupXYZ?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "What is your greatest strength?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "How did you find this job?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Preferred Pronouns (optional)",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Are you authorized to work in the United States?",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Do you require sponsorship now or in the future?",
+          "reason": "no_answer"
+        }
+      ],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Last Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email": {
+          "input": 1,
+          "change": 1
+        },
+        "City": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_shadow_dom",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [],
+      "filled": [],
+      "skipped": [],
+      "wrong": [],
+      "unsupported": [],
+      "events": {},
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_dynamic",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "static-first"
+        },
+        {
+          "label": "Last Name",
+          "type": "text",
+          "name": "dyn-last"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "Alex",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Last Name",
+          "value": "Dynamic",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Last Name": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_typeahead",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "Location (City)",
+          "type": "text",
+          "name": "loc-input"
+        }
+      ],
+      "filled": [
+        {
+          "label": "Location (City)",
+          "value": "Houston, TX",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "Location (City)": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_dropdown_native",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "State",
+          "type": "select-one",
+          "name": "state"
+        },
+        {
+          "label": "Country",
+          "type": "select-one",
+          "name": "country"
+        }
+      ],
+      "filled": [
+        {
+          "label": "State",
+          "value": "Texas",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Country",
+          "value": "United States",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "State": {
+          "input": 1,
+          "change": 1
+        },
+        "Country": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_dropdown_custom",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [],
+      "filled": [],
+      "skipped": [],
+      "wrong": [],
+      "unsupported": [],
+      "events": {},
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_file_upload",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [],
+      "filled": [],
+      "skipped": [],
+      "wrong": [],
+      "unsupported": [],
+      "events": {},
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 1,
+        "labels": [
+          "Resume / CV"
+        ],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_prefilled",
+    "pass": true,
+    "errors": [],
+    "report": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "pf-first"
+        },
+        {
+          "label": "Email",
+          "type": "email",
+          "name": "pf-email"
+        },
+        {
+          "label": "Phone",
+          "type": "tel",
+          "name": "pf-empty"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "ShouldNotApply",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email",
+          "value": "overwrite@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Phone",
+          "value": "5551234567",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [],
+      "wrong": [
+        {
+          "label": "First Name",
+          "kind": "clobber",
+          "expected": "UserTyped",
+          "got": "ShouldNotApply"
+        },
+        {
+          "label": "Email",
+          "kind": "clobber",
+          "expected": "user@example.com",
+          "got": "overwrite@example.com"
+        }
+      ],
+      "unsupported": [],
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email": {
+          "input": 1,
+          "change": 1
+        },
+        "Phone": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  },
+  {
+    "name": "variant/field_multistep",
+    "pass": true,
+    "errors": [],
+    "step1": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "ms-first"
+        },
+        {
+          "label": "Last Name",
+          "type": "text",
+          "name": "ms-last"
+        },
+        {
+          "label": "Email",
+          "type": "email",
+          "name": "ms-email"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "Alex",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [
+        {
+          "label": "Last Name",
+          "reason": "no_answer"
+        },
+        {
+          "label": "Email",
+          "reason": "no_answer"
+        }
+      ],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    },
+    "step2": {
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "ms-first"
+        },
+        {
+          "label": "Last Name",
+          "type": "text",
+          "name": "ms-last"
+        },
+        {
+          "label": "Email",
+          "type": "email",
+          "name": "ms-email"
+        }
+      ],
+      "filled": [
+        {
+          "label": "Last Name",
+          "value": "Tester",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email",
+          "value": "alex@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
+      "skipped": [
+        {
+          "label": "First Name",
+          "reason": "no_answer"
+        }
+      ],
+      "wrong": [],
+      "unsupported": [],
+      "events": {
+        "Last Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email": {
+          "input": 1,
+          "change": 1
+        }
+      },
+      "errors": [],
+      "completed": true,
+      "fileScan": {
+        "count": 0,
+        "labels": [],
+        "inFormFields": false
+      }
+    }
+  }
+]

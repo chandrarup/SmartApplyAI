@@ -62,21 +62,34 @@
         {
             "title": "GPT-2 Style Small Language Model --- Built from Scratch",
             "url": "https://github.com/chandrarup/Build-SLM-From-Scratch",
-            "tech_stack": ["PyTorch", "Transformers", "BPE Tokenization", "TinyStories"],
+            "tech_stack": [
+                "PyTorch",
+                "Transformers",
+                "BPE Tokenization",
+                "TinyStories"
+            ],
             "date": "2024",
             "description": "Implemented a 100M+ parameter GPT-2 style LLM from scratch --- token embeddings, positional encodings, stacked transformer blocks with multi-head self-attention, and next-token prediction training loop --- demonstrating end-to-end understanding of modern LLM internals."
         },
         {
             "title": "Multi-Agent Deep RL for Autonomous Highway Merging",
             "url": "https://github.com/chandrarup/Multi-Agent-Deep-Reinforcement-Learning-for-Highway-Merging",
-            "tech_stack": ["PyTorch", "DQN/DDQN", "CNN"],
+            "tech_stack": [
+                "PyTorch",
+                "DQN/DDQN",
+                "CNN"
+            ],
             "date": "2022",
             "description": "Designed MARL system for autonomous on-ramp merging with human-driven vehicles; CNN policy network on raw pixels with Experience Replay and dual-network architecture for training stability."
         },
         {
             "title": "Speech Emotion Recognition",
             "url": "https://github.com/chandrarup/Speech-Emotion-Recognition-SER-using-Deep-Learning",
-            "tech_stack": ["CNN", "librosa", "RAVDESS"],
+            "tech_stack": [
+                "CNN",
+                "librosa",
+                "RAVDESS"
+            ],
             "date": "2022",
             "description": "CNN with MFCC / mel-spectrogram feature pipeline; 81% accuracy on RAVDESS --- applications in customer service automation and mental health monitoring."
         },
@@ -250,7 +263,8 @@
             "Multi-Head Self-Attention",
             "BPE Tokenization",
             "Positional Encoding",
-            "Next-Token Prediction"
+            "Next-Token Prediction",
+            "Graphiti"
         ],
         "specialized_libraries": [
             "librosa",

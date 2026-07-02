@@ -1,0 +1,7 @@
+{
+  "platform": "generic",
+  "file_input_present": true,
+  "file_in_getFormFields": false,
+  "fill": {},
+  "note": "getFormFields excludes type=file; fillResumeUpload is separate Workday path"
+}

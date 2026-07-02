@@ -1,0 +1,214 @@
+{
+  "results": [
+    {
+      "name": "happy/test_bamboohr.html",
+      "pass": false,
+      "errors": [
+        "happy/test_bamboohr.html: missing must_include \"BambooHR\""
+      ],
+      "len": 391,
+      "platform": "bamboohr",
+      "preview": "Application Questions Are you authorized to work in the US? Select... Yes No Do you require sponsorship to work in the U"
+    },
+    {
+      "name": "happy/test_generic.html",
+      "pass": false,
+      "errors": [
+        "happy/test_generic.html: missing must_include \"Generic\""
+      ],
+      "len": 165,
+      "platform": "generic",
+      "preview": "How did you find this job? Select... LinkedIn Indeed Friend / Referral Company Website Other Preferred Pronouns (optiona"
+    },
+    {
+      "name": "happy/test_greenhouse.html",
+      "pass": false,
+      "errors": [
+        "happy/test_greenhouse.html: missing must_include \"Software Engineer\"",
+        "happy/test_greenhouse.html: missing must_include \"AI Platform\""
+      ],
+      "len": 386,
+      "platform": "greenhouse",
+      "preview": "Application Questions Tell us about yourself Are you legally authorized to work in the United States? * -- Select -- Yes"
+    },
+    {
+      "name": "happy/test_greenhouse_real.html",
+      "pass": false,
+      "errors": [
+        "happy/test_greenhouse_real.html: missing must_include \"Software Engineer\"",
+        "happy/test_greenhouse_real.html: length 9 < min_len 80"
+      ],
+      "len": 9,
+      "platform": "greenhouse",
+      "preview": "not found"
+    },
+    {
+      "name": "happy/test_icims.html",
+      "pass": false,
+      "errors": [
+        "happy/test_icims.html: missing must_include \"iCIMS\""
+      ],
+      "len": 146,
+      "platform": "icims",
+      "preview": "Personal Information First Name * Last Name * Email Address * Phone Number City State / Province Country * -- Select -- "
+    },
+    {
+      "name": "happy/test_lever.html",
+      "pass": false,
+      "errors": [
+        "happy/test_lever.html: missing must_include \"Senior AI Engineer\"",
+        "happy/test_lever.html: missing must_include \"Acme Corp\""
+      ],
+      "len": 349,
+      "platform": "lever",
+      "preview": "Additional Information Additional Information / Cover Letter Are you legally authorized to work in the United States? * "
+    },
+    {
+      "name": "happy/test_linkedin.html",
+      "pass": true,
+      "errors": [],
+      "len": 511,
+      "platform": "linkedin",
+      "preview": "AI Engineer TechCorp · San Francisco, CA · Full-time Real LinkedIn Easy Apply Patterns Contact info First name * Last na"
+    },
+    {
+      "name": "happy/test_smartrecruiters.html",
+      "pass": false,
+      "errors": [
+        "happy/test_smartrecruiters.html: missing must_include \"SmartRecruiters\""
+      ],
+      "len": 223,
+      "platform": "smartrecruiters",
+      "preview": "Eligibility Are you legally authorized to work in the United States? * Select... Yes No Will you require employer sponso"
+    },
+    {
+      "name": "happy/test_taleo.html",
+      "pass": false,
+      "errors": [
+        "happy/test_taleo.html: missing must_include \"Taleo\""
+      ],
+      "len": 320,
+      "platform": "taleo",
+      "preview": "Eligibility & EEO Authorized to work in US? * -- Select -- Yes No Require visa sponsorship? * -- Select -- Yes No Gender"
+    },
+    {
+      "name": "happy/test_workday.html",
+      "pass": true,
+      "errors": [],
+      "len": 1025,
+      "platform": "workday",
+      "preview": "Contact Information First Name * Last Name * Email * Phone City State Select State... Texas California New York Washingt"
+    },
+    {
+      "name": "adversarial/entities_unicode.html",
+      "pass": true,
+      "errors": [],
+      "len": 70,
+      "platform": "generic",
+      "preview": "Skills: PyTorch & NLP — retrieval-augmented generation — TensorFlow 🚀"
+    },
+    {
+      "name": "adversarial/huge_jd.html",
+      "pass": false,
+      "errors": [
+        "adversarial/huge_jd.html: length 97523 > max_len 40000"
+      ],
+      "len": 97523,
+      "platform": "generic",
+      "preview": "PyTorch retrieval-augmented generation PyTorch retrieval-augmented generation PyTorch retrieval-augmented generation PyT"
+    },
+    {
+      "name": "adversarial/jd_collapsed_readmore.html",
+      "pass": true,
+      "errors": [],
+      "len": 115,
+      "platform": "generic",
+      "preview": "PyTorch retrieval-augmented generation TensorFlow Kubernetes MLOps role description with detailed responsibilities."
+    },
+    {
+      "name": "adversarial/jd_in_iframe.html",
+      "pass": false,
+      "errors": [
+        "adversarial/jd_in_iframe.html: missing must_include \"PyTorch\"",
+        "adversarial/jd_in_iframe.html: missing must_include \"retrieval-augmented generation\"",
+        "adversarial/jd_in_iframe.html: length 0 < min_len 40"
+      ],
+      "len": 0,
+      "platform": "generic",
+      "preview": ""
+    },
+    {
+      "name": "adversarial/jd_in_shadow_dom.html",
+      "pass": false,
+      "errors": [
+        "adversarial/jd_in_shadow_dom.html: missing must_include \"PyTorch\"",
+        "adversarial/jd_in_shadow_dom.html: missing must_include \"retrieval-augmented generation\"",
+        "adversarial/jd_in_shadow_dom.html: length 0 < min_len 40"
+      ],
+      "len": 0,
+      "platform": "generic",
+      "preview": ""
+    },
+    {
+      "name": "adversarial/junk_heavy.html",
+      "pass": true,
+      "errors": [],
+      "len": 161,
+      "platform": "generic",
+      "preview": "PyTorch retrieval-augmented generation actual job description buried in plain div with enough text to be meaningful for "
+    },
+    {
+      "name": "adversarial/lazy_loaded.html",
+      "pass": true,
+      "errors": [],
+      "len": 56,
+      "platform": "generic",
+      "preview": "PyTorch retrieval-augmented generation lazy injected JD."
+    },
+    {
+      "name": "adversarial/login_wall.html",
+      "pass": true,
+      "errors": [],
+      "len": 62,
+      "platform": "generic",
+      "preview": "Sign in to view this jobPlease log in to LinkedIn to continue."
+    },
+    {
+      "name": "adversarial/multi_posting.html",
+      "pass": true,
+      "errors": [],
+      "len": 97,
+      "platform": "generic",
+      "preview": "ML Engineering Intern TARGET_MARKERPyTorch retrieval-augmented generation internship summer 2026."
+    },
+    {
+      "name": "adversarial/no_semantic_main.html",
+      "pass": true,
+      "errors": [],
+      "len": 71,
+      "platform": "generic",
+      "preview": "PyTorch retrieval-augmented generation role without semantic landmarks."
+    },
+    {
+      "name": "adversarial/pdf_embedded.html",
+      "pass": false,
+      "errors": [
+        "adversarial/pdf_embedded.html: missing must_include \"PyTorch\""
+      ],
+      "len": 11,
+      "platform": "generic",
+      "preview": "PDF only JD"
+    }
+  ],
+  "lazyLoadedReport": {
+    "immediate": {
+      "text": "Loading...",
+      "platform": "generic"
+    },
+    "delayed": {
+      "text": "PyTorch retrieval-augmented generation lazy injected JD.",
+      "platform": "generic"
+    },
+    "changed": true
+  }
+}
