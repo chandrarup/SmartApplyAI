@@ -1,0 +1,9 @@
+{
+  "platform": "generic",
+  "multistep": true,
+  "step1_labels": ["First Name"],
+  "step2_labels": ["Last Name", "Email"],
+  "fill_step1": { "First Name": "Alex" },
+  "fill_step2": { "Last Name": "Tester", "Email": "alex@example.com" },
+  "expect_step2_values": { "Last Name": "Tester", "Email": "alex@example.com" }
+}

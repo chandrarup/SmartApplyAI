@@ -1,0 +1,9 @@
+{
+  "must_include": [
+    "SmartRecruiters"
+  ],
+  "must_exclude": [],
+  "min_len": 50,
+  "max_len": 50000,
+  "expected_platform": "smartrecruiters"
+}

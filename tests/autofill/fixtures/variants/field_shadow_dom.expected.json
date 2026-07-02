@@ -1,0 +1,6 @@
+{
+  "platform": "workday",
+  "must_map_labels": [],
+  "expect_zero_fields": true,
+  "note": "Shadow DOM fields are not visible to document.querySelector"
+}

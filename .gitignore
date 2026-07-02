@@ -60,3 +60,21 @@ node_modules/
 # Pytest cache
 .pytest_cache/
 pytest-cache-files-*/
+
+# Local SQLite runtime stores (populated by migrate/run scripts)
+backend/knowledge/knowledge.db
+backend/scraper/jobs.db
+backend/matcher/matches.db
+backend/teach/reviews.db
+
+# Test harness artifacts
+test-results/
+screenshots/
+backend/latex_*.pdf
+backend/latex_*.log
+backend/latex_*.tex
+backend/t_*.pdf
+backend/t_*.log
+backend/t_*.tex
+backend/test_latex_inj.*
+.claude/

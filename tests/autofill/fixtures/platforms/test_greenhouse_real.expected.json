@@ -1,0 +1,16 @@
+{
+  "platform": "greenhouse",
+  "must_map_labels": ["First Name", "Last Name", "Email", "Location (City)"],
+  "fill": {
+    "First Name": "Alex",
+    "Last Name": "Tester",
+    "Email": "alex@example.com",
+    "Location (City)": "Houston"
+  },
+  "expect_values": {
+    "First Name": "Alex",
+    "Last Name": "Tester",
+    "Email": "alex@example.com",
+    "Location (City)": "Houston"
+  }
+}

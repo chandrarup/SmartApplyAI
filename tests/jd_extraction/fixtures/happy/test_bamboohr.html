@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ML Engineer at BambooHR | BambooHR</title>
+<style>
+  body { font-family: 'Source Sans Pro', 'Helvetica Neue', sans-serif; max-width: 680px; margin: 0 auto; padding: 28px 20px; background: #f7f8f9; color: #222; }
+  .bhr-header { background: #73bf44; color: white; padding: 18px 24px; border-radius: 6px; margin-bottom: 16px; }
+  .bhr-header h1 { margin: 0 0 4px; font-size: 20px; }
+  .bhr-header p { margin: 0; font-size: 13px; opacity: 0.9; }
+  .badge { background: #edf7e6; color: #3d7a1a; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; display: inline-block; margin-bottom: 14px; }
+  .card { background: white; border-radius: 6px; border: 1px solid #e0e0e0; padding: 20px; margin-bottom: 14px; }
+  .card-title { font-size: 12px; font-weight: 700; color: #73bf44; text-transform: uppercase; letter-spacing: 0.6px; margin: 0 0 14px; }
+  .fab-field { margin-bottom: 12px; }
+  .fab-field label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 4px; }
+  .required::after { content: ' *'; color: #c00; }
+  /* BambooHR uses camelCase IDs: firstName, lastName, email, phoneNumber */
+  input[type=text], input[type=email], input[type=tel], input[type=url], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; font-family: inherit; outline: none; background: #fafafa;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #73bf44; background: #fff; }
+  textarea { resize: vertical; min-height: 80px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .submit-btn { background: #73bf44; color: white; border: none; padding: 11px 28px; border-radius: 4px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .result-overlay { display: none; position: fixed; top: 16px; right: 16px; background: white; border: 2px solid #73bf44; border-radius: 6px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 320px; z-index: 9999; font-size: 12.5px; max-height: 80vh; overflow-y: auto; }
+  .result-overlay h3 { margin: 0 0 8px; color: #73bf44; }
+  .ri { padding: 2px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .close-btn { float: right; background: none; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="bhr-header">
+  <h1>Machine Learning Engineer</h1>
+  <p>Acme Corp · Remote · Full-time</p>
+</div>
+<div class="badge">Real BambooHR HTML Patterns — LocalHire Agent Test</div>
+
+<form id="bhr-form">
+
+  <div class="card">
+    <div class="card-title">Personal Information</div>
+    <div class="two-col">
+      <div class="fab-field">
+        <!-- REAL BambooHR: id=firstName, camelCase -->
+        <label for="firstName" class="required">First Name</label>
+        <input type="text" id="firstName" name="firstName" aria-label="First Name" autocomplete="off">
+      </div>
+      <div class="fab-field">
+        <!-- REAL BambooHR: id=lastName -->
+        <label for="lastName" class="required">Last Name</label>
+        <input type="text" id="lastName" name="lastName" aria-label="Last Name" autocomplete="off">
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="fab-field">
+        <!-- REAL BambooHR: id=email -->
+        <label for="email" class="required">Email Address</label>
+        <input type="email" id="email" name="email" aria-label="Email Address" autocomplete="off">
+      </div>
+      <div class="fab-field">
+        <!-- REAL BambooHR: id=phoneNumber -->
+        <label for="phoneNumber">Phone Number</label>
+        <input type="tel" id="phoneNumber" name="phoneNumber" aria-label="Phone Number" autocomplete="off">
+      </div>
+    </div>
+    <div class="two-col">
+      <!-- REAL BambooHR: id=address -->
+      <div class="fab-field">
+        <label for="city">City</label>
+        <input type="text" id="city" name="city" aria-label="City" autocomplete="off">
+      </div>
+      <div class="fab-field">
+        <label for="state">State / Province</label>
+        <input type="text" id="state" name="state" aria-label="State / Province" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Experience &amp; Background</div>
+    <div class="two-col">
+      <div class="fab-field">
+        <!-- REAL BambooHR: uses these ids -->
+        <label for="linkedin">LinkedIn Profile</label>
+        <input type="url" id="linkedin" name="linkedin" aria-label="LinkedIn Profile" autocomplete="off">
+      </div>
+      <div class="fab-field">
+        <label for="websitePortfolio">Website or Portfolio</label>
+        <input type="url" id="websitePortfolio" name="websitePortfolio" aria-label="Website or Portfolio" autocomplete="off">
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="fab-field">
+        <label for="currentEmployer">Current Employer</label>
+        <input type="text" id="currentEmployer" name="currentEmployer" aria-label="Current Employer" autocomplete="off">
+      </div>
+      <div class="fab-field">
+        <label for="currentJobTitle">Current Job Title</label>
+        <input type="text" id="currentJobTitle" name="currentJobTitle" aria-label="Current Job Title" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Application Questions</div>
+    <div class="fab-field">
+      <label for="workAuthorization" class="required">Are you authorized to work in the US?</label>
+      <select id="workAuthorization" name="workAuthorization" aria-label="Are you authorized to work in the US?">
+        <option value="">Select...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="fab-field">
+      <label for="requireSponsorship">Do you require sponsorship to work in the US?</label>
+      <select id="requireSponsorship" name="requireSponsorship" aria-label="Do you require sponsorship to work in the US?">
+        <option value="">Select...</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="fab-field">
+      <label for="yearsExperience">Years of relevant experience</label>
+      <select id="yearsExperience" name="yearsExperience" aria-label="Years of relevant experience">
+        <option value="">Select...</option>
+        <option value="0-1">Less than 1 year</option>
+        <option value="1-2">1-2 years</option>
+        <option value="2-3">2-3 years</option>
+        <option value="3-5">3-5 years</option>
+        <option value="5+">5+ years</option>
+      </select>
+    </div>
+    <div class="fab-field">
+      <label for="desiredSalary">Desired Salary</label>
+      <input type="text" id="desiredSalary" name="desiredSalary" aria-label="Desired Salary" autocomplete="off">
+    </div>
+    <div class="fab-field">
+      <label for="howDidYouHearAboutUs">How did you hear about this position?</label>
+      <select id="howDidYouHearAboutUs" name="howDidYouHearAboutUs" aria-label="How did you hear about this position?">
+        <option value="">Select...</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="Indeed">Indeed</option>
+        <option value="Company Website">Company Website</option>
+        <option value="Referral">Employee Referral</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="fab-field">
+      <label for="coverLetter">Cover Letter / Tell us about yourself</label>
+      <textarea id="coverLetter" name="coverLetter" aria-label="Cover Letter / Tell us about yourself"></textarea>
+    </div>
+  </div>
+
+  <button type="submit" class="submit-btn">Submit Application</button>
+</form>
+
+<div class="result-overlay" id="ro">
+  <button class="close-btn" onclick="document.getElementById('ro').style.display='none'">✕</button>
+  <h3>Fields Filled</h3><div id="rl"></div>
+</div>
+<script>
+document.getElementById("bhr-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const rl = document.getElementById("rl"); rl.innerHTML = "";
+  let filled = 0, total = 0;
+  document.querySelectorAll("input:not([type=submit]),select,textarea").forEach(f => {
+    total++;
+    if (f.value) {
+      filled++;
+      const lbl = document.querySelector('label[for="'+f.id+'"]');
+      const d = document.createElement("div"); d.className="ri";
+      d.innerHTML = `<b>${lbl?.textContent?.replace('*','').trim()||f.name}:</b> ${f.value.substring(0,50)}`;
+      rl.appendChild(d);
+    }
+  });
+  const s = document.createElement("div");
+  s.style = "margin-top:6px;padding-top:6px;border-top:2px solid #edf7e6;font-weight:700;color:#73bf44";
+  s.textContent = `${filled}/${total} filled`; rl.appendChild(s);
+  document.getElementById("ro").style.display="block";
+});
+</script>
+</body>
+</html>

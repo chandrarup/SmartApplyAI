@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Typeahead</title>
+<style>
+  .opts { border:1px solid #ccc; display:none; max-height:120px; overflow:auto; }
+  .opts.open { display:block; }
+  .opt { padding:6px 10px; cursor:pointer; }
+  .opt:hover { background:#eef; }
+</style></head>
+<body>
+<h1>Location Typeahead</h1>
+<div class="field">
+  <label for="loc-input">Location (City)</label>
+  <input id="loc-input" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" />
+  <div id="loc-opts" class="opts" role="listbox"></div>
+</div>
+<script>
+  const cities = ["Houston, TX", "Austin, TX", "Seattle, WA"];
+  const input = document.getElementById("loc-input");
+  const opts = document.getElementById("loc-opts");
+  input.addEventListener("input", () => {
+    const q = input.value.toLowerCase();
+    opts.innerHTML = cities.filter(c => c.toLowerCase().includes(q))
+      .map(c => `<div class="opt" role="option">${c}</div>`).join("");
+    opts.classList.add("open");
+    input.setAttribute("aria-expanded", "true");
+  });
+  opts.addEventListener("click", (e) => {
+    if (e.target.classList.contains("opt")) {
+      input.value = e.target.textContent;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      opts.classList.remove("open");
+    }
+  });
+</script>
+</body>
+</html>

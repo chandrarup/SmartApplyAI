@@ -1,0 +1,14 @@
+{
+  "platform": "lever",
+  "must_map_labels": ["Full Name", "Email", "Phone"],
+  "fill": {
+    "Full Name": "Alex Tester",
+    "Email": "alex@example.com",
+    "Phone": "2536323181"
+  },
+  "expect_values": {
+    "Full Name": "Alex Tester",
+    "Email": "alex@example.com",
+    "Phone": "2536323181"
+  }
+}

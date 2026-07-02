@@ -37,7 +37,8 @@ This is a personal tool used during an active job hunt. Every minute saved per a
 - `compile_loop.py` — LaTeX compile with self-repair (12 retries, 11 error types)
 - `constraints.py` — Post-LLM validation: no fact invention, word budget, authenticity
 - `latex_ast.py` — AST-level LaTeX manipulation
-- `resume_source.py` — Resume data extraction helpers
+- `resume_source.py `
+— Resume data extraction helpers
 - `resume_versions.py` — Version history for generated resumes
 - `logger.py` / `logs/` — Structured logging
 

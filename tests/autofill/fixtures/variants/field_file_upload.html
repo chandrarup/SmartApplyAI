@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>File Upload</title></head>
+<body>
+<h1>Resume Upload</h1>
+<div class="field">
+  <label for="resume-file">Resume / CV</label>
+  <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" />
+</div>
+<div id="file-status"></div>
+<script>
+  document.getElementById("resume-file").addEventListener("change", (e) => {
+    const f = e.target.files?.[0];
+    document.getElementById("file-status").textContent = f ? `selected:${f.name}` : "";
+  });
+</script>
+</body>
+</html>

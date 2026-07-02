@@ -1,0 +1,12 @@
+role_mode: internship
+match_threshold: 85
+top_recall: 50
+top_fit: 30
+embedding_model: sentence-transformers/all-MiniLM-L6-v2
+rerank_model: BAAI/bge-reranker-base
+llm_prefer: ollama
+recall_evidence_k: 8
+filters_path: backend/scraper/filters.yaml
+jobs_db_path: backend/scraper/jobs.db
+matches_db_path: backend/matcher/matches.db
+

@@ -1,0 +1,12 @@
+{
+  "platform": "generic",
+  "must_map_labels": ["Location (City)"],
+  "fill": {
+    "Location (City)": "Houston, TX"
+  },
+  "expect_values": {
+    "Location (City)": "Houston, TX"
+  },
+  "requires_typeahead_click": true,
+  "typeahead_unsupported_ok": true
+}

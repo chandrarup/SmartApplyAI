@@ -1,0 +1,12 @@
+{
+  "must_include": [
+    "Software Engineer",
+    "AI Platform"
+  ],
+  "must_exclude": [
+    "cookie policy"
+  ],
+  "min_len": 80,
+  "max_len": 50000,
+  "expected_platform": "greenhouse"
+}

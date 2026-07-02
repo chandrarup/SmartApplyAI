@@ -1,0 +1,13 @@
+{
+  "platform": "generic",
+  "wait_ms": 800,
+  "must_map_labels": ["First Name", "Last Name"],
+  "fill": {
+    "First Name": "Alex",
+    "Last Name": "Dynamic"
+  },
+  "expect_values": {
+    "First Name": "Alex",
+    "Last Name": "Dynamic"
+  }
+}

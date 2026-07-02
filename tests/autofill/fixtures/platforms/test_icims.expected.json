@@ -1,0 +1,14 @@
+{
+  "platform": "icims",
+  "must_map_labels": ["First Name", "Last Name", "Email"],
+  "fill": {
+    "First Name": "Alex",
+    "Last Name": "Tester",
+    "Email Address": "alex@example.com"
+  },
+  "expect_values": {
+    "First Name": "Alex",
+    "Last Name": "Tester",
+    "Email": "alex@example.com"
+  }
+}

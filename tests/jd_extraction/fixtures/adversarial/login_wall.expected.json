@@ -1,0 +1,11 @@
+{
+  "must_include": [
+    "Sign in to view this job"
+  ],
+  "must_exclude": [
+    "PyTorch"
+  ],
+  "min_len": 20,
+  "max_len": 500,
+  "expected_platform": "generic"
+}

@@ -2,3 +2,5 @@ fastapi
 uvicorn
 requests
 jinja2
+sqlite-vec
+sentence-transformers

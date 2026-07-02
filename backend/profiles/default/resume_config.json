@@ -1,0 +1,27 @@
+{
+  "preferred_model": "ollama",
+  "resume": {
+    "max_bullets_per_role": 6,
+    "max_words_per_bullet": 35,
+    "tone": "technical",
+    "project_priority_keywords": [
+      "gpt", "llm", "transformer", "pytorch", "language model", "slm", "bpe", "tokenization",
+      "reinforcement", "multi-agent", "autonomous", "dqn", "ddqn", "policy gradient",
+      "emotion", "speech", "audio", "rag", "embedding", "vector", "agentic", "fine-tuning"
+    ]
+  },
+  "skills_display_categories": {
+    "domains":    "LLMs & Agentic AI",
+    "frameworks": "ML / DL",
+    "tools":      "Infrastructure & APIs",
+    "databases":  "Databases & Vector Stores",
+    "languages":  "Languages"
+  },
+  "skills_jd_additions": {
+    "domains":    ["llm", "rag", "fine-tuning", "prompt engineering", "langchain", "llamaindex", "openai", "claude", "gemini", "autogen", "crewai", "agentic"],
+    "frameworks": ["pytorch", "tensorflow", "keras", "hugging face", "scikit-learn", "fastapi", "langchain", "llama-index", "transformers"],
+    "tools":      ["docker", "kubernetes", "aws", "azure", "gcp", "mlflow", "airflow", "fastapi", "git", "ci/cd"],
+    "databases":  ["pinecone", "chromadb", "pgvector", "neo4j", "mongodb", "redis", "weaviate"],
+    "languages":  ["python", "sql", "typescript", "javascript", "java", "rust"]
+  }
+}

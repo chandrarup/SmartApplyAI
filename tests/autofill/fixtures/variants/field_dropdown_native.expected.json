@@ -1,0 +1,12 @@
+{
+  "platform": "generic",
+  "must_map_labels": ["State", "Country"],
+  "fill": {
+    "State": "Texas",
+    "Country": "United States"
+  },
+  "expect_values": {
+    "State": "Texas",
+    "Country": "United States"
+  }
+}

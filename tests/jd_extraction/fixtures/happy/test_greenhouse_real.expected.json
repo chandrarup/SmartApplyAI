@@ -1,0 +1,9 @@
+{
+  "must_include": [
+    "Software Engineer"
+  ],
+  "must_exclude": [],
+  "min_len": 80,
+  "max_len": 50000,
+  "expected_platform": "greenhouse"
+}

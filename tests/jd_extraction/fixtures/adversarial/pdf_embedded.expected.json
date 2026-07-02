@@ -1,0 +1,9 @@
+{
+  "must_include": [
+    "PyTorch"
+  ],
+  "must_exclude": [],
+  "min_len": 5,
+  "max_len": 50000,
+  "expected_platform": "generic"
+}
