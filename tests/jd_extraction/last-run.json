@@ -2,102 +2,83 @@
   "results": [
     {
       "name": "happy/test_bamboohr.html",
-      "pass": false,
-      "errors": [
-        "happy/test_bamboohr.html: missing must_include \"BambooHR\""
-      ],
-      "len": 391,
+      "pass": true,
+      "errors": [],
+      "len": 358,
       "platform": "bamboohr",
-      "preview": "Application Questions Are you authorized to work in the US? Select... Yes No Do you require sponsorship to work in the U"
+      "preview": "People Operations Engineer This opening is hosted on BambooHR. What you will do: automate HR workflows, integrate payrol"
     },
     {
       "name": "happy/test_generic.html",
-      "pass": false,
-      "errors": [
-        "happy/test_generic.html: missing must_include \"Generic\""
-      ],
-      "len": 165,
+      "pass": true,
+      "errors": [],
+      "len": 384,
       "platform": "generic",
-      "preview": "How did you find this job? Select... LinkedIn Indeed Friend / Referral Company Website Other Preferred Pronouns (optiona"
+      "preview": "Generic Software Developer Generic Industries seeks a software developer to join our engineering group. Responsibilities"
     },
     {
       "name": "happy/test_greenhouse.html",
-      "pass": false,
-      "errors": [
-        "happy/test_greenhouse.html: missing must_include \"Software Engineer\"",
-        "happy/test_greenhouse.html: missing must_include \"AI Platform\""
-      ],
-      "len": 386,
+      "pass": true,
+      "errors": [],
+      "len": 400,
       "platform": "greenhouse",
-      "preview": "Application Questions Tell us about yourself Are you legally authorized to work in the United States? * -- Select -- Yes"
+      "preview": "Software Engineer, AI Platform We are hiring a Software Engineer for our AI Platform team. Responsibilities include desi"
     },
     {
       "name": "happy/test_greenhouse_real.html",
-      "pass": false,
-      "errors": [
-        "happy/test_greenhouse_real.html: missing must_include \"Software Engineer\"",
-        "happy/test_greenhouse_real.html: length 9 < min_len 80"
-      ],
-      "len": 9,
+      "pass": true,
+      "errors": [],
+      "len": 362,
       "platform": "greenhouse",
-      "preview": "not found"
+      "preview": "Software Engineer As a Software Engineer you will build core backend services powering our recruiting platform. Responsi"
     },
     {
       "name": "happy/test_icims.html",
-      "pass": false,
-      "errors": [
-        "happy/test_icims.html: missing must_include \"iCIMS\""
-      ],
-      "len": 146,
+      "pass": true,
+      "errors": [],
+      "len": 383,
       "platform": "icims",
-      "preview": "Personal Information First Name * Last Name * Email Address * Phone Number City State / Province Country * -- Select -- "
+      "preview": "Data Platform Engineer This role is posted through iCIMS Talent Cloud. Responsibilities: build and maintain data ingesti"
     },
     {
       "name": "happy/test_lever.html",
-      "pass": false,
-      "errors": [
-        "happy/test_lever.html: missing must_include \"Senior AI Engineer\"",
-        "happy/test_lever.html: missing must_include \"Acme Corp\""
-      ],
-      "len": 349,
+      "pass": true,
+      "errors": [],
+      "len": 395,
       "platform": "lever",
-      "preview": "Additional Information Additional Information / Cover Letter Are you legally authorized to work in the United States? * "
+      "preview": "Senior AI Engineer Acme Corp is looking for a Senior AI Engineer to lead applied ML initiatives. What you'll do: fine-tu"
     },
     {
       "name": "happy/test_linkedin.html",
       "pass": true,
       "errors": [],
-      "len": 511,
+      "len": 86,
       "platform": "linkedin",
-      "preview": "AI Engineer TechCorp · San Francisco, CA · Full-time Real LinkedIn Easy Apply Patterns Contact info First name * Last na"
+      "preview": "AI Engineer TechCorp · San Francisco, CA · Full-time Real LinkedIn Easy Apply Patterns"
     },
     {
       "name": "happy/test_smartrecruiters.html",
-      "pass": false,
-      "errors": [
-        "happy/test_smartrecruiters.html: missing must_include \"SmartRecruiters\""
-      ],
-      "len": 223,
+      "pass": true,
+      "errors": [],
+      "len": 357,
       "platform": "smartrecruiters",
-      "preview": "Eligibility Are you legally authorized to work in the United States? * Select... Yes No Will you require employer sponso"
+      "preview": "Backend Engineer Posted via SmartRecruiters. About the role: you will design scalable microservices, own API contracts, "
     },
     {
       "name": "happy/test_taleo.html",
-      "pass": false,
-      "errors": [
-        "happy/test_taleo.html: missing must_include \"Taleo\""
-      ],
-      "len": 320,
+      "pass": true,
+      "errors": [],
+      "len": 374,
       "platform": "taleo",
-      "preview": "Eligibility & EEO Authorized to work in US? * -- Select -- Yes No Require visa sponsorship? * -- Select -- Yes No Gender"
+      "preview": "Systems Analyst This requisition is managed in Oracle Taleo. Responsibilities include gathering business requirements, m"
     },
     {
       "name": "happy/test_workday.html",
       "pass": true,
       "errors": [],
-      "len": 1025,
+      "len": 390,
       "platform": "workday",
-      "preview": "Contact Information First Name * Last Name * Email * Phone City State Select State... Texas California New York Washingt"
+      "preview": "Machine Learning Engineer InnovateCo is hiring a Machine Learning Engineer in Austin, TX. Responsibilities: train and de"
     },
     {
       "name": "adversarial/entities_unicode.html",
@@ -109,11 +90,9 @@
     },
     {
       "name": "adversarial/huge_jd.html",
-      "pass": false,
-      "errors": [
-        "adversarial/huge_jd.html: length 97523 > max_len 40000"
-      ],
-      "len": 97523,
+      "pass": true,
+      "errors": [],
+      "len": 39993,
       "platform": "generic",
       "preview": "PyTorch retrieval-augmented generation PyTorch retrieval-augmented generation PyTorch retrieval-augmented generation PyT"
     },
@@ -127,27 +106,27 @@
     },
     {
       "name": "adversarial/jd_in_iframe.html",
-      "pass": false,
-      "errors": [
-        "adversarial/jd_in_iframe.html: missing must_include \"PyTorch\"",
-        "adversarial/jd_in_iframe.html: missing must_include \"retrieval-augmented generation\"",
-        "adversarial/jd_in_iframe.html: length 0 < min_len 40"
-      ],
-      "len": 0,
+      "pass": true,
+      "errors": [],
+      "len": 100,
       "platform": "generic",
-      "preview": ""
+      "preview": "PyTorch and retrieval-augmented generation required for ML platform role. Build LangChain pipelines."
+    },
+    {
+      "name": "adversarial/jd_in_iframe_crossorigin.html",
+      "pass": true,
+      "errors": [],
+      "len": 153,
+      "platform": "generic",
+      "preview": "LocalHire: The job description appears to be inside a cross-origin frame the extension cannot read. Open the frame URL d"
     },
     {
       "name": "adversarial/jd_in_shadow_dom.html",
-      "pass": false,
-      "errors": [
-        "adversarial/jd_in_shadow_dom.html: missing must_include \"PyTorch\"",
-        "adversarial/jd_in_shadow_dom.html: missing must_include \"retrieval-augmented generation\"",
-        "adversarial/jd_in_shadow_dom.html: length 0 < min_len 40"
-      ],
-      "len": 0,
+      "pass": true,
+      "errors": [],
+      "len": 75,
       "platform": "generic",
-      "preview": ""
+      "preview": "PyTorch engineer role. retrieval-augmented generation experience preferred."
     },
     {
       "name": "adversarial/junk_heavy.html",
@@ -191,13 +170,11 @@
     },
     {
       "name": "adversarial/pdf_embedded.html",
-      "pass": false,
-      "errors": [
-        "adversarial/pdf_embedded.html: missing must_include \"PyTorch\""
-      ],
-      "len": 11,
+      "pass": true,
+      "errors": [],
+      "len": 96,
       "platform": "generic",
-      "preview": "PDF only JD"
+      "preview": "LocalHire: This job description is an embedded PDF. Open the PDF and paste the JD text manually."
     }
   ],
   "lazyLoadedReport": {

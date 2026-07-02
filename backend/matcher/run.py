@@ -92,13 +92,15 @@ def main() -> int:
             profile_id=args.profile_id,
             fitted=fitted,
             match_threshold=cfg.match_threshold,
+            strong_threshold=cfg.strong_threshold,
         )
     else:
-        stored = 0
+        stored = {"stored": 0, "strong": 0, "stretch": 0}
 
     print(
-        f"[store] cleared_threshold={stored} "
-        f"(MATCH_THRESHOLD={cfg.match_threshold})"
+        f"[store] cleared_threshold={stored['stored']} "
+        f"strong={stored['strong']} stretch={stored['stretch']} "
+        f"(MATCH_THRESHOLD={cfg.match_threshold}, STRONG={cfg.strong_threshold})"
     )
     return 0
 

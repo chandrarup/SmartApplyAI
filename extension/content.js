@@ -1029,6 +1029,121 @@ function fillField(platform, field, value) {
 // ─────────────────────────────────────────────
 // CLEAN PAGE TEXT (for JD extraction)
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// JD EXTRACTION HELPERS (H1 hardening)
+// ─────────────────────────────────────────────
+// Max JD length forwarded to the backend/LLM. Overridable via chrome.storage
+// key "jdMaxChars"; loaded async at inject time so extraction stays synchronous.
+let JD_MAX_CHARS = 40000;
+try {
+  if (isExtensionAlive() && chrome.storage && chrome.storage.local && chrome.storage.local.get) {
+    chrome.storage.local.get(["jdMaxChars"], res => {
+      const n = parseInt(res && res.jdMaxChars, 10);
+      if (Number.isFinite(n) && n >= 1000) JD_MAX_CHARS = n;
+    });
+  }
+} catch (e) {}
+
+// Sentinel messages returned when the JD genuinely cannot be extracted.
+// Callers must never cache these or send them to the LLM as a JD.
+const JD_SENTINEL_PREFIX = "LocalHire:";
+const JD_SENTINEL_PDF =
+  "LocalHire: This job description is an embedded PDF. Open the PDF and paste the JD text manually.";
+const JD_SENTINEL_XORIGIN =
+  "LocalHire: The job description appears to be inside a cross-origin frame the extension cannot read. Open the frame URL directly or paste the JD manually.";
+
+// Score a candidate text block by job-signal density, not raw length: a dense
+// 300-char JD must beat a 1,500-char application form or related-jobs sidebar.
+function jobSignalScore(text) {
+  if (!text) return -Infinity;
+  const t = text.toLowerCase();
+  const count = re => (t.match(re) || []).length;
+  const jd = count(/responsibilit|requirement|qualification|what you.ll do|you will|looking for|about the role|about the team|benefits|salary|compensation|equal opportunity|experience with|proficien|degree in|years of experience|preferred|internship|full.time|part.time|remote|hybrid|on.?site/g);
+  const tech = count(/python|pytorch|tensorflow|machine learning|deep learning|llm|nlp|java\b|c\+\+|sql|aws|azure|gcp|kubernetes|docker|api|engineer|developer|scientist|retrieval|generation|langchain|model|pipeline|data/g);
+  const form = count(/first name|last name|email address|phone number|-- select --|select\.\.\.|submit application|upload|resume\/cv|required field|zip code|address line|are you (legally )?authorized|require .*sponsorship|veteran status|disability|pronouns/g);
+  const junk = count(/related jobs|similar jobs|more jobs|jobs you may|cookie|privacy policy|sign in|log in|copyright|all rights reserved|quick links/g);
+  return (jd * 3 + tech - form * 3 - junk * 6) * Math.log2(t.length + 2);
+}
+
+// Recursive composed-tree text collector: follows open shadow roots (nested
+// too), skips chrome/noise tags. cloneNode() drops shadow content, so this
+// must walk the live DOM.
+function deepShadowText(node, depth = 0) {
+  if (!node || depth > 25) return "";
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent || "";
+  const isElement = node.nodeType === Node.ELEMENT_NODE;
+  if (!isElement && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return "";
+  let out = "";
+  if (isElement) {
+    if (/^(SCRIPT|STYLE|NOSCRIPT|SVG|IFRAME|NAV|HEADER|FOOTER|TEMPLATE)$/.test(node.tagName)) return "";
+    if (node.shadowRoot) out += " " + deepShadowText(node.shadowRoot, depth + 1);
+  }
+  for (const child of node.childNodes) out += " " + deepShadowText(child, depth + 1);
+  return out;
+}
+
+function collectShadowCandidates() {
+  const cands = [];
+  try {
+    const all = document.querySelectorAll("*");
+    const limit = Math.min(all.length, 4000); // perf guard on giant pages
+    for (let i = 0; i < limit; i++) {
+      if (!all[i].shadowRoot) continue;
+      const t = deepShadowText(all[i].shadowRoot).replace(/\s+/g, " ").trim();
+      if (t.length >= 40) cands.push(t);
+    }
+  } catch (e) {}
+  return cands;
+}
+
+// Same-origin frames: harvest text as candidates (or fast-return when clearly
+// the whole JD, e.g. iCIMS). Cross-origin frames can't be read from here —
+// count them so the caller can surface that instead of silently returning "".
+function scanFrames() {
+  const out = { fastText: null, candidates: [], crossOrigin: 0 };
+  try {
+    for (const frame of document.querySelectorAll("iframe")) {
+      const httpSrc = /^https?:/i.test(frame.src || "");
+      try {
+        const fdoc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+        if (!fdoc || !fdoc.body) { if (httpSrc) out.crossOrigin++; continue; }
+        const ftext = (fdoc.body.innerText || fdoc.body.textContent || "").replace(/\s+/g, " ").trim();
+        if (ftext.length > 500) { out.fastText = ftext; return out; }
+        if (ftext.length >= 40) out.candidates.push(ftext);
+      } catch (e) { if (httpSrc) out.crossOrigin++; }
+    }
+  } catch (e) {}
+  return out;
+}
+
+function hasPdfEmbed() {
+  try {
+    return !!document.querySelector(
+      'embed[type="application/pdf"], object[type="application/pdf"], embed[src$=".pdf"], object[data$=".pdf"]'
+    );
+  } catch (e) { return false; }
+}
+
+// Cap huge JDs at JD_MAX_CHARS, cutting at a sentence boundary (word boundary
+// if the text has no sentences) and appending a visible truncation marker.
+function capJD(text) {
+  const max = JD_MAX_CHARS;
+  if (!text || text.length <= max) return text;
+  const marker = ` [JD truncated at ${max} chars]`;
+  let cut = text.slice(0, max - marker.length);
+  const sentenceEnd = Math.max(
+    cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "), cut.lastIndexOf("\n")
+  );
+  if (sentenceEnd > cut.length - 2000) {
+    cut = cut.slice(0, sentenceEnd + 1);
+  } else {
+    const sp = cut.lastIndexOf(" ");
+    if (sp > cut.length - 200) cut = cut.slice(0, sp);
+  }
+  try { console.warn(`[LH] JD truncated: ${text.length} → ${cut.length + marker.length} chars`); } catch (e) {}
+  return cut + marker;
+}
+
 function getCleanText() {
   // ── Structured data: JSON-LD job posting (Lever, most modern ATS)
   try {
@@ -1043,7 +1158,7 @@ function getCleanText() {
           if (desc && desc.length > 200) {
             // Strip HTML tags from description
             const clean = desc.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
-            if (clean.length > 200) return clean;
+            if (clean.length > 200) return capJD(clean);
           }
         }
       }
@@ -1058,24 +1173,15 @@ function getCleanText() {
                   || appData?.posting?.descriptionParts?.descriptionBody?.plain
                   || appData?.job?.descriptionPlainText
                   || "";
-      if (jdText && jdText.length > 200) return jdText.replace(/\s+/g, " ").trim();
+      if (jdText && jdText.length > 200) return capJD(jdText.replace(/\s+/g, " ").trim());
     }
   } catch (e) {}
 
-  // iCIMS and some other ATS embed JD in same-origin iframes — try those first
-  try {
-    const frames = document.querySelectorAll('iframe');
-    for (const frame of frames) {
-      try {
-        const fdoc = frame.contentDocument || frame.contentWindow?.document;
-        if (!fdoc) continue;
-        const fbody = fdoc.body;
-        if (!fbody) continue;
-        const ftext = (fbody.innerText || fbody.textContent || "").trim();
-        if (ftext.length > 500) return ftext.replace(/\s+/g, " ").trim();
-      } catch (e) {} // cross-origin iframe — skip
-    }
-  } catch (e) {}
+  // iCIMS and some other ATS embed JD in same-origin iframes — try those first.
+  // Shorter frame texts become scored candidates below; cross-origin frames are
+  // counted so we can tell the user instead of silently returning nothing.
+  const frameScan = scanFrames();
+  if (frameScan.fastText) return capJD(frameScan.fastText);
 
   const clone = document.body.cloneNode(true);
 
@@ -1136,22 +1242,32 @@ function getCleanText() {
     try {
       const el = clone.querySelector(sel);
       const t = elText(el);
-      if (t.length > 200) return t.replace(/\s+/g, " ").trim();
+      if (t.length > 200) return capJD(t.replace(/\s+/g, " ").trim());
     } catch (e) {}
   }
 
-  // Fallback: find the single largest text-rich div that isn't clearly noise
+  // Shadow DOM pass: cloneNode() drops shadow content, so Workday-class pages
+  // rendered in open shadow roots yield 0 chars from the clone — walk them live.
+  const shadowCands = collectShadowCandidates();
+
+  // Fallback: pick the div/section with the best job-signal density — not raw
+  // length — so related-jobs sidebars and application forms lose to the posting.
   const NOISE_PATTERN = /privacy\s*policy|terms\s*and\s*conditions|copyright|all\s*rights\s*reserved|quick\s*links|cookie/i;
-  let best = null, bestLen = 0;
+  let best = null, bestScore = -Infinity;
   clone.querySelectorAll("div, section").forEach(div => {
     const t = elText(div);
-    if (t.length > bestLen && !NOISE_PATTERN.test(t.slice(0, 200))) {
-      bestLen = t.length;
-      best = div;
-    }
+    if (t.length < 20 || NOISE_PATTERN.test(t.slice(0, 200))) return;
+    const score = jobSignalScore(t);
+    if (score > bestScore) { bestScore = score; best = div; }
   });
+  // Shadow-root and small same-origin frame texts compete on the same scoring
+  let bestDetached = null, bestDetachedScore = bestScore;
+  for (const t of shadowCands.concat(frameScan.candidates)) {
+    const score = jobSignalScore(t);
+    if (score > bestDetachedScore) { bestDetachedScore = score; bestDetached = t; }
+  }
 
-  const raw = elText(best || clone);
+  const raw = bestDetached != null ? bestDetached : elText(best || clone);
   // Final strip: remove lines that are footer/legal/minified code
   const JS_PATTERN = /^[{}\[\]\/\*]|function\s*\(|\s*=>\s*{|const |var |let |import |export |require\(/;
   const lines = raw.split("\n").filter(line => {
@@ -1164,10 +1280,15 @@ function getCleanText() {
     if (punctRatio > 0.15 && l.length > 80) return false; // high punctuation density = code
     return true;
   });
-  const result = lines.join("\n").replace(/\s+/g, " ").trim();
+  let result = lines.join("\n").replace(/\s+/g, " ").trim();
   // If result starts with code-like characters, we got the wrong element
-  if (result.length > 0 && /^[{\/\*]/.test(result)) return "";
-  return result;
+  if (result.length > 0 && /^[{\/\*]/.test(result)) result = "";
+  // Graceful surfaces: only when every pass above produced (near-)nothing.
+  if (result.length < 40) {
+    if (hasPdfEmbed()) return JD_SENTINEL_PDF;
+    if (frameScan.crossOrigin > 0) return JD_SENTINEL_XORIGIN;
+  }
+  return capJD(result);
 }
 
 // ─────────────────────────────────────────────
@@ -1248,6 +1369,8 @@ async function fetchWithTimeout(url, options, timeoutMs = 45000) {
  */
 function isJobDescriptionPage() {
   const text = (getCleanText() || "").toLowerCase();
+  // Sentinel messages ("LocalHire: ...") are guidance for the user, not a JD.
+  if (text.startsWith("localhire:")) return false;
   if (text.length < 100) return false;
   const JD_SIGNALS = [
     "responsibilities", "requirements", "qualifications", "what you'll do",
@@ -2532,7 +2655,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       jdText = (jobContext?.jdText || getCleanText());
     }
 
-    if (jdText && jdText.length > 200) {
+    if (jdText && jdText.length > 200 && !jdText.startsWith(JD_SENTINEL_PREFIX)) {
       lhLog("INFO", "autoCacheJD", "Caching JD", { chars: jdText.length, adapter: jobContext?.sourceAdapter || "dom" });
       chrome.runtime.sendMessage({
         action: "cache_page_context", text: jdText, jobContext, platform: detectPlatform()

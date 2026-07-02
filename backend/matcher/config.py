@@ -12,7 +12,9 @@ import yaml
 @dataclass(slots=True)
 class MatcherConfig:
     role_mode: str = "internship"  # internship | fulltime | both
-    match_threshold: int = 85
+    # CLAUDE.md rule 10: 70+ enters the queue; Strong = 85+, Stretch = 70–84
+    match_threshold: int = 70
+    strong_threshold: int = 85
     top_recall: int = 50
     top_fit: int = 30
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -48,6 +50,7 @@ def load_config(config_path: str | Path | None = None) -> MatcherConfig:
     return MatcherConfig(
         role_mode=str(merged.get("role_mode", base.role_mode)).lower(),
         match_threshold=int(merged.get("match_threshold", base.match_threshold)),
+        strong_threshold=int(merged.get("strong_threshold", base.strong_threshold)),
         top_recall=int(merged.get("top_recall", base.top_recall)),
         top_fit=int(merged.get("top_fit", base.top_fit)),
         embedding_model=str(merged.get("embedding_model", base.embedding_model)),
