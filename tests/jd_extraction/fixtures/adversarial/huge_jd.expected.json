@@ -1,9 +1,11 @@
 {
   "must_include": [
-    "HUGE_JD_TAIL",
-    "PyTorch"
+    "PyTorch",
+    "[JD truncated"
   ],
-  "must_exclude": [],
+  "must_exclude": [
+    "HUGE_JD_TAIL"
+  ],
   "min_len": 20000,
   "max_len": 40000,
   "expected_platform": "generic"

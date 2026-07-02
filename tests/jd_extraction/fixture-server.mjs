@@ -42,7 +42,7 @@ function resolveFile(urlPath) {
   return null;
 }
 
-const server = http.createServer((req, res) => {
+function handler(req, res) {
   const file = resolveFile(req.url || "/");
   if (!file || !fs.existsSync(file)) {
     res.writeHead(404);
@@ -51,8 +51,17 @@ const server = http.createServer((req, res) => {
   }
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   fs.createReadStream(file).pipe(res);
-});
+}
 
+// [test-fix] Listen on both loopback addresses: the cross-origin fixture frames
+// http://localhost:8765 from a page on http://127.0.0.1:8765, and localhost may
+// resolve to ::1 — binding only 127.0.0.1 would break that fixture.
+const server = http.createServer(handler);
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`JD fixture server http://127.0.0.1:${PORT}`);
 });
+const server6 = http.createServer(handler);
+server6.on("error", (e) => {
+  console.log(`JD fixture server: no IPv6 loopback (${e.code}) — continuing on IPv4 only`);
+});
+server6.listen(PORT, "::1");

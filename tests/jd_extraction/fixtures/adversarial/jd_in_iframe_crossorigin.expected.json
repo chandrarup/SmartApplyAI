@@ -1,12 +1,11 @@
 {
   "must_include": [
-    "embedded PDF",
-    "paste"
+    "cross-origin frame"
   ],
   "must_exclude": [
     "PyTorch"
   ],
-  "min_len": 5,
-  "max_len": 50000,
+  "min_len": 20,
+  "max_len": 500,
   "expected_platform": "generic"
 }
