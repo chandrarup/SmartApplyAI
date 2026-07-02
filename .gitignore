@@ -37,9 +37,11 @@ backend/profiles/*/resumes/
 # Test screenshots
 backend/screenshots/
 
-# Runtime logs (keep the logs/ dir via .gitkeep, not the .log files)
+# Runtime logs (keep the logs/ dir via .gitkeep, not the log files —
+# including rotated ones like smartapply_YYYY-MM-DD.log.YYYY-MM-DD)
 backend/telemetry.log
-backend/logs/*.log
+backend/logs/*
+!backend/logs/.gitkeep
 
 # Analysis / planning docs (not codebase)
 DEEP_ANALYSIS_AND_REWRITES.md
