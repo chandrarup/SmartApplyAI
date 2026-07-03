@@ -2586,6 +2586,245 @@ function sendProgress(data) {
 }
 
 // ─────────────────────────────────────────────
+// APPROVED-PACKAGE AUTOFILL (tracker ready_to_apply)
+// Fills ONLY from the item's approved answers + its exact versioned resume
+// artifact. Substantive fields with no approved answer PAUSE and ASK — never
+// guessed, never taken from the generic profile. Contact/identity fields may
+// fall back to the profile (same person). Nothing is ever submitted (rule 1).
+// ─────────────────────────────────────────────
+const CONTACT_KEYS = new Set([
+  "first_name", "last_name", "full_name", "email", "phone", "phone_country",
+  "city", "state", "zip", "country", "linkedin", "github", "website", "address_line1",
+]);
+const autoFilledUrls = new Set(); // guard: approved fill runs once per URL
+
+async function resolveReadyApplication(force = false) {
+  // Cache the match per host so every page of a multi-step flow reuses it.
+  const key = "lh_ready_" + location.host;
+  if (!force && isExtensionAlive()) {
+    const cached = await new Promise(r => {
+      try { chrome.storage.session.get([key], v => { void chrome.runtime.lastError; r(v ? v[key] : undefined); }); }
+      catch (e) { r(undefined); }
+    });
+    if (cached !== undefined) return cached; // cached null = "no match here"
+  }
+  let match = null;
+  try {
+    const { apiUrl } = await getSettings();
+    const company = extractCompanyFromPage() || "";
+    const qs = new URLSearchParams({ host: location.host, url: location.href, company });
+    const res = await fetch(`${apiUrl}/tracker/match?${qs.toString()}`);
+    if (res.ok) match = (await res.json()).match || null;
+  } catch (e) { match = null; }
+  try { chrome.storage.session.set({ [key]: match }, () => { void chrome.runtime.lastError; }); } catch (e) {}
+  return match;
+}
+
+function pickAnswer(map, field) {
+  if (!map || typeof map !== "object") return undefined;
+  const label = (field.label || "").trim();
+  const name = field.name || "";
+  if (label && map[label] != null && map[label] !== "") return map[label];
+  if (name && map[name] != null && map[name] !== "") return map[name];
+  const lc = label.toLowerCase();
+  for (const k of Object.keys(map)) {
+    if (k.trim().toLowerCase() === lc && map[k] !== "") return map[k];
+  }
+  const fk = matchFieldKey(label);
+  if (fk) {
+    for (const k of Object.keys(map)) {
+      if (matchFieldKey(k) === fk && map[k] !== "") return map[k];
+    }
+  }
+  return undefined;
+}
+
+function contactValueForKey(key, profile) {
+  const af = (profile && profile.autofill) || {};
+  const ci = (profile && profile.contact_info) || {};
+  const name = ci.name || "";
+  switch (key) {
+    case "first_name":    return af.first_name || (name ? name.split(/\s+/)[0] : "");
+    case "last_name":     return af.last_name || (name ? name.split(/\s+/).slice(-1)[0] : "");
+    case "full_name":     return name;
+    case "email":         return ci.email || "";
+    case "phone":         return ci.phone || "";
+    case "phone_country": return "United States of America (+1)";
+    case "city":          return af.city || "";
+    case "state":         return af.state || "";
+    case "zip":           return af.zip || "";
+    case "country":       return af.country || "United States";
+    case "linkedin":      return ci.linkedin || "";
+    case "github":        return ci.github || "";
+    case "website":       return ci.website || ci.github || "";
+    case "address_line1": return af.address || "";
+    default:              return "";
+  }
+}
+
+function resolveApprovedAnswer(field, ctx) {
+  let v = pickAnswer(ctx.answers, field);
+  if (v != null && v !== "") return { value: v, source: "approved" };
+  v = pickAnswer(ctx.learned, field);
+  if (v != null && v !== "") return { value: v, source: "learned" };
+  const fk = matchFieldKey(field.label);
+  if (fk && CONTACT_KEYS.has(fk)) {
+    const cv = contactValueForKey(fk, ctx.profile);
+    if (cv != null && cv !== "") return { value: cv, source: "profile" };
+  }
+  return { value: null, source: "unanswered" };
+}
+
+async function fillResumeUploadVersioned(variantId) {
+  if (!variantId) return false;
+  const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
+  const resumeInput = inputs.find(i => {
+    const lbl = (getLabelForInput(i, "") || "").toLowerCase() + " " +
+                (i.name || "").toLowerCase() + " " + (i.id || "").toLowerCase();
+    return /resume|cv\b/.test(lbl);
+  }) || inputs[0];
+  if (!resumeInput) return false;
+  try {
+    const { apiUrl } = await getSettings();
+    const r = await fetch(`${apiUrl}/resume/versions/${encodeURIComponent(variantId)}/pdf`);
+    if (!r.ok) return false;
+    const blob = await r.blob();
+    const file = new File([blob], `resume_${variantId}.pdf`, { type: "application/pdf" });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    resumeInput.files = dt.files;
+    resumeInput.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  } catch (e) { return false; }
+}
+
+function pushNeedsCall(field) {
+  panelState.needsCall = panelState.needsCall || [];
+  const label = field.label || field.name || "(unlabeled)";
+  if (isSensitiveField(label)) return; // never ask about SSN/health/etc.
+  if (panelState.needsCall.some(n => n.label === label)) return;
+  panelState.needsCall.push({
+    label, name: field.name || "", type: field.type || "text",
+    options: (field.options || []).slice(0, 20),
+  });
+}
+
+async function runApprovedFill(item) {
+  if (!item) return;
+  if (isCurrentlyFilling) { panelLog("⚠ Fill already in progress"); return; }
+  isCurrentlyFilling = true;
+  try { return await _runApprovedFillInner(item); }
+  finally { isCurrentlyFilling = false; }
+}
+
+async function _runApprovedFillInner(item) {
+  const platform = detectPlatform();
+  const platformName = getPlatformName(platform);
+
+  // Track the active package so pause-and-ask can persist back to it.
+  panelState.approvedItem = {
+    id: item.id, company: item.company || "", role: item.role || "",
+    variantId: item.resume_variant_id || null, answers: { ...(item.answers || {}) },
+  };
+  panelState.needsCall = [];
+  panelState.collapsed = false;
+  panelState.tab = "fill";
+
+  sendProgress({ status: "detecting", message: `Approved fill — ${item.company || ""} (${platformName})` });
+  panelLog(`▶ Filling from approved package for ${item.company || "this company"}`);
+
+  if (platform === "workday") {
+    try { await clickAddButtonsWorkday(); await delay(500); } catch (e) {}
+  }
+
+  const fields = getFormFields(platform);
+  const radioGroups = getRadioGroups(platform);
+  if (fields.length === 0 && Object.keys(radioGroups).length === 0) {
+    sendProgress({ status: "error", message: "No fillable fields on this page." });
+    return;
+  }
+
+  // Answer sources: approved answers → per-host learned → profile (contact only).
+  let learned = {};
+  let profile = null;
+  try {
+    const { apiUrl } = await getSettings();
+    const [lr, pr] = await Promise.all([
+      fetch(`${apiUrl}/autofill/learned?host=${encodeURIComponent(location.host)}`).catch(() => null),
+      fetch(`${apiUrl}/profile`).catch(() => null),
+    ]);
+    if (lr && lr.ok) learned = await lr.json().catch(() => ({}));
+    if (pr && pr.ok) profile = await pr.json().catch(() => null);
+  } catch (e) {}
+  const ctx = { answers: item.answers || {}, learned, profile };
+
+  const counts = { approved: 0, learned: 0, profile: 0, unanswered: 0, skipped: 0 };
+  clearFilledRegistry();
+
+  for (const field of fields) {
+    if (field.type === "file") continue; // resume handled by the versioned artifact upload
+    const { value, source } = resolveApprovedAnswer(field, ctx);
+    if (value != null && value !== "" && value !== "SKIP") {
+      try { field.element.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
+      flashElement(field.element);
+      await delay(90);
+      if (fillField(platform, field, value)) {
+        counts[source] = (counts[source] || 0) + 1;
+        registerFilled(field, value, platform);
+        panelAddFilled(field.label, value, source);
+        sendProgress({ status: "filling", message: `✓ ${field.label} (${source})` });
+        continue;
+      }
+    }
+    if (isSensitiveField(field.label)) { counts.skipped++; continue; }
+    pushNeedsCall(field);
+    counts.unanswered++;
+  }
+
+  for (const [name, grp] of Object.entries(radioGroups)) {
+    const f = { label: grp.label, name, type: "radio", options: (grp.inputs || []).map(r => r.value) };
+    const { value, source } = resolveApprovedAnswer(f, ctx);
+    if (value != null && value !== "" && grp.container && setRadioGroup(grp.container, value)) {
+      counts[source] = (counts[source] || 0) + 1;
+      panelAddFilled(grp.label, value, source);
+    } else if (isSensitiveField(grp.label)) {
+      counts.skipped++;
+    } else {
+      pushNeedsCall(f); counts.unanswered++;
+    }
+  }
+
+  // Attach the EXACT versioned artifact for this package — never /last-resume.
+  const upl = await fillResumeUploadVersioned(item.resume_variant_id);
+  panelLog(upl ? `✓ Attached approved resume artifact (${item.resume_variant_id})`
+              : `⚠ Resume upload field not found or artifact unavailable`);
+
+  savePanelState();
+  renderPanel();
+  const done = counts.approved + counts.learned + counts.profile;
+  sendProgress({
+    status: "done",
+    message: `Approved fill: ${done} filled, ${counts.unanswered} need your call`,
+    filled: done, skipped: counts.unanswered, total: done + counts.unanswered,
+  });
+  panelLog(`Filled ${counts.approved} approved · ${counts.learned} learned · ${counts.profile} contact · ${counts.unanswered} need your call`);
+  if (counts.unanswered > 0) panelLog(`⏸ ${counts.unanswered} field(s) need your call — see "Needs your call" below.`);
+}
+
+// Auto-fill from an approved package on load / each SPA step, once per URL.
+async function maybeApprovedAutoFill() {
+  if (window.top !== window) return;
+  if (isCurrentlyFilling) return;
+  if (autoFilledUrls.has(location.href)) return;
+  const item = await resolveReadyApplication();
+  if (!item) return;
+  if (getFormFields(detectPlatform()).length === 0) return;
+  autoFilledUrls.add(location.href);
+  panelLog(`↻ Approved item matched — auto-filling ${item.company || "this application"}…`);
+  runApprovedFill(item).catch(e => panelLog("Approved auto-fill error: " + e.message));
+}
+
+// ─────────────────────────────────────────────
 // MESSAGE LISTENER
 // ─────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -2607,6 +2846,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const profileOverride = message.approvedData || message.profileOverride || null;
     runAutoFill(llm, profileOverride).catch(err => sendProgress({ status: "error", message: err.message }));
     sendResponse({ started: true });
+    return true;
+  }
+  if (message.action === "start_approved_fill") {
+    resolveReadyApplication(true).then(item => {
+      if (item) { autoFilledUrls.add(location.href); runApprovedFill(item); }
+      else sendProgress({ status: "warning", message: "No ready-to-apply item matches this page." });
+    });
+    sendResponse({ started: true });
+    return true;
+  }
+  if (message.action === "get_ready_match") {
+    resolveReadyApplication(true).then(item => sendResponse({ match: item || null }));
     return true;
   }
   return true;
@@ -2685,6 +2936,8 @@ const PANEL_ID = "localhire-floating-panel";
 let panelEl = null;
 let panelState = {
   collapsed: true, filled: [], log: [], cover: "", qa: [],
+  approvedItem: null,       // active ready_to_apply package driving the fill
+  needsCall: [],            // fields with no approved answer — pause & ask
   // Resume customization state
   resumeStep: 0,            // 0=idle, 1=match, 2=align, 3=use
   resumeAnalysis: null,     // /analyze-deep response
@@ -2714,8 +2967,8 @@ function savePanelState() {
   catch (e) {}
 }
 
-function panelAddFilled(label, value) {
-  panelState.filled.push({ label, value: String(value), ts: Date.now() });
+function panelAddFilled(label, value, source) {
+  panelState.filled.push({ label, value: String(value), source: source || "auto", ts: Date.now() });
   savePanelState();
   renderPanel();
 }
@@ -2785,6 +3038,19 @@ function injectPanelStyles() {
     border: 2px solid #e5e7eb; border-top-color: #F97316; border-radius: 50%;
     animation: lh-spin 0.7s linear infinite; margin-right: 8px; vertical-align: middle; }
   @keyframes lh-spin { to { transform: rotate(360deg); } }
+  #${PANEL_ID} .lh-approved { padding: 8px 10px; margin-bottom: 8px; border-radius: 8px;
+    background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 12px; }
+  #${PANEL_ID} .lh-approved-sub { font-size: 10px; opacity: 0.8; margin-top: 2px;
+    word-break: break-all; }
+  #${PANEL_ID} .lh-needs { margin-top: 10px; padding: 8px; border-radius: 8px;
+    background: #fffbeb; border: 1px solid #fde68a; }
+  #${PANEL_ID} .lh-needs-h { font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 6px; }
+  #${PANEL_ID} .lh-src { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px;
+    vertical-align: middle; }
+  #${PANEL_ID} .lh-src-approved { background: #d1fae5; color: #065f46; }
+  #${PANEL_ID} .lh-src-learned  { background: #dbeafe; color: #1e40af; }
+  #${PANEL_ID} .lh-src-profile  { background: #f3e8ff; color: #6b21a8; }
+  #${PANEL_ID} .lh-src-asked    { background: #fef3c7; color: #92400e; }
   `;
   (document.head || document.documentElement).appendChild(s);
 }
@@ -2833,10 +3099,17 @@ function renderPanel() {
   bindBodyHandlers(tab);
 }
 
+const SOURCE_BADGE = {
+  approved: '<span class="lh-src lh-src-approved">approved</span>',
+  learned:  '<span class="lh-src lh-src-learned">learned</span>',
+  profile:  '<span class="lh-src lh-src-profile">contact</span>',
+  asked:    '<span class="lh-src lh-src-asked">you</span>',
+};
+
 function renderFillTab() {
   const items = panelState.filled.map((f, i) => `
     <div class="lh-fill-item">
-      <div class="lh-fill-label">${escapeHtml(f.label)}</div>
+      <div class="lh-fill-label">${escapeHtml(f.label)} ${SOURCE_BADGE[f.source] || ""}</div>
       <textarea class="lh-fill-input" data-idx="${i}" rows="${f.value.length>60?3:1}">${escapeHtml(f.value)}</textarea>
       <div class="lh-fill-actions">
         <button class="lh-mini upd" data-upd="${i}">Update on page</button>
@@ -2845,7 +3118,37 @@ function renderFillTab() {
     </div>`).join("") || `<div class="lh-status">No fields filled yet. Click "Fill This Form" to start.</div>`;
   const log = panelState.log.slice(-8).map(l => `<div>${escapeHtml(l.msg)}</div>`).join("");
   const tracker = buildCompletionTracker(detectPlatform());
+
+  const ai = panelState.approvedItem;
+  const nc = panelState.needsCall || [];
+  const banner = ai && ai.id ? `
+    <div class="lh-approved">
+      📦 Approved package: <b>${escapeHtml(ai.company || "")}</b>${ai.role ? " — " + escapeHtml(ai.role) : ""}
+      ${ai.variantId ? `<div class="lh-approved-sub">resume: ${escapeHtml(ai.variantId)}</div>` : ""}
+    </div>` : "";
+
+  const by = panelState.filled.reduce((m, f) => { const s = f.source || "auto"; m[s] = (m[s] || 0) + 1; return m; }, {});
+  const summary = panelState.filled.length || nc.length ? `
+    <div class="lh-status">Filled ${panelState.filled.length}
+      · approved ${by.approved || 0} · learned ${by.learned || 0} · contact ${by.profile || 0}
+      ${nc.length ? `· <b style="color:#b45309">${nc.length} need your call</b>` : ""}</div>` : "";
+
+  const needs = nc.length ? `
+    <div class="lh-needs">
+      <div class="lh-needs-h">⏸ Needs your call (${nc.length}) — I'll remember your answer</div>
+      ${nc.map((n, i) => `
+        <div class="lh-fill-item">
+          <div class="lh-fill-label">${escapeHtml(n.label)}</div>
+          ${(n.options && n.options.length)
+            ? `<select class="lh-fill-input" data-need="${i}"><option value="">— pick —</option>${
+                n.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("")}</select>`
+            : `<input class="lh-fill-input" data-need="${i}" placeholder="Type answer — I'll remember it"/>`}
+          <div class="lh-fill-actions"><button class="lh-mini upd" data-savefill="${i}">Save &amp; fill</button></div>
+        </div>`).join("")}
+    </div>` : "";
+
   return `
+    ${banner}
     <div class="lh-row">
       <button class="lh-btn" id="lh-fill">Fill This Form</button>
       <button class="lh-btn lh-sec" id="lh-clear" style="flex:0 0 90px">Clear</button>
@@ -2853,6 +3156,8 @@ function renderFillTab() {
     <button class="lh-btn lh-sec" id="lh-next" style="margin-top:6px">Next Page →</button>
     <button class="lh-btn lh-sec" id="lh-customize" style="margin-top:6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">✨ Customize Resume on Web</button>
     ${tracker}
+    ${summary}
+    ${needs}
     <div>${items}</div>
     ${log ? `<div class="lh-log">${log}</div>` : ""}
   `;
@@ -3151,6 +3456,13 @@ function bindResumeHandlers() {
 function bindBodyHandlers(tab) {
   if (tab === "fill") {
     panelEl.querySelector("#lh-fill").onclick = async () => {
+      const item = await resolveReadyApplication(true);
+      if (item && item.id) {
+        autoFilledUrls.add(location.href);
+        panelLog("Starting approved fill…");
+        runApprovedFill(item).catch(e => panelLog("Error: " + e.message));
+        return;
+      }
       panelLog("Starting autofill...");
       const settings = await getSettings();
       runAutoFill(settings.llm).catch(e => panelLog("Error: " + e.message));
@@ -3305,6 +3617,46 @@ function bindBodyHandlers(tab) {
         panelState.filled.splice(i, 1); savePanelState(); renderPanel();
       };
     });
+    // Pause-and-ask: fill a novel field, then REMEMBER it (approved package + per-host).
+    panelEl.querySelectorAll("[data-savefill]").forEach(b => {
+      b.onclick = async () => {
+        const i = parseInt(b.dataset.savefill);
+        const need = (panelState.needsCall || [])[i];
+        if (!need) return;
+        const inp = panelEl.querySelector(`[data-need="${i}"]`);
+        const val = (inp && inp.value || "").trim();
+        if (!val) { panelLog("⚠ Enter a value first"); return; }
+        const platform = detectPlatform();
+        const target = getFormFields(platform).find(
+          f => (f.label || "") === need.label || (need.name && f.name === need.name));
+        if (target) {
+          if (fillField(platform, target, val)) { flashElement(target.element); registerFilled(target, val, platform); }
+        } else {
+          const grp = Object.values(getRadioGroups(platform)).find(g => g.label === need.label);
+          if (grp && grp.container) setRadioGroup(grp.container, val);
+        }
+        panelAddFilled(need.label, val, "asked");
+        try {
+          const { apiUrl } = await getSettings();
+          const ai = panelState.approvedItem;
+          if (ai && ai.id) {
+            ai.answers = ai.answers || {};
+            ai.answers[need.label] = val;
+            await fetch(`${apiUrl}/applications/${encodeURIComponent(ai.id)}`, {
+              method: "PATCH", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ answers: ai.answers }),
+            });
+          }
+          await fetch(`${apiUrl}/autofill/learn`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ host: location.host, label: need.label, value: val }),
+          });
+          panelLog(`📌 Remembered "${need.label}" — will auto-fill next time`);
+        } catch (e) { panelLog("⚠ Could not persist answer: " + e.message); }
+        panelState.needsCall.splice(i, 1);
+        savePanelState(); renderPanel();
+      };
+    });
   } else if (tab === "cover") {
     panelEl.querySelector("#lh-co-gen").onclick = async () => {
       const company = panelEl.querySelector("#lh-co-company").value;
@@ -3397,6 +3749,13 @@ if (document.readyState === "loading") {
   setTimeout(injectPanel, 800);
 }
 
+// On initial page load, auto-fill from an approved package if one matches (every page).
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => setTimeout(maybeApprovedAutoFill, 1600));
+} else {
+  setTimeout(maybeApprovedAutoFill, 1600);
+}
+
 // ─────────────────────────────────────────────
 // SPA AUTO-RETRIGGER — re-fires autofill on each
 // new step/page in Workday, Greenhouse, LinkedIn, etc.
@@ -3436,10 +3795,23 @@ if (document.readyState === "loading") {
   window.addEventListener("lh-urlchange", async () => {
     try {
       if (isCurrentlyFilling) return; // BUG 8: don't retrigger mid-fill
-      const settings = await getSettings();
-      if (!settings.autoRetrigger) return;
       await delay(1500);
       if (isCurrentlyFilling) return; // re-check after delay
+
+      // Approved-package fill takes priority on every step (user wants it on every page).
+      const item = await resolveReadyApplication();
+      if (item) {
+        if (getFormFields(detectPlatform()).length && !autoFilledUrls.has(location.href)) {
+          autoFilledUrls.add(location.href);
+          panelLog("↻ New step — filling from approved package…");
+          runApprovedFill(item).catch(e => panelLog("Approved fill error: " + e.message));
+        }
+        return;
+      }
+
+      // Otherwise fall back to the generic retrigger (only when enabled).
+      const settings = await getSettings();
+      if (!settings.autoRetrigger) return;
       const fields = getFormFields(detectPlatform());
       if (fields.length === 0) return;
       panelLog("↻ New step detected — auto-filling...");

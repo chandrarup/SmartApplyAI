@@ -300,7 +300,7 @@ def test_matcher_threshold_boundary_85_included_84_excluded(tmp_path):
         },
     ]
     stored = matcher_store.gate_and_store(matches_db, "default", fitted, match_threshold=85)
-    assert stored == 1
+    assert stored["stored"] == 1  # gate_and_store returns {stored, strong, stretch} counts
     with sqlite3.connect(matches_db) as conn:
         rows = conn.execute("SELECT external_id, match_pct FROM matches").fetchall()
     assert len(rows) == 1
@@ -309,14 +309,15 @@ def test_matcher_threshold_boundary_85_included_84_excluded(tmp_path):
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
-def test_scheduler_no_catch_up_on_missed_nightly_run():
-    """schedule.py uses plain cron with no misfire_grace / catch-up job."""
+def test_scheduler_hardened_against_missed_and_overlapping_runs():
+    """schedule.py now coalesces a missed nightly run and forbids overlap (FINDINGS_pipeline)."""
     import inspect
 
     src = inspect.getsource(scraper_schedule.start_scheduler)
-    assert "misfire" not in src
-    assert "catch" not in src.lower()
-    assert "interval" not in src  # no periodic wake-up besides nightly cron
+    assert "misfire_grace_time" in src   # late wake still fires the missed run
+    assert "coalesce=True" in src        # collapse catch-ups into a single run
+    assert "max_instances=1" in src      # no overlapping concurrent runs
+    assert "interval" not in src         # still no periodic wake-up besides nightly cron
 
 
 def test_scheduler_no_overlap_guard_on_execute_run():

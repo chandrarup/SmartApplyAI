@@ -241,6 +241,26 @@ def preflight_tailored_resume(
     return {"ok": ok, "issues": issues}
 
 
+# Preflight issue kinds that specifically threaten the one-page budget.
+PAGE_FIT_KINDS = {"page_overflow", "bullet_growth", "skills_overflow", "summary_length"}
+
+
+def page_fit_summary(preflight: dict | None) -> dict:
+    """Collapse a preflight result into a single one-page-fit verdict for the queue UI.
+
+    FINDINGS_tailoring §5: page overflow used to surface only as a silent PDF-compile
+    warning. This lifts it to a hard, visible flag on the queue item so the reviewer
+    sees "won't fit one page" before approving, not after the PDF is built.
+    """
+    issues = (preflight or {}).get("issues") or []
+    reasons = [
+        i.get("message", "")
+        for i in issues
+        if i.get("kind") in PAGE_FIT_KINDS
+    ]
+    return {"wont_fit_one_page": bool(reasons), "reasons": reasons}
+
+
 def detect_authenticity_issues(text: str) -> list[Violation]:
     """Flag AI-prose tells: corporate buzzwords, padded language."""
     violations = []

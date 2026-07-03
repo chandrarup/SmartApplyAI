@@ -6,6 +6,21 @@ grounded resume tailoring → human review queue → assisted application fillin
 learning memory + teaching loop. Full architecture: docs/SmartApplyAI_MASTER_DESIGN.md.
 Current-code map of the profile system: docs/KNOWLEDGE_SERVICE_MAP.md.
 
+## Architecture (modules & their stores)
+Nightly flow: **scraper → matcher → tailoring → review queue → tracker**, with the
+knowledge service and teach loop feeding sideways. Each module owns its SQLite store
+(rule 8); `backend/run_nightly.py` chains matching → tailoring → pacing.
+
+| Module | Code | Store | Role |
+|--------|------|-------|------|
+| Scraper | `backend/scraper/` | `jobs.db` | Public ATS JSON feeds (Greenhouse/Lever/Ashby). No login-walled scraping. |
+| Knowledge service | `backend/knowledge/` | `knowledge.db` | Profile + memory behind the `load_pdata`/`save_pdata` seam (SQLite, not JSON). |
+| Matcher | `backend/matcher/` | `matches.db` | Recall → rerank → fit; gates 70+ into the banded queue (Strong 85+, Stretch 70–84). |
+| Tailoring | `backend/main.py` (`run_tailoring`), `backend/constraints.py` | — | Evidence-grounded edits + preflight; untrusted-JD handling; humanize/validate. |
+| Review queue | `backend/matcher/store.py`, `backend/dashboard.html` | `matches.db` | Human review UI; Strong-first; accept/reject edits, page-fit flag. |
+| Tracker | `backend/tracker/` | tracker store | Dedupe + pacing caps; approved ≠ submitted (human gate). |
+| Teach loop | `backend/teach/` | `reviews.db` | Gap skills (manual `gaps.yaml` + matcher missing_skills) → FSRS lessons. |
+
 ## Non-negotiable rules
 1. HUMAN GATE: nothing is ever auto-submitted. The pipeline prepares; the human approves
    and clicks submit. Never build unattended submission.
