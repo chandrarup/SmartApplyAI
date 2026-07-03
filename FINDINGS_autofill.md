@@ -2,7 +2,7 @@
 
 **TEST ONLY** — `extension/content.js` was not modified.
 
-Generated: 2026-06-30T04:27:02.305Z
+Generated: 2026-07-02T23:22:12.877Z
 Harness: `tests/autofill/harness.spec.mjs` (Playwright + Chromium)
 
 **Summary:** 13 passed, 0 failed (13 total; smartrecruiters/taleo/workday skipped — no expected.json)

@@ -15,6 +15,7 @@ if BACKEND_DIR not in sys.path:
 
 from knowledge import rating  # noqa: E402
 import teach.fsrs as fsrs  # noqa: E402
+import teach.gaps as teach_gaps  # noqa: E402
 import teach.lesson as teach_lesson  # noqa: E402
 import teach.store as store  # noqa: E402
 import main as backend_main  # noqa: E402
@@ -35,12 +36,17 @@ def main() -> int:
     args = parser.parse_args()
 
     pid = args.pid
-    skills = teach_lesson.load_gap_skills()
+    # Manual gaps.yaml seeds + matcher-derived missing_skills (frequency-weighted).
+    matcher_ranked = teach_gaps.matcher_gap_skills(profile_id=pid)
+    skills = teach_gaps.load_gap_skills_merged(profile_id=pid)
     if not skills:
-        print("No skills found in gaps.yaml")
+        print("No skills found in gaps.yaml or matcher missing_skills")
         return 1
 
-    print("1) Seeding gap skills from gaps.yaml")
+    print("1) Seeding gap skills (gaps.yaml + matcher missing_skills)")
+    if matcher_ranked:
+        top = ", ".join(f"{name}×{freq}" for name, freq in matcher_ranked[:5])
+        print(f"   matcher gaps (most common): {top}")
     for s in skills:
         rating.ensure_skill(pid, s, category="domains")
         print(f" - seeded: {s}")

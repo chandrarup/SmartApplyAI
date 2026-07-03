@@ -2,6 +2,7 @@ role_mode: internship
 # CLAUDE.md rule 10: 70+ enters the queue; Strong = 85+, Stretch = 70-84
 match_threshold: 70
 strong_threshold: 85
+stretch_threshold: 70
 top_recall: 50
 top_fit: 30
 embedding_model: sentence-transformers/all-MiniLM-L6-v2

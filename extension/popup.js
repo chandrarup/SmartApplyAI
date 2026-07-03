@@ -672,18 +672,22 @@ document.getElementById("autofillBtn").addEventListener("click", () => {
 });
 
 document.getElementById("fillApprovedBtn").addEventListener("click", () => {
-  const sel = document.getElementById("approvedMatchSelect");
-  const selectedId = sel?.value || "";
-  const selected = approvedMatches.find(item => String(item.id) === String(selectedId));
-  if (!selected) {
-    showStatus("autofillStatus", "warning", "Pick an approved queue item first.");
-    return;
-  }
-  const company = selected.company || selected.company_name || "Selected Company";
-  showStatus("autofillStatus", "info", `Using approved data for ${company}.`);
-  startAutofillRun({
-    approvedItemId: selected.id,
-    approvedData: selected.tailored_data || selected.profile_override || selected,
+  // Fill from the tracker's ready-to-apply package for THIS page: the exact versioned
+  // resume artifact + approved answers. Never the generic profile, never /last-resume.
+  const btn = document.getElementById("autofillBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Filling..."; }
+  fillLogEntries = [];
+  hideEl("fillLog"); hideEl("autofillStatus"); showEl("progressWrap");
+  document.getElementById("progressBar").style.width = "0%";
+  document.getElementById("progressLabel").textContent = "Matching approved item…";
+  chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+    chrome.tabs.sendMessage(tabs[0].id, { action: "start_approved_fill" }, () => {
+      if (chrome.runtime.lastError) {
+        showStatus("autofillStatus", "error", "Could not connect to page. Try reloading the tab.");
+        if (btn) { btn.disabled = false; btn.textContent = "Auto-Fill This Application"; }
+        hideEl("progressWrap");
+      }
+    });
   });
 });
 

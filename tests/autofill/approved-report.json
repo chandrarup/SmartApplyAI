@@ -1,0 +1,42 @@
+{
+  "company": "Acme",
+  "role": "Machine Learning Engineer",
+  "resume_artifact": "acme_abc12345_1700000000",
+  "filled": [
+    {
+      "label": "First Name",
+      "value": "Jane",
+      "source": "profile"
+    },
+    {
+      "label": "Last Name",
+      "value": "Doe",
+      "source": "profile"
+    },
+    {
+      "label": "Email",
+      "value": "jane@example.com",
+      "source": "profile"
+    },
+    {
+      "label": "Phone",
+      "value": "512-555-0100",
+      "source": "profile"
+    },
+    {
+      "label": "Why do you want to work at Acme?",
+      "value": "Acme's ML platform is exactly where I want to build.",
+      "source": "approved"
+    },
+    {
+      "label": "Are you authorized to work in the US?",
+      "value": "Yes",
+      "source": "approved"
+    }
+  ],
+  "needs_your_call": [
+    "What is your favorite programming paradigm?"
+  ],
+  "resume_attached_from": "http://127.0.0.1:5001/resume/versions/acme_abc12345_1700000000/pdf",
+  "submitted": false
+}

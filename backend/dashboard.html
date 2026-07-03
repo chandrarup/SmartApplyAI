@@ -252,6 +252,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   <div class="ns">Resume Tailoring</div>
   <div class="ni" data-pg="pg-analyze"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>Analyze JD</div>
   <div class="ni" data-pg="pg-tailor"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>Tailor Resume</div>
+  <div class="ni" data-pg="pg-review"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review Queue<span class="nbadge" id="queuebadge">0</span></div>
   <div class="ni" data-pg="pg-apps"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>Applications<span class="nbadge" id="navbadge">0</span></div>
 
   <div class="ns">System</div>
@@ -769,26 +770,47 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 </div>
 
 <!-- APPLICATIONS -->
+<!-- REVIEW QUEUE (M6) -->
+<div id="pg-review" class="pg">
+  <div class="ph"><h2>Review Queue</h2><p>Matched &amp; tailored overnight — review edits, then approve. Strong matches first. Nothing is submitted until you say so.</p></div>
+  <div class="tb">
+    <div style="font-size:12.5px;color:var(--g500)" id="queueSummary">Loading…</div>
+    <div class="mla" style="display:flex;gap:8px">
+      <button class="btn bo" id="tailorQueueBtn" title="Tailor any items still pending">↻ Tailor pending</button>
+      <button class="btn bo" id="refreshQueueBtn">Refresh</button>
+    </div>
+  </div>
+  <div id="queueList"><p style="color:var(--g400);font-size:13px;padding:20px">Loading queue…</p></div>
+</div>
+
 <div id="pg-apps" class="pg">
-  <div class="ph"><h2>Application Tracker</h2><p>Every job you've applied to, with status and notes</p></div>
+  <div class="ph"><h2>Application Tracker</h2><p>Every application, its exact resume version, and where it stands</p></div>
   <div class="pipe">
+    <div class="pcol cw"><div class="pl">Approved / Ready</div><div class="pn" id="pc-ready">0</div></div>
     <div class="pcol ca"><div class="pl">Applied</div><div class="pn" id="pc-a">0</div></div>
-    <div class="pcol cs"><div class="pl">Phone Screen</div><div class="pn" id="pc-s">0</div></div>
+    <div class="pcol cs"><div class="pl">Screen</div><div class="pn" id="pc-s">0</div></div>
     <div class="pcol ci"><div class="pl">Interview</div><div class="pn" id="pc-i">0</div></div>
     <div class="pcol co"><div class="pl">Offer</div><div class="pn" id="pc-o">0</div></div>
-    <div class="pcol cx"><div class="pl">Rejected</div><div class="pn" id="pc-r">0</div></div>
-    <div class="pcol cw"><div class="pl">Other</div><div class="pn" id="pc-w">0</div></div>
+    <div class="pcol cx"><div class="pl">Rejected / Ghosted</div><div class="pn" id="pc-r">0</div></div>
   </div>
   <div class="tb">
     <input type="text" id="appSearch" placeholder="🔍  Search company, role…">
-    <select id="appFiltSt"><option value="">All Statuses</option><option>Applied</option><option>Phone Screen</option><option>Interview</option><option>Offer</option><option>Rejected</option><option>Withdrawn</option></select>
-    <select id="appFiltPl"><option value="">All Platforms</option><option>Greenhouse</option><option>Workday</option><option>Lever</option><option>BambooHR</option><option>iCIMS</option><option>SmartRecruiters</option><option>LinkedIn Easy Apply</option><option>Taleo</option><option>Other</option></select>
-    <div class="mla"><button class="btn bp" id="addAppBtn">＋ Log Application</button></div>
+    <select id="appFiltSt"><option value="">All Statuses</option></select>
+    <select id="appFiltPl"><option value="">All Platforms</option><option>greenhouse</option><option>lever</option><option>ashby</option><option>Workday</option><option>Other</option></select>
+    <div class="mla" style="display:flex;gap:8px">
+      <button class="btn bo" id="releaseBtn" title="Release approved items to 'ready to apply' within pacing caps">⏱ Release ready (pacing)</button>
+      <button class="btn bp" id="addAppBtn">＋ Log Application</button>
+    </div>
   </div>
   <div class="card"><table class="at">
-    <thead><tr><th>Company</th><th>Role</th><th>Platform</th><th>Status</th><th>Applied</th><th>Salary</th><th>Actions</th></tr></thead>
-    <tbody id="appTbody"><tr><td colspan="7" style="text-align:center;color:var(--g400);padding:32px">No applications yet. Click "Log Application" to add one.</td></tr></tbody>
+    <thead><tr><th>Company</th><th>Role</th><th>Band</th><th>Resume</th><th>Status</th><th>Applied</th><th>Actions</th></tr></thead>
+    <tbody id="appTbody"><tr><td colspan="7" style="text-align:center;color:var(--g400);padding:32px">No applications yet.</td></tr></tbody>
   </table></div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="ch"><h3>Callback analytics</h3><span style="font-size:11.5px;color:var(--g500)">callback = reached screen or beyond</span></div>
+    <div class="cb" id="analyticsBox"><p style="color:var(--g400);font-size:13px">No applied data yet.</p></div>
+  </div>
 </div>
 
 <!-- SETTINGS -->
@@ -817,7 +839,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
           <select id="m-pl"><option value="Other">Other</option><option>Greenhouse</option><option>Workday</option><option>Lever</option><option>BambooHR</option><option>iCIMS</option><option>SmartRecruiters</option><option>LinkedIn Easy Apply</option><option>Taleo</option></select>
         </div>
         <div class="fld"><label>Status</label>
-          <select id="m-st"><option value="Applied">Applied</option><option value="Phone Screen">Phone Screen</option><option value="Interview">Interview</option><option value="Offer">Offer</option><option value="Rejected">Rejected</option><option value="Withdrawn">Withdrawn</option></select>
+          <select id="m-st"><option value="applied">Applied</option><option value="approved">Approved</option><option value="ready_to_apply">Ready to Apply</option><option value="confirmed">Confirmed</option><option value="screen">Screen</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="ghosted">Ghosted</option></select>
         </div>
         <div class="fld"><label>Date Applied</label><input id="m-dt" type="date"></div>
         <div class="fld"><label>Salary / Range</label><input id="m-sal" type="text" placeholder="$120k–$150k"></div>
@@ -866,6 +888,8 @@ document.querySelectorAll('.ni').forEach(n=>{
     n.classList.add('active');
     const pg=document.getElementById(n.dataset.pg);
     if(pg) pg.classList.add('active');
+    if(n.dataset.pg==='pg-review') loadQueue();
+    if(n.dataset.pg==='pg-apps'){ loadApps(); loadAnalytics(); }
   });
 });
 
@@ -1214,42 +1238,56 @@ async function loadApps(){
   document.getElementById('navbadge').textContent=apps.length;
 }
 
-const SCL={'Applied':'sa','Phone Screen':'ss2','Interview':'si','Offer':'so','Rejected':'sr','Withdrawn':'sw'};
+// M6 pipeline vocabulary (matches backend tracker.config)
+const STATUS_ORDER=['approved','ready_to_apply','applied','confirmed','screen','interview','offer','rejected','ghosted'];
+const STATUS_LABEL={approved:'Approved',ready_to_apply:'Ready to Apply',applied:'Applied',confirmed:'Confirmed',screen:'Screen',interview:'Interview',offer:'Offer',rejected:'Rejected',ghosted:'Ghosted'};
+const SCL={approved:'sw',ready_to_apply:'sa',applied:'sa',confirmed:'ss2',screen:'ss2',interview:'si',offer:'so',rejected:'sr',ghosted:'sw'};
+function stLabel(s){ return STATUS_LABEL[s]||s||'—'; }
 
 function renderApps(){
+  // Populate the status filter once from the vocabulary.
+  const fsel=document.getElementById('appFiltSt');
+  if(fsel && fsel.options.length<=1){
+    fsel.innerHTML='<option value="">All Statuses</option>'+STATUS_ORDER.map(s=>`<option value="${s}">${stLabel(s)}</option>`).join('');
+  }
   const srch=(document.getElementById('appSearch')?.value||'').toLowerCase();
   const fst=document.getElementById('appFiltSt')?.value||'';
   const fpl=document.getElementById('appFiltPl')?.value||'';
   let rows=[...apps].filter(a=>{
     const t=`${a.company} ${a.role} ${a.platform}`.toLowerCase();
     return(!srch||t.includes(srch))&&(!fst||a.status===fst)&&(!fpl||a.platform===fpl);
-  }).sort((a,b)=>new Date(b.date_applied||0)-new Date(a.date_applied||0));
+  }).sort((a,b)=>new Date(b.date_applied||b.date_approved||0)-new Date(a.date_applied||a.date_approved||0));
 
   const tb=document.getElementById('appTbody');
   if(!rows.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--g400);padding:32px">No applications match your filter.</td></tr>`;updatePipe();return;}
 
-  tb.innerHTML=rows.map(a=>`<tr data-id="${a.id}">
+  tb.innerHTML=rows.map(a=>{
+    const variant=a.resume_variant_id?`<a href="${apiBase()}/resume/versions/${a.resume_variant_id}/pdf" target="_blank" style="color:var(--brand);font-size:11.5px" title="Exact resume sent">PDF ↗</a>`:'<span style="color:var(--g400);font-size:11.5px">—</span>';
+    const bandChip=a.band?`<span class="pc" title="${a.match_pct?('match '+a.match_pct+'%'):''}">${a.band}</span>`:'—';
+    return `<tr data-id="${a.id}">
     <td><strong>${a.company}</strong>${a.url?` <a href="${a.url}" target="_blank" style="color:var(--brand);font-size:11px;margin-left:4px" title="Open job posting">↗</a>`:''}
       ${a.notes?`<div style="font-size:11px;color:var(--g400);margin-top:2px">${a.notes.slice(0,60)}${a.notes.length>60?'…':''}</div>`:''}
     </td>
     <td>${a.role}</td>
-    <td><span class="pc">${a.platform||'—'}</span></td>
+    <td>${bandChip}</td>
+    <td>${variant}</td>
     <td><select class="sst" data-id="${a.id}" style="border:1px solid var(--g200);border-radius:6px;padding:3px 7px;font-size:12px;cursor:pointer;background:#fff">
-      ${['Applied','Phone Screen','Interview','Offer','Rejected','Withdrawn'].map(s=>`<option value="${s}"${s===a.status?' selected':''}>${s}</option>`).join('')}
+      ${STATUS_ORDER.map(s=>`<option value="${s}"${s===a.status?' selected':''}>${stLabel(s)}</option>`).join('')}
     </select></td>
     <td style="color:var(--g500);font-size:12.5px;white-space:nowrap">${fmtDate(a.date_applied)}</td>
-    <td style="font-size:12.5px">${a.salary||'—'}</td>
     <td><div style="display:flex;gap:5px">
       <button class="btn bo bsm ea" data-id="${a.id}">Edit</button>
       <button class="btn bd bsm da" data-id="${a.id}">✕</button>
     </div></td>
-  </tr>`).join('');
+  </tr>`;}).join('');
 
   tb.querySelectorAll('.sst').forEach(sel=>sel.addEventListener('change',async e=>{
     const id=e.target.dataset.id;
-    await api('/applications/'+id,{method:'PATCH',body:JSON.stringify({status:e.target.value})});
-    apps.find(a=>a.id===id).status=e.target.value;
-    updatePipe(); updateOverview(); toast('Status updated');
+    try{
+      const updated=await api('/applications/'+id,{method:'PATCH',body:JSON.stringify({status:e.target.value})});
+      Object.assign(apps.find(a=>a.id===id),updated);
+      updatePipe(); updateOverview(); loadAnalytics(); toast('Status updated');
+    }catch(err){ toast('Update failed: '+err.message,'err'); }
   }));
   tb.querySelectorAll('.ea').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.id)));
   tb.querySelectorAll('.da').forEach(b=>b.addEventListener('click',()=>delApp(b.dataset.id)));
@@ -1257,44 +1295,211 @@ function renderApps(){
 }
 
 function updatePipe(){
-  const c={'Applied':0,'Phone Screen':0,'Interview':0,'Offer':0,'Rejected':0,other:0};
-  apps.forEach(a=>{if(c[a.status]!==undefined)c[a.status]++;else c.other++;});
-  document.getElementById('pc-a').textContent=c['Applied'];
-  document.getElementById('pc-s').textContent=c['Phone Screen'];
-  document.getElementById('pc-i').textContent=c['Interview'];
-  document.getElementById('pc-o').textContent=c['Offer'];
-  document.getElementById('pc-r').textContent=c['Rejected'];
-  document.getElementById('pc-w').textContent=c.other;
+  const c={ready:0,applied:0,screen:0,interview:0,offer:0,closed:0};
+  apps.forEach(a=>{
+    if(a.status==='approved'||a.status==='ready_to_apply'||a.status==='confirmed')c.ready++;
+    else if(a.status==='applied')c.applied++;
+    else if(a.status==='screen')c.screen++;
+    else if(a.status==='interview')c.interview++;
+    else if(a.status==='offer')c.offer++;
+    else if(a.status==='rejected'||a.status==='ghosted')c.closed++;
+  });
+  document.getElementById('pc-ready').textContent=c.ready;
+  document.getElementById('pc-a').textContent=c.applied;
+  document.getElementById('pc-s').textContent=c.screen;
+  document.getElementById('pc-i').textContent=c.interview;
+  document.getElementById('pc-o').textContent=c.offer;
+  document.getElementById('pc-r').textContent=c.closed;
 }
 
 function updateOverview(){
   const total=apps.length;
-  const active=apps.filter(a=>['Applied','Phone Screen','Interview'].includes(a.status)).length;
-  const offers=apps.filter(a=>a.status==='Offer').length;
-  const responded=apps.filter(a=>['Phone Screen','Interview','Offer'].includes(a.status)).length;
+  const active=apps.filter(a=>['applied','confirmed','screen','interview'].includes(a.status)).length;
+  const offers=apps.filter(a=>a.status==='offer').length;
+  const responded=apps.filter(a=>['screen','interview','offer'].includes(a.status)).length;
   document.getElementById('st-total').textContent=total;
   document.getElementById('st-active').textContent=active;
   document.getElementById('st-offers').textContent=offers;
   document.getElementById('st-rate').textContent=total>0?Math.round(responded/total*100)+'%':'—';
 
-  const last5=[...apps].sort((a,b)=>new Date(b.date_applied||0)-new Date(a.date_applied||0)).slice(0,5);
+  const last5=[...apps].sort((a,b)=>new Date(b.date_applied||b.date_approved||0)-new Date(a.date_applied||a.date_approved||0)).slice(0,5);
   const rec=document.getElementById('ovRecent');
   rec.innerHTML=last5.length?last5.map(a=>`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--g100)">
       <div><div style="font-size:13px;font-weight:600">${a.company}</div><div style="font-size:11.5px;color:var(--g500)">${a.role}</div></div>
-      <span class="sb ${SCL[a.status]||'sa'}">${a.status}</span>
+      <span class="sb ${SCL[a.status]||'sa'}">${stLabel(a.status)}</span>
     </div>`).join(''):
     '<p style="color:var(--g400);font-size:13px">No applications yet.</p>';
 
   const pipe=document.getElementById('ovPipe');
   const sc={};apps.forEach(a=>{sc[a.status]=(sc[a.status]||0)+1;});
-  const stgs=[{l:'Applied',c:'sa'},{l:'Phone Screen',c:'ss2'},{l:'Interview',c:'si'},{l:'Offer',c:'so'},{l:'Rejected',c:'sr'}];
+  const stgs=[{k:'applied',c:'sa'},{k:'screen',c:'ss2'},{k:'interview',c:'si'},{k:'offer',c:'so'},{k:'rejected',c:'sr'}];
   pipe.innerHTML=Object.keys(sc).length?stgs.map(s=>`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0">
-      <span class="sb ${s.c}">${s.l}</span><strong style="font-size:14px">${sc[s.l]||0}</strong>
+      <span class="sb ${s.c}">${stLabel(s.k)}</span><strong style="font-size:14px">${sc[s.k]||0}</strong>
     </div>`).join(''):
     '<p style="color:var(--g400);font-size:13px">No applications yet.</p>';
 }
+
+// ── REVIEW QUEUE (M6) ─────────────────────────────
+let queueItems=[];               // full queue rows from GET /queue
+const queueEdits={};             // match_id -> edited _edits array (accept/reject state)
+
+async function loadQueue(){
+  const list=document.getElementById('queueList');
+  try{ const r=await api('/queue'); queueItems=r.items||[]; }
+  catch(e){ list.innerHTML=`<p style="color:var(--red);font-size:13px;padding:20px">Failed to load queue: ${tlrEsc(e.message)}</p>`; return; }
+  const badge=document.getElementById('queuebadge');
+  const openCount=queueItems.filter(i=>i.review_status==='new').length;
+  if(badge) badge.textContent=openCount;
+  renderQueue();
+}
+
+function chip(txt,kind){
+  const col=kind==='ok'?'#166534':'#b45309', bg=kind==='ok'?'#dcfce7':'#fef3c7';
+  return `<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:${bg};color:${col};margin:2px 3px 0 0">${tlrEsc(txt)}</span>`;
+}
+
+function renderQueue(){
+  const list=document.getElementById('queueList');
+  const summary=document.getElementById('queueSummary');
+  const open=queueItems.filter(i=>i.review_status==='new');
+  const strong=open.filter(i=>i.band==='strong').length;
+  summary.textContent=`${open.length} to review · ${strong} strong · ${open.length-strong} stretch`;
+  if(!open.length){ list.innerHTML='<p style="color:var(--g400);font-size:13px;padding:20px">Nothing to review. Run matching + tailoring, or check back after tonight\'s run.</p>'; return; }
+
+  const bands=[['strong','Strong matches (85+)'],['stretch','Stretch matches (70–84)']];
+  list.innerHTML=bands.map(([b,title])=>{
+    const items=open.filter(i=>i.band===b);
+    if(!items.length) return '';
+    return `<h3 style="margin:14px 0 8px;font-size:13px;color:var(--t2)">${title} · ${items.length}</h3>`+
+      items.map(it=>renderQueueCard(it)).join('');
+  }).join('');
+
+  list.querySelectorAll('[data-qexpand]').forEach(h=>h.addEventListener('click',()=>{
+    const body=document.getElementById('qbody-'+h.dataset.qexpand);
+    if(body) body.style.display=body.style.display==='none'?'block':'none';
+  }));
+  list.querySelectorAll('[data-edit-after]').forEach(el=>el.addEventListener('input',()=>{
+    const {mid,idx}=el.dataset; const arr=queueEdits[mid]; if(arr&&arr[idx]) arr[idx].after=(el.innerText||'').trim();
+  }));
+  list.querySelectorAll('[data-editbtn]').forEach(btn=>btn.addEventListener('click',()=>{
+    const {mid,idx,status}=btn.dataset; const arr=queueEdits[mid]; if(!arr||!arr[idx])return;
+    arr[idx].status=status; renderQueue();
+  }));
+  list.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>approveQueueItem(b.dataset.approve)));
+  list.querySelectorAll('[data-skip]').forEach(b=>b.addEventListener('click',()=>skipQueueItem(b.dataset.skip)));
+}
+
+function renderQueueCard(it){
+  const mid=it.id;
+  if(!queueEdits[mid]) queueEdits[mid]=JSON.parse(JSON.stringify(it.edits||[])).map(e=>({...e,status:e.status||(e.evidence_ref?'accepted':'needs_your_call')}));
+  const edits=queueEdits[mid];
+  const matched=(it.matched_skills||[]).map(s=>chip(s.skill||s,'ok')).join('');
+  const missing=(it.missing_skills||[]).map(s=>chip(s.skill||s,'warn')).join('');
+  const tailorWarn=it.tailor_status!=='tailored'?`<div style="font-size:11.5px;color:#b45309;margin-top:4px">Tailoring ${tlrEsc(it.tailor_status||'pending')}${it.tailor_error?': '+tlrEsc(it.tailor_error):''} — run "Tailor pending".</div>`:'';
+  const pf=it.page_fit||{};
+  const overflowBadge=pf.wont_fit_one_page?`<span class="pc" style="margin-left:6px;background:#fee2e2;color:#b91c1c;border-color:#fca5a5" title="${tlrEsc((pf.reasons||[]).join(' · '))}">⚠ won't fit one page</span>`:'';
+  const overflowDetail=pf.wont_fit_one_page?`<div style="font-size:11.5px;color:#b91c1c;margin-top:4px"><strong>Won't fit one page:</strong> ${tlrEsc((pf.reasons||[]).join(' · '))} — shorten before approving.</div>`:'';
+  const editsHtml=edits.length?edits.map((e,idx)=>{
+    const st=e.status||'proposed', before=tlrEsc(e.before||''), after=tlrEsc(e.after||'');
+    const ev=e.evidence_ref?`<div class="tlr-edit-meta">Evidence: <code>${tlrEsc(e.evidence_ref)}</code></div>`:'<div class="tlr-edit-meta" style="color:#b45309">No evidence found — needs your call</div>';
+    return `<div class="tlr-edit-row" style="margin-top:6px">
+      <div style="font-size:12px;font-weight:700;color:var(--t2)">${tlrEsc(e.section||'')} · ${tlrEsc(e.field||'')}</div>
+      <div style="font-size:11.5px;color:var(--t3);margin-top:3px">${tlrEsc(e.reason||'')}</div>
+      ${ev}
+      <div style="margin-top:6px;font-size:11px;color:#6b7280">Before</div>
+      <div style="font-size:12px;color:#6b7280;text-decoration:line-through">${before||'—'}</div>
+      <div style="margin-top:6px;font-size:11px;color:#166534">After</div>
+      <div contenteditable="true" data-edit-after="1" data-mid="${mid}" data-idx="${idx}" style="font-size:12.5px;border:1px solid var(--border);border-radius:6px;padding:6px">${after||''}</div>
+      <div class="tlr-edit-actions">
+        <button data-editbtn="1" data-mid="${mid}" data-idx="${idx}" data-status="accepted" class="${st==='accepted'?'on':''}">Accept</button>
+        <button data-editbtn="1" data-mid="${mid}" data-idx="${idx}" data-status="rejected" class="${st==='rejected'?'on':''}">Reject</button>
+        <button data-editbtn="1" data-mid="${mid}" data-idx="${idx}" data-status="needs_your_call" class="${st==='needs_your_call'?'on':''}">Needs Call</button>
+      </div></div>`;
+  }).join(''):'<span style="font-size:12px;color:var(--t4)">No structured edits — resume uses your master profile as-is.</span>';
+
+  return `<div class="card" style="margin-bottom:10px">
+    <div class="ch" data-qexpand="${mid}" style="cursor:pointer">
+      <h3>${tlrEsc(it.company)} — ${tlrEsc(it.title)} <span class="pc" style="margin-left:6px">${it.match_pct}%</span>${overflowBadge}</h3>
+      <span style="font-size:11.5px;color:var(--g500)">▾ review</span>
+    </div>
+    <div class="cb" id="qbody-${mid}" style="display:none">
+      <div style="font-size:12.5px;color:var(--t2);margin-bottom:6px"><strong>Why:</strong> ${tlrEsc(it.rationale||'—')}</div>
+      <div style="margin-bottom:4px"><span style="font-size:11px;color:var(--g500)">Matched:</span> ${matched||'—'}</div>
+      <div style="margin-bottom:8px"><span style="font-size:11px;color:var(--g500)">Missing:</span> ${missing||'—'}</div>
+      ${tailorWarn}
+      ${overflowDetail}
+      <div style="margin-top:8px;font-weight:600;font-size:12.5px">Proposed edits</div>
+      ${editsHtml}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn bp" data-approve="${mid}">Approve</button>
+        <button class="btn bo" data-skip="${mid}">Skip</button>
+        ${it.apply_url?`<a class="btn bo" href="${it.apply_url}" target="_blank">Open posting ↗</a>`:''}
+      </div>
+    </div></div>`;
+}
+
+async function approveQueueItem(mid, force=false){
+  const btns=document.querySelectorAll(`[data-approve="${mid}"]`); btns.forEach(b=>{b.disabled=true;b.textContent='Approving…';});
+  try{
+    const body={edits:queueEdits[mid]||[]}; if(force) body.force=true;
+    await api(`/queue/${mid}/approve`,{method:'POST',body:JSON.stringify(body)});
+    toast('Approved — added to tracker as "approved"');
+    await loadQueue(); await loadApps(); loadAnalytics();
+  }catch(e){
+    let detail; try{ detail=JSON.parse(e.message).detail; }catch{ detail=null; }
+    if(detail&&detail.error==='dedupe_block'){
+      if(confirm('⚠ '+detail.dedupe.reason+'\n\nApprove anyway?')){ return approveQueueItem(mid,true); }
+      btns.forEach(b=>{b.disabled=false;b.textContent='Approve';});
+      return;
+    }
+    toast('Approve failed: '+e.message,'err');
+    btns.forEach(b=>{b.disabled=false;b.textContent='Approve';});
+  }
+}
+
+async function skipQueueItem(mid){
+  try{ await api(`/queue/${mid}/skip`,{method:'POST',body:'{}'}); toast('Skipped'); loadQueue(); }
+  catch(e){ toast('Skip failed: '+e.message,'err'); }
+}
+
+document.getElementById('refreshQueueBtn')?.addEventListener('click',loadQueue);
+document.getElementById('tailorQueueBtn')?.addEventListener('click',async()=>{
+  const b=document.getElementById('tailorQueueBtn'); b.disabled=true; b.textContent='Tailoring…';
+  try{ const r=await api('/queue/tailor',{method:'POST',body:'{}'}); toast(`Tailored ${r.tailored}, failed ${r.failed}`); loadQueue(); }
+  catch(e){ toast('Tailoring failed: '+e.message,'err'); }
+  finally{ b.disabled=false; b.textContent='↻ Tailor pending'; }
+});
+
+// ── ANALYTICS (M6) ────────────────────────────────
+async function loadAnalytics(){
+  const box=document.getElementById('analyticsBox'); if(!box) return;
+  let a; try{ a=await api('/tracker/analytics'); }catch{ return; }
+  const pct=v=>Math.round((v||0)*100)+'%';
+  if(!a.overall||!a.overall.applied){ box.innerHTML='<p style="color:var(--g400);font-size:13px">No applied data yet.</p>'; return; }
+  const bandRows=(a.by_band||[]).map(r=>`<tr><td>${tlrEsc(r.band)}</td><td>${r.applied}</td><td>${r.callbacks}</td><td><strong>${pct(r.callback_rate)}</strong></td></tr>`).join('');
+  const coRows=(a.by_company||[]).slice(0,12).map(r=>`<tr><td>${tlrEsc(r.company)}</td><td>${r.applied}</td><td>${r.callbacks}</td><td><strong>${pct(r.callback_rate)}</strong></td></tr>`).join('');
+  box.innerHTML=`
+    <div style="font-size:12.5px;margin-bottom:10px">Overall: <strong>${pct(a.overall.callback_rate)}</strong> (${a.overall.callbacks}/${a.overall.applied} applied)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div><div style="font-size:11px;color:var(--g500);text-transform:uppercase;margin-bottom:4px">By band</div>
+        <table class="at"><thead><tr><th>Band</th><th>Applied</th><th>Callbacks</th><th>Rate</th></tr></thead><tbody>${bandRows||'<tr><td colspan=4>—</td></tr>'}</tbody></table></div>
+      <div><div style="font-size:11px;color:var(--g500);text-transform:uppercase;margin-bottom:4px">By company</div>
+        <table class="at"><thead><tr><th>Company</th><th>Applied</th><th>Callbacks</th><th>Rate</th></tr></thead><tbody>${coRows||'<tr><td colspan=4>—</td></tr>'}</tbody></table></div>
+    </div>`;
+}
+
+document.getElementById('releaseBtn')?.addEventListener('click',async()=>{
+  const b=document.getElementById('releaseBtn'); b.disabled=true; b.textContent='Releasing…';
+  try{
+    const r=await api('/tracker/release',{method:'POST',body:'{}'});
+    toast(`Released ${r.released.length}, held ${r.held.length}`);
+    if(r.held.length) console.log('[pacing] held:',r.held);
+    await loadApps();
+  }catch(e){ toast('Release failed: '+e.message,'err'); }
+  finally{ b.disabled=false; b.textContent='⏱ Release ready (pacing)'; }
+});
 
 // ── MODAL ─────────────────────────────────────────
 function openAdd(){
@@ -1302,7 +1507,7 @@ function openAdd(){
   document.getElementById('modalTitle').textContent='Log New Application';
   ['m-co','m-ro','m-sal','m-loc','m-url','m-nts'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('m-pl').value='Other';
-  document.getElementById('m-st').value='Applied';
+  document.getElementById('m-st').value='applied';
   document.getElementById('m-dt').value=new Date().toISOString().split('T')[0];
   document.getElementById('appModal').classList.add('open');
   setTimeout(()=>document.getElementById('m-co').focus(),50);
@@ -1314,7 +1519,7 @@ function openEdit(id){
   document.getElementById('m-co').value=a.company||'';
   document.getElementById('m-ro').value=a.role||'';
   document.getElementById('m-pl').value=a.platform||'Other';
-  document.getElementById('m-st').value=a.status||'Applied';
+  document.getElementById('m-st').value=a.status||'applied';
   document.getElementById('m-dt').value=a.date_applied||'';
   document.getElementById('m-sal').value=a.salary||'';
   document.getElementById('m-loc').value=a.location||'';
@@ -1562,7 +1767,7 @@ document.getElementById('jdLogBtn').addEventListener('click', () => {
   document.getElementById('m-co').value = currentAnalysis.company || '';
   document.getElementById('m-ro').value = currentAnalysis.role || '';
   document.getElementById('m-pl').value = 'Other';
-  document.getElementById('m-st').value = 'Applied';
+  document.getElementById('m-st').value = 'applied';
   document.getElementById('m-dt').value = new Date().toISOString().split('T')[0];
   document.getElementById('m-sal').value = '';
   document.getElementById('m-loc').value = '';
@@ -2577,6 +2782,7 @@ async function init(){
   await Promise.all([loadModels(), loadProfile(), loadApps()]);
   tlrSetStep(1);
   loadResumeVersions();
+  loadQueue();   // populate the review-queue badge on startup
 }
 init(); setInterval(checkApi,30000);
 </script>

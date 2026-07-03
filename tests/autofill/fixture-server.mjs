@@ -28,6 +28,9 @@ function resolve(urlPath) {
   if (clean.startsWith("/variants/")) {
     return path.join(FIXTURES, "variants", path.basename(clean));
   }
+  if (clean.startsWith("/approved/")) {
+    return path.join(FIXTURES, "approved", path.basename(clean));
+  }
   return null;
 }
 
