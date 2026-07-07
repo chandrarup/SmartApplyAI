@@ -114,28 +114,158 @@ def ollama_reachable(timeout: float = 1.5) -> bool:
         return False
 
 
+# ── Provider config (backend/llm_config.json — gitignored, never commit keys) ──
+LLM_CONFIG_PATH = os.getenv(
+    "SMARTAPPLY_LLM_CONFIG",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "llm_config.json"),
+)
+_llm_config_cache: dict = {"path": None, "mtime": None, "data": None}
+
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+
+
+def default_llm_config() -> dict:
+    """Config synthesized from the current env — zero-migration when the file
+    is absent. New providers are config entries, not code: any OpenAI-compatible
+    base_url + key + model works, and the Settings UI can add more."""
+    return {
+        "active_provider": "ollama",
+        "model": OLLAMA_MODEL,
+        "providers": {
+            "ollama": {"type": "openai", "base_url": f"{_default_base}/v1",
+                       "api_key": "", "models": []},
+            "anthropic": {"type": "anthropic", "base_url": "", "api_key": "",
+                          "models": [DEFAULT_ANTHROPIC_MODEL]},
+            "openai": {"type": "openai", "base_url": "https://api.openai.com/v1",
+                       "api_key": "", "models": ["gpt-4o-mini"]},
+            "google": {"type": "openai",
+                       "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+                       "api_key": "", "models": ["gemini-2.0-flash"]},
+            "groq": {"type": "openai", "base_url": "https://api.groq.com/openai/v1",
+                     "api_key": "", "models": ["llama-3.3-70b-versatile"]},
+            "openrouter": {"type": "openai", "base_url": "https://openrouter.ai/api/v1",
+                           "api_key": "", "models": []},
+        },
+    }
+
+
+def load_llm_config() -> dict:
+    """Read llm_config.json (mtime-cached); synthesize the default if missing."""
+    path = LLM_CONFIG_PATH
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return default_llm_config()
+    if _llm_config_cache["path"] == path and _llm_config_cache["mtime"] == mtime:
+        return _llm_config_cache["data"]
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict) or not isinstance(data.get("providers"), dict):
+            raise ValueError("llm_config.json must be an object with a providers map")
+    except Exception as e:
+        log.warning(f"llm_config.json unreadable ({e}) — using defaults")
+        return default_llm_config()
+    merged = default_llm_config()
+    merged_providers = merged["providers"]
+    merged.update({k: v for k, v in data.items() if k != "providers"})
+    merged_providers.update(data["providers"])
+    merged["providers"] = merged_providers
+    _llm_config_cache.update(path=path, mtime=mtime, data=merged)
+    return merged
+
+
+def save_llm_config(cfg: dict) -> None:
+    if not isinstance(cfg, dict) or not isinstance(cfg.get("providers"), dict):
+        raise ValueError("Config must be an object with a providers map")
+    with open(LLM_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
+    os.chmod(LLM_CONFIG_PATH, 0o600)  # holds API keys
+    _llm_config_cache["mtime"] = None  # force re-read
+
+
+def mask_api_key(key: str) -> str:
+    key = str(key or "")
+    if not key:
+        return ""
+    return "****" + key[-4:]
+
+
 def normalize_llm_prefer(prefer: str) -> tuple[str, str | None]:
-    """Return (provider_key, ollama_model_or_none). Accepts legacy 'ollama' bare id."""
+    """Return (provider_key, model_or_none).
+
+    Legacy strings parse unchanged: "ollama", "claude", "ollama/<model>",
+    bare "<model>" (treated as an Ollama model). Additionally,
+    "<provider>" / "<provider>/<model>" resolve against llm_config providers;
+    empty prefer falls back to the config's active provider + model.
+    """
     if not prefer:
-        return "ollama", None
+        cfg = load_llm_config()
+        return cfg.get("active_provider") or "ollama", cfg.get("model") or None
     if prefer.startswith("ollama/"):
         model = prefer[len("ollama/"):].strip()
         return "ollama", model or None
     if prefer.startswith("claude/"):
-        return "claude", None
+        return "claude", prefer[len("claude/"):].strip() or None
     if prefer == "ollama":
         return "ollama", None
     if prefer == "claude":
         return "claude", None
-    # Unknown — treat bare string as Ollama model name for backward compat
-    if "/" not in prefer:
-        return "ollama", prefer
-    return prefer.split("/", 1)[0], None
+    if "/" in prefer:
+        provider, model = prefer.split("/", 1)
+        return provider, (model.strip() or None)
+    # Bare string: a configured provider name, else legacy Ollama model name.
+    if prefer in load_llm_config()["providers"]:
+        return prefer, None
+    return "ollama", prefer
 
 
 def get_anthropic_key():
-    # Read from env at call time so POST /set-claude-key hot-reload works
-    return os.environ.get("ANTHROPIC_API_KEY", "")
+    # Env first (POST /set-claude-key hot-reload), then llm_config.json.
+    env_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if env_key:
+        return env_key
+    return str((load_llm_config()["providers"].get("anthropic") or {}).get("api_key") or "")
+
+
+def call_openai_compat(messages: list, temperature: float = 0.3, timeout: int = 600,
+                       system: str = "", *, base_url: str, api_key: str = "",
+                       model: str, connect_timeout: int = None,
+                       provider_name: str = "openai") -> str:
+    """Generic OpenAI-compatible chat/completions client — covers OpenAI, Groq,
+    OpenRouter, Gemini's OpenAI endpoint, and any future provider via config."""
+    import requests as http_requests
+    if not base_url:
+        raise RuntimeError(f"Provider '{provider_name}' has no base_url configured")
+    if not model:
+        raise RuntimeError(f"Provider '{provider_name}' has no model configured")
+    url = base_url.rstrip("/") + "/chat/completions"
+    conn_to = connect_timeout if connect_timeout is not None else OLLAMA_CONNECT_TIMEOUT
+    out_messages = ([{"role": "system", "content": system}] if system else []) + messages
+    data = {"model": model, "messages": out_messages, "stream": False,
+            "temperature": temperature}
+    kwargs = {"json": data, "timeout": (conn_to, timeout)}
+    if api_key:
+        kwargs["headers"] = {"Authorization": f"Bearer {api_key}"}
+    t0 = _time.time()
+    log.debug(f"Calling {provider_name} — model={model} messages={len(messages)}")
+    try:
+        response = http_requests.post(url, **kwargs)
+    except http_requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Cannot reach {provider_name} at {url}: {e}") from e
+    if response.status_code in (401, 403):
+        raise RuntimeError(f"{provider_name} rejected the API key (HTTP {response.status_code})")
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise RuntimeError(str(payload["error"]))
+    try:
+        result = payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as e:
+        raise RuntimeError(f"Unexpected {provider_name} response shape: {payload!r}") from e
+    log_event(log, "INFO", "llm_call", provider=provider_name, model=model,
+              latency_ms=int((_time.time()-t0)*1000), response_chars=len(result))
+    return result
 
 
 def call_ollama(messages: list, temperature: float = 0.3, timeout: int = 600,
@@ -177,7 +307,8 @@ def call_ollama(messages: list, temperature: float = 0.3, timeout: int = 600,
     return result
 
 
-def call_claude(messages: list, temperature: float = 0.3, system: str = "") -> str:
+def call_claude(messages: list, temperature: float = 0.3, system: str = "",
+                model: str = None) -> str:
     try:
         import anthropic
     except ImportError as exc:
@@ -189,7 +320,10 @@ def call_claude(messages: list, temperature: float = 0.3, system: str = "") -> s
     if not api_key:
         log.error("call_claude: ANTHROPIC_API_KEY is not set")
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    log.debug(f"Calling Claude — messages={len(messages)} temp={temperature}")
+    anthropic_cfg = load_llm_config()["providers"].get("anthropic") or {}
+    active_model = (model or (anthropic_cfg.get("models") or [None])[0]
+                    or DEFAULT_ANTHROPIC_MODEL)
+    log.debug(f"Calling Claude — model={active_model} messages={len(messages)} temp={temperature}")
     client = anthropic.Anthropic(api_key=api_key)
     # Convert OpenAI-format messages; extract system if present
     claude_messages = []
@@ -200,7 +334,7 @@ def call_claude(messages: list, temperature: float = 0.3, system: str = "") -> s
         else:
             claude_messages.append({"role": m["role"], "content": m["content"]})
     kwargs = {
-        "model": "claude-sonnet-4-6",
+        "model": active_model,
         "max_tokens": 2048,
         "messages": claude_messages,
     }
@@ -208,30 +342,62 @@ def call_claude(messages: list, temperature: float = 0.3, system: str = "") -> s
         kwargs["system"] = sys_content
     message = client.messages.create(**kwargs)
     result = message.content[0].text
-    log_event(log, "INFO", "llm_call", provider="claude", model="claude-sonnet-4-6",
+    log_event(log, "INFO", "llm_call", provider="claude", model=active_model,
               latency_ms=int((_time.time()-t0)*1000), response_chars=len(result))
     return result
 
 
+def _dispatch_provider(provider: str, messages: list, temperature: float,
+                       system: str, timeout: int, model: str | None) -> str:
+    def _claude():
+        # Pass model only when set — keeps legacy 3-arg call_claude fakes valid.
+        if model:
+            return call_claude(messages, temperature, system, model=model)
+        return call_claude(messages, temperature, system)
+
+    if provider == "ollama":
+        return call_ollama(messages, temperature, timeout, model=model)
+    if provider in ("claude", "anthropic"):
+        return _claude()
+    cfg = load_llm_config()
+    entry = cfg["providers"].get(provider)
+    if not isinstance(entry, dict):
+        raise RuntimeError(f"Unknown LLM provider '{provider}' — configure it in Settings")
+    if entry.get("type") == "anthropic":
+        return _claude()
+    active_model = model or (entry.get("models") or [None])[0]
+    return call_openai_compat(
+        messages, temperature, timeout, system,
+        base_url=str(entry.get("base_url") or ""),
+        api_key=str(entry.get("api_key") or ""),
+        model=active_model, provider_name=provider,
+    )
+
+
 def call_llm(messages: list, temperature: float = 0.3, system: str = "",
              prefer: str = "ollama", timeout: int = 600, model: str = None) -> str:
-    """Try preferred provider first, auto-fallback to the other.
+    """Try preferred provider first, auto-fallback to ollama then claude.
 
-    prefer: "ollama" | "claude" | "ollama/<model-name>" (e.g. "ollama/llama3:8b")
-    model: explicit Ollama model name override (overrides OLLAMA_MODEL default)
+    prefer: "ollama" | "claude" | "ollama/<model-name>" | "<provider>" |
+    "<provider>/<model>" for any provider configured in llm_config.json.
+    model: explicit model name override.
     """
-    # Parse provider and optional model from prefer string like "ollama/llama3:8b"
     provider_key, parsed_model = normalize_llm_prefer(prefer or "ollama")
-    ollama_model_override = model or parsed_model
+    model_override = model or parsed_model
 
-    providers = ["claude", "ollama"] if provider_key == "claude" else ["ollama", "claude"]
+    providers = []
+    for candidate in [provider_key, "ollama", "claude"]:
+        if candidate not in providers:
+            providers.append(candidate)
+    if provider_key == "claude":
+        providers = ["claude", "ollama"]
     last_err = None
     for provider in providers:
         try:
-            if provider == "ollama":
-                return call_ollama(messages, temperature, timeout, model=ollama_model_override)
-            else:
-                return call_claude(messages, temperature, system)
+            # The parsed model belongs to the requested provider only.
+            active_model = model_override if provider == provider_key else None
+            return _dispatch_provider(provider, messages, temperature, system,
+                                      timeout, active_model)
         except Exception as e:
             last_err = e
             log.warning(f"LLM provider '{provider}' failed — {e}. Trying next...")

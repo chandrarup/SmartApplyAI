@@ -89,3 +89,6 @@ backend/tracker/tracker.db
 
 # Scratch
 .tmp/
+
+# LLM provider config (holds API keys — never commit)
+backend/llm_config.json

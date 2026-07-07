@@ -54,6 +54,7 @@ from llm_provider import (
     OLLAMA_MODEL, OLLAMA_API_URL, OLLAMA_HEALTH_URL, get_anthropic_key,
     call_ollama, call_claude, call_llm, clean_json, ollama_reachable, normalize_llm_prefer,
 )
+import llm_provider
 import scoring
 PDF_OUTPUT_DIR = os.path.join(os.getcwd(), "generated_resumes")
 os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
@@ -997,8 +998,11 @@ def llm_status():
     """Return provider availability plus local PDF toolchain status."""
     ollama_ok = ollama_reachable(timeout=1.5)
     claude_ok = bool(get_anthropic_key())
+    llm_cfg = llm_provider.load_llm_config()
     return {
         "default_provider": "ollama",
+        "active_provider": llm_cfg.get("active_provider", "ollama"),
+        "active_model": llm_cfg.get("model", ""),
         "ollama": ollama_ok,
         "ollama_model": OLLAMA_MODEL,
         "ollama_api_url": OLLAMA_API_URL,
@@ -1118,13 +1122,108 @@ def list_models(request: Request):
                 "note": note,
             })
 
+    # Configured OpenAI-compatible providers (llm_config.json) — their ids
+    # ("<provider>/<model>") parse through normalize_llm_prefer unchanged.
+    llm_cfg = llm_provider.load_llm_config()
+    for name, entry in llm_cfg.get("providers", {}).items():
+        if name in ("ollama", "anthropic") or not isinstance(entry, dict):
+            continue
+        if not entry.get("api_key"):
+            continue  # unconfigured providers would only produce failing calls
+        for model_name in entry.get("models") or []:
+            models.append({
+                "id": f"{name}/{model_name}",
+                "label": model_name,
+                "provider": name,
+                "default": False,
+                "size_gb": None,
+                "note": f"{name} (cloud)",
+            })
+
     # Profile default model from config
     pid = get_pid(request)
     cfg = load_profile_config(pid)
     profile_default = cfg.get("preferred_model", "ollama")
 
     return {"models": models, "profile_default": profile_default, "system_default": OLLAMA_MODEL,
-            "ollama_reachable": ollama_reachable(timeout=1.5)}
+            "ollama_reachable": ollama_reachable(timeout=1.5),
+            "active_provider": llm_cfg.get("active_provider", "ollama")}
+
+
+# ─────────────────────────────────────────────────────────────────
+# LLM PROVIDER SETTINGS (llm_config.json — keys never leave masked)
+# ─────────────────────────────────────────────────────────────────
+def _masked_llm_config() -> dict:
+    cfg = json.loads(json.dumps(llm_provider.load_llm_config()))
+    for entry in cfg.get("providers", {}).values():
+        if isinstance(entry, dict):
+            entry["api_key"] = llm_provider.mask_api_key(entry.get("api_key", ""))
+    return cfg
+
+
+@app.get("/llm-settings")
+def get_llm_settings():
+    return _masked_llm_config()
+
+
+@app.put("/llm-settings")
+def put_llm_settings(body: dict):
+    if not isinstance(body, dict) or not isinstance(body.get("providers"), dict):
+        raise HTTPException(status_code=400, detail="Body must include a providers map")
+    current = llm_provider.load_llm_config()
+    merged = {
+        "active_provider": str(body.get("active_provider")
+                               or current.get("active_provider") or "ollama"),
+        "model": str(body.get("model") or current.get("model") or ""),
+        "providers": {},
+    }
+    for name, entry in body["providers"].items():
+        name = str(name).strip().lower()
+        if not name or not isinstance(entry, dict):
+            continue
+        ptype = str(entry.get("type") or "openai").strip().lower()
+        if ptype not in ("openai", "anthropic"):
+            raise HTTPException(status_code=400, detail=f"Provider '{name}': type must be openai or anthropic")
+        base_url = str(entry.get("base_url") or "").strip()
+        if ptype == "openai" and name != "ollama" and base_url and not base_url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail=f"Provider '{name}': base_url must be http(s)")
+        api_key = str(entry.get("api_key") or "")
+        # A masked value (or blank) means "keep the stored key".
+        stored = (current.get("providers", {}).get(name) or {}).get("api_key", "")
+        if not api_key or api_key.startswith("****"):
+            api_key = stored
+        merged["providers"][name] = {
+            "type": ptype,
+            "base_url": base_url,
+            "api_key": api_key,
+            "models": [str(m).strip() for m in (entry.get("models") or []) if str(m).strip()],
+        }
+    if merged["active_provider"] not in merged["providers"]:
+        raise HTTPException(status_code=400,
+                            detail=f"active_provider '{merged['active_provider']}' is not a configured provider")
+    llm_provider.save_llm_config(merged)
+    log_event(log, "INFO", "llm_settings_saved",
+              active=merged["active_provider"], providers=len(merged["providers"]))
+    return _masked_llm_config()
+
+
+@app.post("/llm-settings/test")
+async def test_llm_settings(body: dict):
+    """One tiny completion against the requested provider/model."""
+    provider = str(body.get("provider") or "").strip()
+    model = str(body.get("model") or "").strip() or None
+    if not provider:
+        raise HTTPException(status_code=400, detail="provider is required")
+    t0 = _time.time()
+    try:
+        async with llm_semaphore:
+            await asyncio.to_thread(
+                llm_provider._dispatch_provider, provider,
+                [{"role": "user", "content": "Reply with the single word: OK"}],
+                0.0, "", 15, model)
+        return {"ok": True, "latency_ms": int((_time.time() - t0) * 1000)}
+    except Exception as e:
+        return {"ok": False, "latency_ms": int((_time.time() - t0) * 1000), "error": str(e)[:400]}
 
 # ─────────────────────────────────────────────────────────────────
 # PAGES

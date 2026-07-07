@@ -895,6 +895,33 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
     <div class="fld" id="set-ckrow" style="display:none"><label>Anthropic API Key</label><input id="set-ck" type="password" placeholder="sk-ant-api03-…"></div>
     <button class="btn bp" id="saveSettingsBtn">Save Settings</button>
   </div></div>
+
+  <div class="card" style="max-width:500px;margin-top:16px"><div class="ch"><h3>LLM Providers</h3></div><div class="cb" style="display:flex;flex-direction:column;gap:14px">
+    <div class="fhint">Any OpenAI-compatible API is a config entry, not code: pick a provider, set its base URL + key + models, save. Keys are stored server-side in llm_config.json (gitignored) and only ever shown masked. Per-request model priority: request dropdown &gt; active provider below &gt; profile resume_config.</div>
+    <div class="fld"><label>Provider</label>
+      <div style="display:flex;gap:8px">
+        <select id="prov-select" style="flex:1"></select>
+        <button class="btn bo bsm" id="prov-addBtn" title="Add a new OpenAI-compatible provider">＋ Add</button>
+        <button class="btn bo bsm" id="prov-delBtn" title="Remove this provider">Delete</button>
+      </div>
+    </div>
+    <div class="fld" id="prov-namerow" style="display:none"><label>New provider name</label><input id="prov-name" type="text" placeholder="e.g. fireworks"></div>
+    <div class="fld"><label>Type</label><select id="prov-type"><option value="openai">OpenAI-compatible</option><option value="anthropic">Anthropic SDK</option></select></div>
+    <div class="fld"><label>Base URL</label><input id="prov-url" type="text" placeholder="https://api.example.com/v1"></div>
+    <div class="fld"><label>API Key</label><input id="prov-key" type="password" placeholder="(unchanged)"><div class="fhint">Leave blank or masked to keep the stored key.</div></div>
+    <div class="fld"><label>Models (comma-separated)</label><input id="prov-models" type="text" placeholder="gpt-4o-mini, gpt-4.1"></div>
+    <div class="fld"><label>Active provider / model (used when a request doesn't pick one)</label>
+      <div style="display:flex;gap:8px">
+        <select id="prov-active" style="flex:1"></select>
+        <input id="prov-active-model" type="text" style="flex:1" placeholder="model id">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn bo" id="prov-testBtn">Test connection</button>
+      <button class="btn bp" id="prov-saveBtn">Save Providers</button>
+      <span id="prov-status" style="font-size:12px;color:var(--t4)"></span>
+    </div>
+  </div></div>
 </div>
 
 </main>
@@ -966,6 +993,7 @@ document.querySelectorAll('.ni').forEach(n=>{
     if(n.dataset.pg==='pg-sourcing') loadSourcing();
     if(n.dataset.pg==='pg-knowledge') loadKnowledgePage();
     if(n.dataset.pg==='pg-autofill') loadLearnedAnswers();
+    if(n.dataset.pg==='pg-settings') loadProviderSettings();
   });
 });
 
@@ -1948,12 +1976,15 @@ async function loadModels(){
   ['jd-llm','tlr-llm','set-llm'].forEach(id=>{
     const sel=document.getElementById(id);
     sel.innerHTML='';
-    // Group: Ollama first, then Claude
-    ['ollama','claude'].forEach(provider=>{
+    // Group: Ollama first, then Claude, then any configured cloud provider
+    const provOrder=['ollama','claude',...new Set(models.map(m=>m.provider).filter(p=>p&&p!=='ollama'&&p!=='claude'))];
+    provOrder.forEach(provider=>{
       const group=models.filter(m=>m.provider===provider);
       if(!group.length) return;
       const og=document.createElement('optgroup');
-      og.label=provider==='ollama'?'Ollama (Local)':'Claude (Cloud)';
+      og.label=provider==='ollama'?'Ollama (Local)'
+        :provider==='claude'?'Claude (Cloud)'
+        :provider.charAt(0).toUpperCase()+provider.slice(1)+' (Cloud)';
       group.forEach(m=>{
         if(m.installed===false) return;
         const opt=document.createElement('option');
@@ -1964,7 +1995,8 @@ async function loadModels(){
         const noteStr = m.note ? ` ${m.note}.` : '';
         opt.dataset.hint=m.provider==='ollama'
           ?`Local (Ollama)${m.size_gb?' · '+m.size_gb+'GB':''}.${noteStr}${offlineNote}`
-          :`Cloud (Anthropic API · requires key).${noteStr}`;
+          :m.provider==='claude'?`Cloud (Anthropic API · requires key).${noteStr}`
+          :`Cloud (${provider}).${noteStr}`;
         og.appendChild(opt);
       });
       sel.appendChild(og);
@@ -2018,6 +2050,87 @@ document.getElementById('saveSettingsBtn').addEventListener('click',async()=>{
   }
   toast('Settings saved!'); checkApi();
 });
+
+// ── LLM PROVIDER SETTINGS (llm_config.json via /llm-settings) ─────
+let provCfg=null, provCurrent=null;
+function provStatus(msg){ document.getElementById('prov-status').textContent=msg||''; }
+function provFillForm(name){
+  provCurrent=name;
+  const e=(provCfg&&provCfg.providers||{})[name]||{type:'openai',base_url:'',api_key:'',models:[]};
+  document.getElementById('prov-namerow').style.display='none';
+  document.getElementById('prov-type').value=e.type||'openai';
+  document.getElementById('prov-url').value=e.base_url||'';
+  const keyInput=document.getElementById('prov-key');
+  keyInput.value='';
+  keyInput.placeholder=e.api_key?e.api_key+' (stored — blank keeps it)':'(no key stored)';
+  document.getElementById('prov-models').value=(e.models||[]).join(', ');
+}
+function provRender(){
+  const sel=document.getElementById('prov-select'), act=document.getElementById('prov-active');
+  const names=Object.keys(provCfg.providers||{});
+  const optHtml=names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  sel.innerHTML=optHtml; act.innerHTML=optHtml;
+  act.value=provCfg.active_provider||names[0]||'';
+  document.getElementById('prov-active-model').value=provCfg.model||'';
+  sel.value=(provCurrent&&names.includes(provCurrent))?provCurrent:(names[0]||'');
+  provFillForm(sel.value);
+}
+async function loadProviderSettings(){
+  try{ provCfg=await api('/llm-settings'); provRender(); provStatus(''); }
+  catch(e){ provStatus('Backend offline — provider settings unavailable'); }
+}
+function provHarvest(){
+  const adding=document.getElementById('prov-namerow').style.display!=='none';
+  const name=adding?document.getElementById('prov-name').value.trim().toLowerCase():provCurrent;
+  if(!name) return null;
+  provCfg.providers[name]={
+    type:document.getElementById('prov-type').value,
+    base_url:document.getElementById('prov-url').value.trim(),
+    api_key:document.getElementById('prov-key').value.trim(), // blank/masked = keep stored (server rule)
+    models:document.getElementById('prov-models').value.split(',').map(s=>s.trim()).filter(Boolean),
+  };
+  return name;
+}
+document.getElementById('prov-select').addEventListener('change',e=>provFillForm(e.target.value));
+document.getElementById('prov-addBtn').addEventListener('click',()=>{
+  provCurrent=null;
+  document.getElementById('prov-namerow').style.display='';
+  document.getElementById('prov-name').value='';
+  document.getElementById('prov-type').value='openai';
+  document.getElementById('prov-url').value='';
+  const keyInput=document.getElementById('prov-key');
+  keyInput.value=''; keyInput.placeholder='sk-…';
+  document.getElementById('prov-models').value='';
+  provStatus('New provider — fill in the fields and Save');
+});
+document.getElementById('prov-delBtn').addEventListener('click',()=>{
+  if(!provCurrent||['ollama','anthropic'].includes(provCurrent)){ toast('Built-in providers cannot be deleted','err'); return; }
+  delete provCfg.providers[provCurrent];
+  if(provCfg.active_provider===provCurrent) provCfg.active_provider='ollama';
+  provCurrent=null; provRender();
+  provStatus('Removed locally — click Save Providers to apply');
+});
+document.getElementById('prov-saveBtn').addEventListener('click',async()=>{
+  if(provHarvest()===null){ toast('Provider name required','err'); return; }
+  provCfg.active_provider=document.getElementById('prov-active').value||provCfg.active_provider;
+  provCfg.model=document.getElementById('prov-active-model').value.trim();
+  try{
+    provCfg=await api('/llm-settings',{method:'PUT',body:JSON.stringify(provCfg)});
+    provRender(); provStatus('Saved.'); toast('Providers saved');
+    await loadModels(); // refresh all three model dropdowns with new providers
+  }catch(e){ provStatus('Save failed: '+e.message); }
+});
+document.getElementById('prov-testBtn').addEventListener('click',async()=>{
+  // Tests the SAVED config for the selected provider — save unsaved edits first.
+  const name=document.getElementById('prov-select').value;
+  const models=document.getElementById('prov-models').value.split(',').map(s=>s.trim()).filter(Boolean);
+  provStatus('Testing '+name+'…');
+  try{
+    const r=await api('/llm-settings/test',{method:'POST',body:JSON.stringify({provider:name,model:models[0]||''})});
+    provStatus(r.ok?`✓ ${name} OK — ${r.latency_ms}ms`:`✗ ${name} failed (${r.latency_ms}ms): ${r.error}`);
+  }catch(e){ provStatus('Test failed: '+e.message); }
+});
+loadProviderSettings();
 
 // ── ANALYZE JD ────────────────────────────────────
 let currentAnalysis = null;
