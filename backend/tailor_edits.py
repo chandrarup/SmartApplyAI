@@ -12,16 +12,32 @@ STATUSES = {"proposed", "needs_your_call", "accepted", "rejected"}
 # a knowledge hit to count as evidence.
 EVIDENCE_SCORE_FLOOR = 0.60
 
-# Rewrite vocabulary that carries no factual claim — connectors and generic
-# engineering verbs a rephrase introduces without asserting anything new.
+# Rewrite vocabulary that carries no factual claim — function words plus the
+# connectors and generic resume verbs a rephrase introduces without asserting
+# anything new. Tokens shorter than 3 chars never reach this check.
 STYLE_STOPWORDS = {
+    # function words (>=3 chars, so they survive the token regex)
+    "and", "for", "the", "into", "onto", "them", "they", "their", "this",
+    "that", "these", "those", "from", "over", "under", "while", "also",
+    "with", "within", "across", "through", "between", "using", "each",
+    "than", "then", "when", "where", "which", "was", "were", "will", "has",
+    "have", "had", "are", "its", "our", "per", "via", "both", "all", "more",
+    # generic engineering / resume verbs and fillers
     "built", "build", "building", "delivered", "delivering", "designed",
     "developed", "developing", "improved", "improving", "implemented",
     "created", "shipped", "drove", "driving", "led", "leading", "owned",
-    "using", "across", "within", "through", "with", "and", "for", "the",
-    "production", "scalable", "robust", "end-to-end", "hands-on",
-    "experience", "expertise", "strong", "proficient", "skilled",
+    "reduced", "increased", "enhanced", "streamlined", "received", "achieved",
+    "production", "scalable", "robust", "end-to-end", "hands-on", "time",
+    "experience", "expertise", "strong", "proficient", "skilled", "skills",
+    "skill", "team", "teams", "work", "working", "systems", "solutions",
 }
+
+
+def _known_in_profile(term: str, profile_terms: set[str]) -> bool:
+    """Singular/plural-tolerant membership: 'llms' matches a profile 'llm'."""
+    return (term in profile_terms
+            or term.rstrip("s") in profile_terms
+            or term + "s" in profile_terms)
 
 
 def _norm(s: str) -> str:
@@ -133,6 +149,13 @@ def collect_profile_terms(profile: dict[str, Any]) -> set[str]:
     for pub in profile.get("publications") or []:
         if isinstance(pub, dict):
             parts.append(" ".join(str(pub.get(k) or "") for k in ("title", "description")))
+    for award in profile.get("awards") or []:
+        if isinstance(award, dict):
+            parts.append(" ".join(str(award.get(k) or "") for k in ("title", "organization", "description")))
+    for cert in profile.get("certifications") or []:
+        if isinstance(cert, dict):
+            parts.append(" ".join(str(cert.get(k) or "") for k in ("name", "issuer")))
+    parts.extend(str(i) for i in (profile.get("research_interests") or []))
     text = " ".join(parts).lower()
     return {t for t in re.findall(r"\b[a-z][a-z0-9\+\#\.\-/]{2,}\b", text) if len(t) >= 3}
 
@@ -158,9 +181,12 @@ def ground_edit(
     """
     out = copy.deepcopy(validate_edit_object(edit))
     added_terms = _new_terms(out.get("before", ""), out.get("after", ""))
-    # Strip style vocabulary and profile-known terms FIRST, then prefer the
-    # JD-overlapping remainder (most likely to be injected keywords).
-    meaningful = added_terms - (profile_terms or set()) - STYLE_STOPWORDS
+    # Strip style vocabulary and profile-known terms FIRST (plural-tolerant),
+    # then prefer the JD-overlapping remainder (likely injected keywords).
+    known = profile_terms or set()
+    meaningful = {
+        t for t in added_terms - STYLE_STOPWORDS if not _known_in_profile(t, known)
+    }
     jd_claims = meaningful & _jd_terms(jd_text)
     claim_terms = jd_claims or meaningful
 

@@ -366,7 +366,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
     <!-- Actions -->
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
       <button class="btn bo" id="jdClearBtn">Clear &amp; Reset</button>
-      <button class="btn bp" id="jdLogBtn">+ Log This Application</button>
+      <button class="btn bo" id="jdLogBtn">+ Log This Application</button>
+      <button class="btn bp" id="jdTailorBtn">Tailor resume for this job →</button>
     </div>
   </div>
 </div>
@@ -574,6 +575,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 
   <!-- ═══ STEP 3: REVIEW ═══ -->
   <div id="tlr-s3" style="display:none">
+    <!-- Sticky action bar: Download PDF + AI Rewrite are never below the fold -->
+    <div id="tlr-stickyBar" style="position:sticky;top:calc(var(--hh) + 8px);z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+      <span id="tlr-acceptCount" style="font-size:12.5px;font-weight:600;color:var(--t3);white-space:nowrap"></span>
+      <input id="tlr-aiAsk" type="text" placeholder="Tell me how you'd like to tweak your resume…" style="flex:1;min-width:220px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px">
+      <button class="btn bo" id="tlr-aiRewrite">✦ Edit With AI</button>
+      <button class="btn bp" id="tlr-pdfBtn">⬇ Download PDF Resume</button>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start">
       <!-- Left: rendered resume with highlights -->
       <div class="card">
@@ -607,18 +615,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
             <div id="tlr-skRemoved" style="display:flex;flex-wrap:wrap;gap:4px"></div>
           </div>
         </div>
-        <!-- AI rewrite -->
-        <div class="card">
-          <div class="ch"><h3>AI Rewrite</h3></div>
-          <div class="cb">
-            <textarea id="tlr-aiAsk" placeholder="Tell me how you'd like to tweak your resume..." rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;resize:vertical"></textarea>
-            <button class="btn bp" id="tlr-aiRewrite" style="width:100%;margin-top:8px">✦ Edit With AI</button>
-          </div>
-        </div>
-        <!-- Download -->
+        <!-- Download PDF + AI Rewrite moved to the sticky top bar -->
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="btn bo" id="tlr-htmlBtn" style="width:100%;font-size:12px" title="Plain HTML view — not the final format. Use Download Resume for the real PDF.">Quick Browser Preview</button>
-          <button class="btn bp" id="tlr-pdfBtn" style="width:100%">⬇ Download PDF Resume</button>
           <button class="btn bo" id="tlr-clear" style="width:100%">Start Over</button>
         </div>
         <!-- Log -->
@@ -2149,7 +2148,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
       api('/suggest-questions', {method:'POST', body:JSON.stringify({jd_text:jd, llm})}).catch(()=>[])
     ]);
     currentAnalysis = {...analysis,
-      company: document.getElementById('jd-co').value.trim() || analysis.role || '',
+      company: document.getElementById('jd-co').value.trim() || analysis.deep?.company || '',
       role: document.getElementById('jd-role').value.trim() || analysis.role || '',
       jd_text: jd
     };
@@ -2238,6 +2237,27 @@ document.getElementById('jdLogBtn').addEventListener('click', () => {
   setTimeout(()=>document.getElementById('m-co').focus(), 50);
   // Navigate to applications after logging
   document.querySelector('[data-pg="pg-apps"]')?.click();
+});
+
+// Analyze → Tailor handoff: carry JD/company/role/analysis over, no re-paste,
+// and reuse the /analyze deep block instead of a second LLM extraction.
+document.getElementById('jdTailorBtn').addEventListener('click', () => {
+  if (!currentAnalysis) return;
+  document.getElementById('tlr-jd').value = currentAnalysis.jd_text || '';
+  document.getElementById('tlr-co').value = currentAnalysis.company || '';
+  document.getElementById('tlr-role').value = currentAnalysis.role || '';
+  const llm = document.getElementById('jd-llm').value;
+  const tlrLlm = document.getElementById('tlr-llm');
+  if ([...tlrLlm.options].some(o=>o.value===llm)) tlrLlm.value = llm;
+  document.querySelector('[data-pg="pg-tailor"]')?.click();
+  tlrSetStep(1);
+  const deep = currentAnalysis.deep;
+  if (deep && (deep.must_have_skills||[]).length) {
+    tlrRenderAnalysis(deep, currentAnalysis.jd_text || '');
+    toast('Analysis carried over — review and continue');
+  } else {
+    document.getElementById('tlr-analyzeBtn').click();
+  }
 });
 
 // ── PROFILE HEADER ────────────────────────────────
@@ -2381,22 +2401,61 @@ function tlrApplyEditField(result, edit){
   }
 }
 
+// Frontend mirror of the backend's _filter_payload_to_accepted: a deep copy of
+// res where every non-accepted edit is reverted to its original text — this is
+// exactly what the generated PDF will contain.
+function tlrEffectiveResult(res){
+  const eff = JSON.parse(JSON.stringify(res || {}));
+  for (const e of (eff._edits || [])) {
+    if (e.status === 'accepted') continue;
+    if (e.field === 'summary') {
+      const orig = (eff.summary_diff||{}).original || e.before || '';
+      eff.tailored_summary = orig;
+      eff.summary_diff = eff.summary_diff || {};
+      eff.summary_diff.tailored = orig;
+    } else if (e.field.startsWith('experience.')) {
+      const m = e.field.match(/^experience\.(\d+)\.bullets\.(\d+)$/);
+      if (m) {
+        const b = eff.experience?.[+m[1]]?.bullets?.[+m[2]];
+        if (b) { b.text = e.before || b.original || b.text; b.status = 'unchanged'; }
+      }
+    } else if (e.field.startsWith('tailored_skills.')) {
+      const key = e.field.slice('tailored_skills.'.length);
+      if (eff.tailored_skills) {
+        eff.tailored_skills[key] = (e.before || '').split(',').map(s=>s.trim()).filter(Boolean);
+      }
+    }
+  }
+  return eff;
+}
+
+function tlrAcceptCountLabel(edits){
+  const el = document.getElementById('tlr-acceptCount');
+  if (!el) return;
+  const acc = edits.filter(e=>e.status==='accepted').length;
+  el.textContent = edits.length ? `${acc} of ${edits.length} edits accepted` : '';
+}
+
 function tlrRenderEditControls(res){
   const wrap = document.getElementById('tlr-editControls');
   if (!wrap) return;
   const edits = Array.isArray(res?._edits) ? res._edits : [];
+  tlrAcceptCountLabel(edits);
   if (!edits.length) {
     wrap.innerHTML = '<span style="font-size:12px;color:var(--t4)">No structured edits returned.</span>';
     return;
   }
-  wrap.innerHTML = edits.map((e, idx) => {
+  const rowHtml = (e, idx) => {
     const status = e.status || 'proposed';
     const before = tlrEsc(e.before || '');
     const after = tlrEsc(e.after || '');
-    const evidence = e.evidence_ref ? `<div class="tlr-edit-meta">Evidence: <code>${tlrEsc(e.evidence_ref)}</code></div>` : '<div class="tlr-edit-meta" style="color:#b45309">No evidence found — needs your call</div>';
+    const unbacked = (e.ungrounded_terms||[]).length
+      ? ` — unbacked terms: ${e.ungrounded_terms.map(tlrEsc).join(', ')}` : '';
+    const evidence = e.evidence_ref
+      ? `<div class="tlr-edit-meta">Evidence: <code>${tlrEsc(e.evidence_ref)}</code></div>`
+      : `<div class="tlr-edit-meta" style="color:#b45309">No evidence found — needs your call${unbacked}</div>`;
     return `<div class="tlr-edit-row" data-edit-idx="${idx}">
-      <div style="font-size:12px;font-weight:700;color:var(--t2)">${tlrEsc(e.section)} · ${tlrEsc(e.field)}</div>
-      <div style="font-size:11.5px;color:var(--t3);margin-top:3px">${tlrEsc(e.reason || '')}</div>
+      <div style="font-size:11.5px;color:var(--t3)">${tlrEsc(e.reason || '')}</div>
       ${evidence}
       <div style="margin-top:6px;font-size:11px;color:#6b7280">Before</div>
       <div style="font-size:12px;color:#6b7280;text-decoration:line-through">${before || '—'}</div>
@@ -2408,6 +2467,18 @@ function tlrRenderEditControls(res){
         <button data-status="needs_your_call" class="${status==='needs_your_call'?'on':''}">Needs Call</button>
       </div>
     </div>`;
+  };
+  // Group by section into collapsible accordions; data-edit-idx stays the flat
+  // index into res._edits so the listeners below are section-agnostic.
+  const sections = [...new Set(edits.map(e => e.section || 'other'))];
+  wrap.innerHTML = sections.map(sec => {
+    const pairs = edits.map((e,i)=>[e,i]).filter(([e]) => (e.section||'other') === sec);
+    const acc = pairs.filter(([e])=>e.status==='accepted').length;
+    const label = sec.charAt(0).toUpperCase()+sec.slice(1);
+    return `<details open>
+      <summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--t2);padding:4px 0">${tlrEsc(label)} (${pairs.length}) · ${acc} accepted</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">${pairs.map(([e,i])=>rowHtml(e,i)).join('')}</div>
+    </details>`;
   }).join('');
 
   wrap.querySelectorAll('[data-edit-after]').forEach(el => {
@@ -2426,20 +2497,29 @@ function tlrRenderEditControls(res){
       if (!window.tlrLastResult?._edits?.[idx]) return;
       window.tlrLastResult._edits[idx].status = btn.dataset.status;
       tlrRenderEditControls(window.tlrLastResult);
+      // Accept/Reject drives the resume preview, not just the pill.
+      tlrRenderPreview(window.tlrLastResult);
     });
   });
 }
 
-// Render step 3 — FULL resume preview matching the actual LaTeX template structure
+// Render step 3 — FULL resume preview matching the actual LaTeX template structure.
+// Shows the EFFECTIVE result (what the PDF will contain: accepted edits only),
+// decorated with the edit statuses: green = accepted change, red = rejected
+// (struck), amber = pending/needs-your-call (original shown).
 function tlrRenderPreview(res) {
   const preview = document.getElementById('tlr-resumePreview');
-  const sd  = res.summary_diff || {};
-  const exp = res.experience || [];
+  const allEdits = Array.isArray(res?._edits) ? res._edits : [];
+  const editByField = Object.fromEntries(allEdits.map(e => [e.field, e]));
+  const eff = allEdits.length ? tlrEffectiveResult(res) : res;
+  const sd  = eff.summary_diff || {};
+  const exp = eff.experience || [];
   const c   = (profile.contact_info || {});
   const edu = (profile.education || []);
   const sk  = (profile.skills || {});
-  const tailoredSummary = sd.tailored || res.tailored_summary || profile.summary || '';
+  const tailoredSummary = sd.tailored || eff.tailored_summary || profile.summary || '';
   const summaryChanged  = !!(sd.tailored && sd.original && sd.tailored !== sd.original);
+  const summaryEdit = editByField['summary'];
 
   // ── Helper: escape HTML entities ──────────────────────────────
   // Convert LaTeX em-dash (---) to real em dash for HTML display, then escape HTML
@@ -2470,7 +2550,21 @@ function tlrRenderPreview(res) {
   // ── SUMMARY ────────────────────────────────────────────────────
   if (tailoredSummary) {
     html += sec('Summary');
-    if (summaryChanged) {
+    if (summaryEdit && summaryEdit.status === 'rejected') {
+      // Rejected rewrite: original stands; the discarded text shows struck in red.
+      html += `<div style="font-size:11pt">${esc(tailoredSummary)}</div>
+      <div style="background:#fee2e2;border-left:3px solid #dc2626;padding:5px 10px;border-radius:0 4px 4px 0;margin-top:4px">
+        <span style="font-size:9pt;font-weight:700;color:#991b1b">✗ REJECTED REWRITE</span>
+        <div style="font-size:10pt;color:#991b1b;text-decoration:line-through;margin-top:2px">${esc(summaryEdit.after||'')}</div>
+      </div>`;
+    } else if (summaryEdit && summaryEdit.status !== 'accepted') {
+      // Pending / needs-your-call: original stands until a decision is made.
+      html += `<div style="background:#fef9c3;border-left:3px solid #f59e0b;padding:5px 10px;border-radius:0 4px 4px 0">
+        <span style="font-size:9pt;font-weight:700;color:#92400e">? PENDING — decide in Approve Edits</span>
+        <div style="font-size:11pt;margin-top:2px">${esc(tailoredSummary)}</div>
+        <div style="font-size:10pt;color:#78350f;margin-top:2px">Proposed: ${esc(summaryEdit.after||'')}</div>
+      </div>`;
+    } else if (summaryChanged) {
       html += `<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:6px 10px;border-radius:0 4px 4px 0;margin-bottom:4px">
         <span style="font-size:9pt;font-weight:700;color:#166534">~ REWRITTEN FOR THIS ROLE</span>
         <div contenteditable="true" data-edit-path="summary" style="margin-top:3px;font-size:11pt">${esc(tailoredSummary)}</div>
@@ -2509,16 +2603,33 @@ function tlrRenderPreview(res) {
         </div>
         <ul style="margin:4px 0 0 16px;padding:0">`;
       for (const [bIdx, b] of (e.bullets||[]).entries()) {
-        if (b.status === 'added') {
+        const bEdit = editByField[`experience.${eIdx}.bullets.${bIdx}`];
+        if (bEdit && bEdit.status === 'rejected') {
+          // Original stands; the discarded rewrite shows struck in red.
+          html += `<li style="margin:2px 0;font-size:11pt">${esc(b.text||'')}
+            <div style="background:#fee2e2;border-left:3px solid #dc2626;padding:2px 8px;border-radius:0 3px 3px 0;margin-top:2px">
+              <span style="font-size:9pt;font-weight:700;color:#991b1b">✗ REJECTED  </span>
+              <span style="font-size:10pt;color:#991b1b;text-decoration:line-through">${esc(bEdit.after||'')}</span>
+            </div></li>`;
+        } else if (bEdit && bEdit.status !== 'accepted') {
+          html += `<li style="background:#fef9c3;border-left:3px solid #f59e0b;list-style:none;margin:3px 0 3px -16px;padding:4px 8px;border-radius:0 3px 3px 0">
+            <span style="font-size:9pt;font-weight:700;color:#92400e">? PENDING  </span>
+            <span style="font-size:11pt">${esc(b.text||'')}</span>
+            <div style="font-size:10pt;color:#78350f;margin-top:2px">Proposed: ${esc(bEdit.after||'')}</div>
+          </li>`;
+        } else if (b.status === 'added') {
           html += `<li style="background:#dcfce7;border-left:3px solid #16a34a;list-style:none;margin:3px 0 3px -16px;padding:4px 8px;border-radius:0 3px 3px 0">
             <span style="font-size:9pt;font-weight:700;color:#166534">+ ADDED  </span>
             <span contenteditable="true" data-edit-path="experience.${eIdx}.bullets.${bIdx}.text">${esc(b.text||'')}</span>
           </li>`;
-        } else if (b.status === 'edited') {
+        } else if (b.status === 'edited' ||
+                   (bEdit && bEdit.status === 'accepted' && (bEdit.before||'') !== (b.text||''))) {
+          // Green diff keys off the ACCEPTED edit, not the LLM's status label.
+          const originalText = b.original || bEdit?.before || '';
           html += `<li style="background:#dcfce7;border-left:3px solid #16a34a;list-style:none;margin:3px 0 3px -16px;padding:4px 8px;border-radius:0 3px 3px 0">
             <span style="font-size:9pt;font-weight:700;color:#166534">~ EDITED  </span>
             <span contenteditable="true" data-edit-path="experience.${eIdx}.bullets.${bIdx}.text">${esc(b.text||'')}</span>
-            <div style="font-size:10pt;color:#9ca3af;text-decoration:line-through;margin-top:2px">${esc(b.original||'')}</div>
+            <div style="font-size:10pt;color:#9ca3af;text-decoration:line-through;margin-top:2px">${esc(originalText)}</div>
           </li>`;
         } else {
           html += `<li style="margin:2px 0;font-size:11pt" contenteditable="true" data-edit-path="experience.${eIdx}.bullets.${bIdx}.text">${esc(b.text||'')}</li>`;
@@ -2573,8 +2684,8 @@ function tlrRenderPreview(res) {
     }
   }
 
-  // ── SKILLS (dynamic — from tailored result or profile) ─────────
-  const tailoredSkills = res.tailored_skills || sk;
+  // ── SKILLS (dynamic — effective result; diff line mirrors the edits panel) ─
+  const tailoredSkills = eff.tailored_skills || sk;
   html += sec('Skills');
   const skillCats = [
     ['LLMs & Agentic AI', 'domains', (tailoredSkills.domains||[]).join(', ')],
@@ -2585,7 +2696,27 @@ function tlrRenderPreview(res) {
   ];
   for (const [label, key, items] of skillCats) {
     if (!items) continue;
-    html += `<div style="font-size:10.5pt;margin:2px 0"><strong>${esc(label)}:</strong> <span contenteditable="true" data-edit-path="tailored_skills.${key}">${esc(items)}</span></div>`;
+    const skEdit = editByField[`tailored_skills.${key}`];
+    let diffLine = '';
+    if (skEdit && skEdit.status === 'accepted') {
+      const beforeSet = new Set((skEdit.before||'').split(',').map(s=>s.trim()).filter(Boolean));
+      const afterSet  = new Set((skEdit.after||'').split(',').map(s=>s.trim()).filter(Boolean));
+      const added   = [...afterSet].filter(s=>!beforeSet.has(s));
+      const removed = [...beforeSet].filter(s=>!afterSet.has(s));
+      if (added.length || removed.length) {
+        diffLine = `<div style="font-size:9.5pt;margin:1px 0 3px 12px">
+          ${added.map(s=>`<span style="color:#166534;background:#dcfce7;border-radius:6px;padding:0 5px;margin-right:4px">+ ${esc(s)}</span>`).join('')}
+          ${removed.map(s=>`<span style="color:#991b1b;background:#fee2e2;border-radius:6px;padding:0 5px;margin-right:4px;text-decoration:line-through">${esc(s)}</span>`).join('')}
+        </div>`;
+      }
+    } else if (skEdit && skEdit.status === 'rejected') {
+      diffLine = `<div style="font-size:9.5pt;margin:1px 0 3px 12px;color:#991b1b">✗ rejected — <span style="text-decoration:line-through">${esc(skEdit.after||'')}</span></div>`;
+    } else if (skEdit) {
+      diffLine = `<div style="font-size:9.5pt;margin:1px 0 3px 12px;color:#92400e">? pending — proposed: ${esc(skEdit.after||'')}</div>`;
+    }
+    const editable = (!skEdit || skEdit.status === 'accepted')
+      ? ` contenteditable="true" data-edit-path="tailored_skills.${key}"` : '';
+    html += `<div style="font-size:10.5pt;margin:2px 0"><strong>${esc(label)}:</strong> <span${editable}>${esc(items)}</span></div>${diffLine}`;
   }
 
   html += '</div>';
@@ -2803,15 +2934,10 @@ function tlrShowExtensionCustomizeBanner(res) {
   });
 }
 
-document.getElementById('tlr-analyzeBtn').addEventListener('click', async () => {
-  const jd = document.getElementById('tlr-jd').value.trim();
-  if (!jd) { toast('Paste a job description first', 'err'); return; }
-  const llm = document.getElementById('tlr-llm').value;
-  const btn = document.getElementById('tlr-analyzeBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinning">↻</span> Analyzing…';
-  try {
-    const res = await tlrFetch('/analyze-deep', { method:'POST', body: JSON.stringify({jd_text: jd, company: document.getElementById('tlr-co').value, role: document.getElementById('tlr-role').value, llm}) });
-    tlrLog(`  role: ${res.role || '?'} • level: ${res.level || '?'} • match: ${res.match_score || 0}% • must-have: ${(res.must_have_skills||[]).length} • nice: ${(res.nice_to_have_skills||[]).length} • keywords: ${(res.keywords||[]).length}`);
+// Render an /analyze-deep-shaped analysis into Tailor step 1. Shared by the
+// Analyze Match button and the Analyze-tab handoff (which carries its own
+// analysis in, skipping a duplicate LLM call).
+function tlrRenderAnalysis(res, jd) {
     tlrAnalysis = res;
     tlrSelectedSkills.clear();
     // Pre-select all matched must-have skills
@@ -2850,6 +2976,18 @@ document.getElementById('tlr-analyzeBtn').addEventListener('click', async () => 
     if(res.company && !document.getElementById('tlr-co').value) document.getElementById('tlr-co').value = res.company;
     document.getElementById('tlr-results').style.display = 'block';
     tlrBuildStep2();
+}
+
+document.getElementById('tlr-analyzeBtn').addEventListener('click', async () => {
+  const jd = document.getElementById('tlr-jd').value.trim();
+  if (!jd) { toast('Paste a job description first', 'err'); return; }
+  const llm = document.getElementById('tlr-llm').value;
+  const btn = document.getElementById('tlr-analyzeBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinning">↻</span> Analyzing…';
+  try {
+    const res = await tlrFetch('/analyze-deep', { method:'POST', body: JSON.stringify({jd_text: jd, company: document.getElementById('tlr-co').value, role: document.getElementById('tlr-role').value, llm}) });
+    tlrLog(`  role: ${res.role || '?'} • level: ${res.level || '?'} • match: ${res.match_score || 0}% • must-have: ${(res.must_have_skills||[]).length} • nice: ${(res.nice_to_have_skills||[]).length} • keywords: ${(res.keywords||[]).length}`);
+    tlrRenderAnalysis(res, jd);
     toast('Analysis complete!');
     if (window._extensionImportMode) {
       tlrShowExtensionCustomizeBanner(res);
@@ -2902,7 +3040,8 @@ document.getElementById('tlr-aiRewrite')?.addEventListener('click', async () => 
       company: document.getElementById('tlr-co').value,
       selected_skills: [...tlrSelectedSkills],
       selected_projects: [...tlrSelectedProjects],
-      llm, user_instruction: q
+      llm, user_instruction: q,
+      analysis: tlrAnalysis || {}
     })});
     renderTlrOut(res); tlrRenderPreview(res);
     document.getElementById('tlr-aiAsk').value='';
@@ -2920,7 +3059,8 @@ document.getElementById('tlr-genBtn').addEventListener('click', async () => {
   btn.disabled = true; btn.innerHTML = '<span class="spinning">↻</span> Tailoring resume…';
   try {
     const res = await tlrFetch('/tailor-resume', { method:'POST', body: JSON.stringify({
-      jd_text: jd, role, company, selected_skills: [...tlrSelectedSkills], selected_projects: [...tlrSelectedProjects], llm
+      jd_text: jd, role, company, selected_skills: [...tlrSelectedSkills], selected_projects: [...tlrSelectedProjects], llm,
+      analysis: tlrAnalysis || {}
     })});
     const expCount = (res.experience||[]).length;
     const bulCount = (res.experience||[]).reduce((n,e)=>n+(e.bullets||[]).length, 0);
