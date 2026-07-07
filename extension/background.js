@@ -2,10 +2,63 @@
 
 const tabState = {};
 
+const FETCH_JSON_ALLOWED_HOSTS = [
+  /(^|\.)ashbyhq\.com$/i,
+  /^boards-api\.greenhouse\.io$/i,
+  /(^|\.)greenhouse\.io$/i,
+  /^api\.lever\.co$/i,
+  /(^|\.)lever\.co$/i,
+  /^api\.smartrecruiters\.com$/i,
+  /(^|\.)smartrecruiters\.com$/i,
+  /(^|\.)myworkdayjobs\.com$/i,
+  /(^|\.)icims\.com$/i,
+  /(^|\.)bamboohr\.com$/i,
+  /(^|\.)taleo\.net$/i,
+  /(^|\.)successfactors\.com$/i,
+];
+
+function isAllowedFetchUrl(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    if (!["http:", "https:"].includes(u.protocol)) return false;
+    return FETCH_JSON_ALLOWED_HOSTS.some(re => re.test(u.hostname));
+  } catch (e) {
+    return false;
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab?.id || message.tabId;
 
-  if (message.action === "save_state") {
+  if (message.action === "fetch_json") {
+    const url = message.url || "";
+    if (!isAllowedFetchUrl(url)) {
+      sendResponse({ ok: false, status: 0, error: `URL not allowed: ${url}` });
+      return true;
+    }
+    fetch(url, {
+      method: message.method || "GET",
+      headers: message.headers || { "Accept": "application/json,text/plain,*/*" },
+      body: message.body || undefined,
+      credentials: "omit",
+      cache: "no-store",
+    }).then(async res => {
+      const text = await res.text();
+      let json = null;
+      try { json = text ? JSON.parse(text) : null; } catch (e) {}
+      sendResponse({
+        ok: res.ok,
+        status: res.status,
+        statusText: res.statusText,
+        json,
+        text: json === null ? text : "",
+      });
+    }).catch(e => {
+      sendResponse({ ok: false, status: 0, error: e?.message || String(e) });
+    });
+    return true;
+
+  } else if (message.action === "save_state") {
     tabState[tabId] = { ...tabState[tabId], ...message.data };
     sendResponse({ success: true });
 

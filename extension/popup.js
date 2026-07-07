@@ -95,26 +95,44 @@ let approvedMatches = [];
 // ─────────────────────────────────────────────
 // SESSION PERSISTENCE (survives popup close/reopen)
 // ─────────────────────────────────────────────
+function getSessionStore() {
+  try {
+    return chrome.storage?.session || chrome.storage?.local || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function saveSession(updates) {
   if (!currentTabId) return;
   const key = `tab_${currentTabId}`;
+  const store = getSessionStore();
+  if (!store) return;
   return new Promise(resolve => {
-    chrome.storage.session.get([key], result => {
+    store.get([key], result => {
       const current = result[key] || {};
-      chrome.storage.session.set({ [key]: { ...current, ...updates, ts: Date.now() } }, resolve);
+      store.set({ [key]: { ...current, ...updates, ts: Date.now() } }, resolve);
     });
   });
 }
 
 async function loadSession() {
   if (!currentTabId) return null;
+  const store = getSessionStore();
+  if (!store) return null;
   return new Promise(resolve => {
-    chrome.storage.session.get([`tab_${currentTabId}`], result => {
+    store.get([`tab_${currentTabId}`], result => {
       const data = result[`tab_${currentTabId}`];
       if (data && (Date.now() - (data.ts || 0)) < 7200000) resolve(data);
       else resolve(null);
     });
   });
+}
+
+function removeSession(key) {
+  const store = getSessionStore();
+  if (!store) return;
+  try { store.remove(key); } catch (e) {}
 }
 
 // ─────────────────────────────────────────────
@@ -218,6 +236,23 @@ function getApiUrl() {
 
 function getLlm() {
   return document.getElementById("llmSelect").value || currentLlm;
+}
+
+async function getReadyMatchFromActiveTab() {
+  return new Promise(resolve => {
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      const tabId = tabs[0]?.id || currentTabId;
+      if (!tabId) { resolve(null); return; }
+      chrome.tabs.sendMessage(tabId, { action: "get_ready_match" }, response => {
+        if (chrome.runtime.lastError) {
+          LHLog.warn("tracker", "No ready-match response", { err: chrome.runtime.lastError.message });
+          resolve(null);
+          return;
+        }
+        resolve(response?.match || null);
+      });
+    });
+  });
 }
 
 async function loadSettings() {
@@ -777,7 +812,7 @@ function handleFillProgress(data) {
       log.innerHTML = fillLogEntries.map(e => `<div class="entry">${e}</div>`).join("");
       showEl("fillLog");
     }
-    // Show "Log Application" banner
+    // Show the human-confirmed tracker transition banner.
     showEl("logAppBanner");
     btn.disabled = false; btn.textContent = "Auto-Fill Again";
   } else if (data.status === "error") {
@@ -903,7 +938,7 @@ document.getElementById("chatInput").addEventListener("keydown", e => { if (e.ke
 // ─────────────────────────────────────────────
 document.getElementById("refreshBtn").addEventListener("click", () => {
   pageContext = null; analysisData = null; chatHistory = [];
-  if (currentTabId) chrome.storage.session.remove(`tab_${currentTabId}`);
+  if (currentTabId) removeSession(`tab_${currentTabId}`);
   hideEl("matchResult");
   document.getElementById("chat-history").innerHTML = '<div class="msg bot">Page refreshed. What would you like to know?</div>';
   scrapePageContext(() => loadFAQs());
@@ -927,34 +962,32 @@ document.getElementById("dashboardBtn").addEventListener("click", () => {
 });
 
 // ─────────────────────────────────────────────
-// LOG APPLICATION BANNER (appears after autofill)
+// MARK APPLIED BANNER (appears after autofill)
 // ─────────────────────────────────────────────
 document.getElementById("logAppBtn").addEventListener("click", async () => {
-  const company = lastDetectedCompany || document.getElementById("companyInput")?.value?.trim() || "";
-  const role    = lastDetectedRole    || document.getElementById("roleInput")?.value?.trim()    || "";
-  const platform = lastDetectedPlatform || "";
-
+  const btn = document.getElementById("logAppBtn");
+  btn.disabled = true;
+  btn.textContent = "Marking...";
   try {
-    await fetch(`${getApiUrl()}/applications`, {
+    const match = await getReadyMatchFromActiveTab();
+    if (!match?.id) {
+      throw new Error("No ready queue match found for this page.");
+    }
+    const res = await fetch(`${getApiUrl()}/queue/${encodeURIComponent(match.id)}/mark-applied`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        company: company || "Unknown Company",
-        role: role || "Unknown Role",
-        platform,
-        status: "Applied",
-        date_applied: new Date().toISOString().split("T")[0],
-        url: "",
-        notes: ""
-      })
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
     hideEl("logAppBanner");
-    // Flash success on button
-    const btn = document.getElementById("logAppBtn");
-    btn.textContent = "Logged ✓";
+    btn.textContent = "Marked ✓";
     btn.style.background = "#166534";
+    showStatus("autofillStatus", "success", "Marked queue item as applied.");
   } catch (e) {
-    console.error("Log app failed:", e);
+    btn.disabled = false;
+    btn.textContent = "Mark as Applied";
+    showStatus("autofillStatus", "warning", e?.message || "Could not mark as applied.");
+    LHLog.warn("tracker", "Mark applied failed", { err: e?.message });
   }
 });
 
