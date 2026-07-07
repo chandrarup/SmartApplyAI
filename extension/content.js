@@ -1,6 +1,7 @@
 // LocalHire Agent — Content Script v3.0
 // Architecture: MAIN-world interception → schema → adapters → section parser
 // Legacy autofill flow preserved (extraction is additive, not replacement).
+const LH_INITIAL_PATH = typeof location !== "undefined" ? location.pathname : "";
 
 // ════════════════════════════════════════════════════════════════════════════
 // TELEMETRY — buffered event bus, console + (optional) backend sink
@@ -175,9 +176,40 @@ const CaptureBus = (() => {
   };
 })();
 
+// Keep the manifest narrow, then gate the heavy content-script behavior further
+// so ATS marketing/home pages do not get a panel or background scraping.
+function isLhActivePage() {
+  try {
+    const h = location.hostname.toLowerCase();
+    const p = location.pathname.toLowerCase();
+    const q = location.search.toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1") {
+      return p === "/test" || /^\/test\//.test(p) || /approved|multi_ats_demo|ats/.test(p);
+    }
+    if (/linkedin\.com$/.test(h)) {
+      return /^\/jobs\//.test(p) || !!document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]');
+    }
+    if (/greenhouse\.io$/.test(h)) {
+      return /\/jobs?\//.test(p) || /embed\/job_app|job_app|application|apply/.test(p) || h === "apply.greenhouse.io";
+    }
+    if (/lever\.co$/.test(h)) return /\/apply\b|\/[0-9a-f-]{24,}/i.test(p);
+    if (/ashbyhq\.com$/.test(h)) return /\/application\b|\/[0-9a-f-]{24,}|\/[^/]+\/[^/]+/.test(p);
+    if (/myworkdayjobs\.com$/.test(h)) return /\/job\/|\/apply\b|\/candidate-home/.test(p);
+    if (/icims\.com$/.test(h)) return /\/jobs\//.test(p) || q.includes("mode=apply");
+    if (/bamboohr\.com$/.test(h)) return /\/careers\/|\/jobs\//.test(p);
+    if (/smartrecruiters\.com$/.test(h)) return /\/application\b|\/jobs?\//.test(p) || p.split("/").filter(Boolean).length >= 2;
+    if (/taleo\.net$/.test(h)) return /jobdetail\.ftl|jobapplication\.ftl/.test(p);
+    if (/successfactors\.com$|jobvite\.com$|rippling\.com$|paycom\.com$|workable\.com$|recruitee\.com$|paylocity\.com$/.test(h)) {
+      return /job|apply|application|career|position|requisition/.test(p + " " + q);
+    }
+  } catch (e) {}
+  return false;
+}
+
 // Inject the MAIN-world interceptor (must run at document_start)
 (function injectInterceptor() {
   if (window.top !== window) return;
+  if (!isLhActivePage()) return;
   try {
     if (typeof chrome === "undefined" || !chrome.runtime?.getURL) return;
     const url = chrome.runtime.getURL("injected.js");
@@ -725,7 +757,26 @@ function setRadioGroup(container, value) {
 // ─────────────────────────────────────────────
 // LABEL EXTRACTION — platform-aware
 // ─────────────────────────────────────────────
+function formDocuments(platform = detectPlatform()) {
+  const docs = [document];
+  if (platform !== "icims") return docs;
+  for (const frame of document.querySelectorAll("iframe")) {
+    try {
+      const doc = frame.contentDocument;
+      if (doc && doc.body) docs.push(doc);
+    } catch (e) {
+      // Cross-origin frames are intentionally ignored; the manifest keeps all_frames=false.
+    }
+  }
+  return docs;
+}
+
+function queryFormDocuments(selector, platform = detectPlatform()) {
+  return formDocuments(platform).flatMap(doc => Array.from(doc.querySelectorAll(selector)));
+}
+
 function getLabelForInput(input, platform) {
+  const doc = input.ownerDocument || document;
   // 1. aria-label
   const ariaLabel = input.getAttribute("aria-label");
   if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
@@ -735,7 +786,7 @@ function getLabelForInput(input, platform) {
   const labelledBy = input.getAttribute("aria-labelledby");
   if (labelledBy) {
     const texts = labelledBy.trim().split(/\s+/)
-      .map(id => { const el = document.getElementById(id); return el ? (el.innerText || el.textContent || "").replace(/[\s*✱]+$/, "").trim() : ""; })
+      .map(id => { const el = doc.getElementById(id); return el ? (el.innerText || el.textContent || "").replace(/[\s*✱]+$/, "").trim() : ""; })
       .filter(Boolean);
     if (texts.length) return texts.join(" ");
   }
@@ -772,7 +823,7 @@ function getLabelForInput(input, platform) {
   if (input.id) {
     try {
       const escaped = (typeof CSS !== "undefined" && CSS.escape) ? CSS.escape(input.id) : input.id.replace(/[^\w-]/g, "\\$&");
-      const lbl = document.querySelector(`label[for="${escaped}"]`);
+      const lbl = doc.querySelector(`label[for="${escaped}"]`);
       if (lbl) return (lbl.innerText || lbl.textContent || "").replace(/[\s*✱]+$/, "").trim();
     } catch (e) {}
   }
@@ -815,6 +866,7 @@ function getLabelForInput(input, platform) {
 function detectPlatform() {
   const h = location.hostname;
   const path = location.pathname;
+  const initialPath = LH_INITIAL_PATH || "";
   if (/myworkdayjobs\.com|workday\.com/.test(h)) return "workday";
   if (/greenhouse\.io/.test(h)) return "greenhouse";
   if (/lever\.co/.test(h) && /\/apply/.test(path)) return "lever";
@@ -837,6 +889,11 @@ function detectPlatform() {
   if (/test\/smartrecruiters/.test(path)) return "smartrecruiters";
   if (/test\/linkedin/.test(path)) return "linkedin";
   if (/test\/taleo/.test(path)) return "taleo";
+  if (/test\/ashby/.test(path) || /test\/ashby/.test(initialPath)) return "ashby";
+  if ((h === "localhost" || h === "127.0.0.1") && path === "/test") {
+    const localText = `${document.title || ""} ${document.body?.innerText || ""}`.slice(0, 2000);
+    if (/ashby/i.test(localText)) return "ashby";
+  }
   if (/test\/greenhouse/.test(path)) return "greenhouse";
   if (/test\/workday/.test(path)) return "workday";
   return "generic";
@@ -886,9 +943,10 @@ function getFormFields(platform) {
     ));
   } else if (platform === "icims") {
     // iCIMS: elements with class iCIMS_Input
-    rawInputs = Array.from(document.querySelectorAll(
-      '.iCIMS_Input, input[name*="applicant"], select[name*="applicant"], textarea[name*="applicant"]'
-    ));
+    rawInputs = queryFormDocuments(
+      '.iCIMS_Input, input[name*="applicant"], select[name*="applicant"], textarea[name*="applicant"]',
+      platform
+    );
   } else if (platform === "smartrecruiters") {
     // SmartRecruiters: data-test-id attributes or generic
     rawInputs = Array.from(document.querySelectorAll(
@@ -951,14 +1009,17 @@ function getFormFields(platform) {
 // Also scan radio button groups separately
 function getRadioGroups(platform) {
   const groups = {};
-  let scope = document;
+  let scopes = [document];
   if (platform === "linkedin") {
-    scope = document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]') || document;
+    scopes = [document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]') || document];
+  } else if (platform === "icims") {
+    scopes = formDocuments(platform);
   }
-  const radios = scope.querySelectorAll('input[type="radio"]');
+  const radios = scopes.flatMap(scope => Array.from(scope.querySelectorAll('input[type="radio"]')));
   for (const r of radios) {
     const name = r.name;
     if (!name) continue;
+    const doc = r.ownerDocument || document;
     if (!groups[name]) {
       const container = r.closest("fieldset, .field, .form-group, .application-field, .fab-field, .sr-field, .wd-field, tr, .li-field, [data-automation-id]");
       // BUG 7: Priority — legend > aria-labelledby on container > label without input child > name
@@ -970,7 +1031,7 @@ function getRadioGroups(platform) {
         } else {
           const labelledBy = container.getAttribute("aria-labelledby");
           if (labelledBy) {
-            const el = document.getElementById(labelledBy);
+            const el = doc.getElementById(labelledBy);
             if (el) label = (el.innerText || el.textContent || "").replace(/[\s*✱]+$/, "").trim();
           }
           if (!label || label === name) {
@@ -1303,6 +1364,45 @@ function isExtensionAlive() {
 
 const DEFAULT_API_URL = "http://127.0.0.1:5001";
 
+function getSessionStore() {
+  try {
+    return chrome.storage?.session || chrome.storage?.local || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function hashString(str) {
+  let h = 2166136261;
+  const s = String(str || "");
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16);
+}
+
+function getStoreValue(store, key) {
+  return new Promise(resolve => {
+    if (!store) { resolve(undefined); return; }
+    try {
+      store.get([key], value => {
+        void chrome.runtime.lastError;
+        resolve(value ? value[key] : undefined);
+      });
+    } catch (e) {
+      resolve(undefined);
+    }
+  });
+}
+
+function setStoreValue(store, key, value) {
+  if (!store) return;
+  try {
+    store.set({ [key]: value }, () => { void chrome.runtime.lastError; });
+  } catch (e) {}
+}
+
 async function getSettings() {
   // If the runtime is invalidated, return safe defaults so callers still work.
   if (!isExtensionAlive()) {
@@ -1353,6 +1453,36 @@ async function fetchWithTimeout(url, options, timeoutMs = 45000) {
     }
     throw e;
   }
+}
+
+async function bgFetchJson(url, options = {}, timeoutMs = 20000) {
+  if (!isExtensionAlive()) throw new Error("Extension runtime unavailable");
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Background fetch timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+    try {
+      chrome.runtime.sendMessage({
+        action: "fetch_json",
+        url,
+        method: options.method || "GET",
+        headers: options.headers || undefined,
+        body: options.body || undefined,
+      }, res => {
+        clearTimeout(timer);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!res || !res.ok) {
+          reject(new Error(res?.error || `HTTP ${res?.status || 0}`));
+          return;
+        }
+        resolve(res.json !== null && res.json !== undefined ? res.json : res.text);
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      reject(e);
+    }
+  });
 }
 
 /**
@@ -1643,13 +1773,19 @@ function detectAshbyApplyPage() {
 async function fetchAshbyJDContent(company, jobId) {
   try {
     const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(company)}`;
-    lhLog("INFO", "ashby-api", "Fetching job board", { url, company, jobId });
-    const r = await fetch(url);
-    if (!r.ok) {
-      lhLog("WARN", "ashby-api", `API returned ${r.status}`, { company, jobId });
-      return null;
+    lhLog("INFO", "ashby-api", "Fetching job board via background", { url, company, jobId });
+    let data = null;
+    try {
+      data = await bgFetchJson(url);
+    } catch (bgErr) {
+      lhLog("WARN", "ashby-api", "Background fetch failed; trying page fetch", { error: bgErr?.message || String(bgErr) });
+      const r = await fetch(url);
+      if (!r.ok) {
+        lhLog("WARN", "ashby-api", `API returned ${r.status}`, { company, jobId });
+        return null;
+      }
+      data = await r.json();
     }
-    const data = await r.json();
     const jobs = data.jobs || data.jobPostings || [];
     const job = jobs.find(j => j.id === jobId || j.jobId === jobId);
     if (!job) {
@@ -1664,7 +1800,7 @@ async function fetchAshbyJDContent(company, jobId) {
     lhLog("INFO", "ashby-api", "JD fetched OK", { chars: jdText.length, title });
     return { title, company, location: loc, jdText, sourceAdapter: "ashby-api", confidence: { jd: 0.95 } };
   } catch (e) {
-    lhLog("ERROR", "ashby-api", "Fetch failed", { error: e.message });
+    lhLog("ERROR", "ashby-api", "Fetch failed", { error: e?.message || String(e) });
     return null;
   }
 }
@@ -2315,7 +2451,7 @@ async function retryCascadingField(fieldKey, value, platform, waitMs = 1200) {
 
 async function fillResumeUpload(userData) {
   // Find file inputs labeled Resume/CV
-  const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
+  const inputs = queryFormDocuments('input[type="file"]', detectPlatform());
   const resumeInput = inputs.find(i => {
     const lbl = (getLabelForInput(i, "") || "").toLowerCase() +
                 " " + (i.name || "").toLowerCase() +
@@ -2596,16 +2732,13 @@ const CONTACT_KEYS = new Set([
   "first_name", "last_name", "full_name", "email", "phone", "phone_country",
   "city", "state", "zip", "country", "linkedin", "github", "website", "address_line1",
 ]);
-const autoFilledUrls = new Set(); // guard: approved fill runs once per URL
+const autoFilledUrls = new Set(); // guard: approved fill runs once per detected form step
 
 async function resolveReadyApplication(force = false) {
-  // Cache the match per host so every page of a multi-step flow reuses it.
-  const key = "lh_ready_" + location.host;
-  if (!force && isExtensionAlive()) {
-    const cached = await new Promise(r => {
-      try { chrome.storage.session.get([key], v => { void chrome.runtime.lastError; r(v ? v[key] : undefined); }); }
-      catch (e) { r(undefined); }
-    });
+  const key = "lh_ready_" + location.host + "_" + hashString(location.origin + location.pathname + location.search);
+  const store = isExtensionAlive() ? getSessionStore() : null;
+  if (!force && store) {
+    const cached = await getStoreValue(store, key);
     if (cached !== undefined) return cached; // cached null = "no match here"
   }
   let match = null;
@@ -2613,11 +2746,48 @@ async function resolveReadyApplication(force = false) {
     const { apiUrl } = await getSettings();
     const company = extractCompanyFromPage() || "";
     const qs = new URLSearchParams({ host: location.host, url: location.href, company });
-    const res = await fetch(`${apiUrl}/tracker/match?${qs.toString()}`);
-    if (res.ok) match = (await res.json()).match || null;
-  } catch (e) { match = null; }
-  try { chrome.storage.session.set({ [key]: match }, () => { void chrome.runtime.lastError; }); } catch (e) {}
+    const res = await fetchWithTimeout(`${apiUrl}/tracker/match?${qs.toString()}`, {}, 8000);
+    if (res.ok) {
+      match = (await res.json()).match || null;
+      if (force && !match) panelLog("No queue match for this page.");
+    } else if (force) {
+      panelLog(`Tracker match failed: HTTP ${res.status}`);
+    }
+  } catch (e) {
+    match = null;
+    if (force) panelLog(`Backend offline: ${e?.message || String(e)}`);
+  }
+  setStoreValue(store, key, match);
   return match;
+}
+
+function currentFormSignature(platform = detectPlatform(), fields = null) {
+  try {
+    const formFields = fields || getFormFields(platform);
+    const radios = getRadioGroups(platform);
+    const fieldBits = formFields.slice(0, 80).map(f => [
+      f.type || "",
+      (f.label || "").trim().toLowerCase(),
+      f.name || "",
+      f.element?.id || "",
+      f.options ? f.options.join(",") : "",
+    ].join(":"));
+    const radioBits = Object.values(radios).slice(0, 40).map(g => [
+      "radio",
+      (g.label || "").trim().toLowerCase(),
+      (g.inputs || []).map(i => i.value || i.id || "").join(","),
+    ].join(":"));
+    const descriptor = fieldBits.concat(radioBits).join("|");
+    const page = location.origin + location.pathname + location.search;
+    return `${page}#${hashString(platform + "|" + descriptor)}`;
+  } catch (e) {
+    return location.href;
+  }
+}
+
+function approvedFillGuardKey(item, platform = detectPlatform(), fields = null) {
+  const id = item?.id || "matched";
+  return `${id}:${currentFormSignature(platform, fields)}`;
 }
 
 function pickAnswer(map, field) {
@@ -2677,7 +2847,7 @@ function resolveApprovedAnswer(field, ctx) {
 
 async function fillResumeUploadVersioned(variantId) {
   if (!variantId) return false;
-  const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
+  const inputs = queryFormDocuments('input[type="file"]', detectPlatform());
   const resumeInput = inputs.find(i => {
     const lbl = (getLabelForInput(i, "") || "").toLowerCase() + " " +
                 (i.name || "").toLowerCase() + " " + (i.id || "").toLowerCase();
@@ -2750,8 +2920,8 @@ async function _runApprovedFillInner(item) {
   try {
     const { apiUrl } = await getSettings();
     const [lr, pr] = await Promise.all([
-      fetch(`${apiUrl}/autofill/learned?host=${encodeURIComponent(location.host)}`).catch(() => null),
-      fetch(`${apiUrl}/profile`).catch(() => null),
+      fetchWithTimeout(`${apiUrl}/autofill/learned?host=${encodeURIComponent(location.host)}`, {}, 6000).catch(() => null),
+      fetchWithTimeout(`${apiUrl}/profile`, {}, 6000).catch(() => null),
     ]);
     if (lr && lr.ok) learned = await lr.json().catch(() => ({}));
     if (pr && pr.ok) profile = await pr.json().catch(() => null);
@@ -2811,15 +2981,20 @@ async function _runApprovedFillInner(item) {
   if (counts.unanswered > 0) panelLog(`⏸ ${counts.unanswered} field(s) need your call — see "Needs your call" below.`);
 }
 
-// Auto-fill from an approved package on load / each SPA step, once per URL.
+// Auto-fill from an approved package on load / each SPA step, once per form step.
 async function maybeApprovedAutoFill() {
   if (window.top !== window) return;
+  if (!isLhActivePage()) return;
   if (isCurrentlyFilling) return;
-  if (autoFilledUrls.has(location.href)) return;
   const item = await resolveReadyApplication();
   if (!item) return;
-  if (getFormFields(detectPlatform()).length === 0) return;
-  autoFilledUrls.add(location.href);
+  const platform = detectPlatform();
+  const fields = getFormFields(platform);
+  const radioGroups = getRadioGroups(platform);
+  if (fields.length === 0 && Object.keys(radioGroups).length === 0) return;
+  const key = approvedFillGuardKey(item, platform, fields);
+  if (autoFilledUrls.has(key)) return;
+  autoFilledUrls.add(key);
   panelLog(`↻ Approved item matched — auto-filling ${item.company || "this application"}…`);
   runApprovedFill(item).catch(e => panelLog("Approved auto-fill error: " + e.message));
 }
@@ -2850,7 +3025,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.action === "start_approved_fill") {
     resolveReadyApplication(true).then(item => {
-      if (item) { autoFilledUrls.add(location.href); runApprovedFill(item); }
+      if (item) { autoFilledUrls.add(approvedFillGuardKey(item)); runApprovedFill(item); }
       else sendProgress({ status: "warning", message: "No ready-to-apply item matches this page." });
     });
     sendResponse({ started: true });
@@ -2867,6 +3042,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // even after the user navigates away from the JD page.
 (async function autoCacheJD() {
   if (!isExtensionAlive()) return;
+  if (!isLhActivePage()) return;
   try {
     let jdText = "";
     let jobContext = null;
@@ -2920,7 +3096,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ═════════════════════════════════════════════════════════════════
 // IN-PAGE FLOATING PANEL — visible fill, edit, cover letter, Q&A
 // Injected into every page (top frame only). Persists across navigation
-// via chrome.storage.session keyed by tab origin.
+// via extension storage keyed by tab origin.
 // ═════════════════════════════════════════════════════════════════
 function flashElement(el) {
   if (!el) return;
@@ -2949,22 +3125,13 @@ function panelKey() { return "lh_panel_" + location.host; }
 
 async function loadPanelState() {
   if (!isExtensionAlive()) return;
-  return new Promise(resolve => {
-    try {
-      chrome.storage.session.get([panelKey()], r => {
-        if (chrome.runtime.lastError) { resolve(); return; }
-        const s = r && r[panelKey()];
-        if (s) panelState = { ...panelState, ...s };
-        resolve();
-      });
-    } catch (e) { resolve(); }
-  });
+  const s = await getStoreValue(getSessionStore(), panelKey());
+  if (s) panelState = { ...panelState, ...s };
 }
 
 function savePanelState() {
   if (!isExtensionAlive()) return;
-  try { chrome.storage.session.set({ [panelKey()]: panelState }, () => { void chrome.runtime.lastError; }); }
-  catch (e) {}
+  setStoreValue(getSessionStore(), panelKey(), panelState);
 }
 
 function panelAddFilled(label, value, source) {
@@ -2978,6 +3145,28 @@ function panelLog(msg) {
   if (panelState.log.length > 30) panelState.log.shift();
   savePanelState();
   renderPanel();
+}
+
+async function markApprovedItemApplied() {
+  const item = panelState.approvedItem;
+  if (!item?.id) {
+    panelLog("No approved queue item is active on this page.");
+    return;
+  }
+  try {
+    const { apiUrl } = await getSettings();
+    const res = await fetchWithTimeout(`${apiUrl}/queue/${encodeURIComponent(item.id)}/mark-applied`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }, 15000);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    panelState.appliedAt = new Date().toISOString();
+    savePanelState();
+    panelLog("Marked as applied in tracker.");
+  } catch (e) {
+    panelLog("Mark as applied failed: " + (e?.message || String(e)));
+  }
 }
 
 function injectPanelStyles() {
@@ -3126,6 +3315,10 @@ function renderFillTab() {
       📦 Approved package: <b>${escapeHtml(ai.company || "")}</b>${ai.role ? " — " + escapeHtml(ai.role) : ""}
       ${ai.variantId ? `<div class="lh-approved-sub">resume: ${escapeHtml(ai.variantId)}</div>` : ""}
     </div>` : "";
+  const markApplied = ai && ai.id ? `
+    <button class="lh-btn lh-sec" id="lh-mark-applied" style="margin-top:6px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0">
+      ${panelState.appliedAt ? "Marked Applied ✓" : "Mark as Applied"}
+    </button>` : "";
 
   const by = panelState.filled.reduce((m, f) => { const s = f.source || "auto"; m[s] = (m[s] || 0) + 1; return m; }, {});
   const summary = panelState.filled.length || nc.length ? `
@@ -3154,6 +3347,7 @@ function renderFillTab() {
       <button class="lh-btn lh-sec" id="lh-clear" style="flex:0 0 90px">Clear</button>
     </div>
     <button class="lh-btn lh-sec" id="lh-next" style="margin-top:6px">Next Page →</button>
+    ${markApplied}
     <button class="lh-btn lh-sec" id="lh-customize" style="margin-top:6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">✨ Customize Resume on Web</button>
     ${tracker}
     ${summary}
@@ -3458,7 +3652,7 @@ function bindBodyHandlers(tab) {
     panelEl.querySelector("#lh-fill").onclick = async () => {
       const item = await resolveReadyApplication(true);
       if (item && item.id) {
-        autoFilledUrls.add(location.href);
+        autoFilledUrls.add(approvedFillGuardKey(item));
         panelLog("Starting approved fill…");
         runApprovedFill(item).catch(e => panelLog("Error: " + e.message));
         return;
@@ -3475,6 +3669,14 @@ function bindBodyHandlers(tab) {
       nextBtn.onclick = () => {
         const ok = clickNextButton();
         panelLog(ok ? "→ Clicked Next" : "⚠ Next button not found");
+      };
+    }
+    const markBtn = panelEl.querySelector("#lh-mark-applied");
+    if (markBtn) {
+      markBtn.onclick = async () => {
+        markBtn.disabled = true;
+        await markApprovedItemApplied();
+        renderPanel();
       };
     }
     const customizeBtn = panelEl.querySelector("#lh-customize");
@@ -3717,6 +3919,7 @@ function bindBodyHandlers(tab) {
 
 async function injectPanel() {
   if (window.top !== window) return; // top frame only
+  if (!isLhActivePage()) return;
   if (document.getElementById(PANEL_ID)) return;
   if (!document.body) {
     setTimeout(injectPanel, 500); return;
@@ -3762,10 +3965,12 @@ if (document.readyState === "loading") {
 // ─────────────────────────────────────────────
 (function installSpaRetrigger() {
   if (window.top !== window) return;        // top frame only
+  if (!isLhActivePage()) return;
   if (window.__lhSpaInstalled) return;
   window.__lhSpaInstalled = true;
 
   let lastUrl = location.href;
+  let lastSignature = currentFormSignature(detectPlatform());
 
   function wrapHistoryMethod(method) {
     const original = history[method];
@@ -3784,8 +3989,10 @@ if (document.readyState === "loading") {
     clearTimeout(mutationTimer);
     mutationTimer = setTimeout(() => {
       const currentUrl = location.href;
-      if (currentUrl !== lastUrl) {
+      const currentSignature = currentFormSignature(detectPlatform());
+      if (currentUrl !== lastUrl || currentSignature !== lastSignature) {
         lastUrl = currentUrl;
+        lastSignature = currentSignature;
         window.dispatchEvent(new Event("lh-urlchange"));
       }
     }, 500);
@@ -3797,12 +4004,18 @@ if (document.readyState === "loading") {
       if (isCurrentlyFilling) return; // BUG 8: don't retrigger mid-fill
       await delay(1500);
       if (isCurrentlyFilling) return; // re-check after delay
+      lastUrl = location.href;
+      lastSignature = currentFormSignature(detectPlatform());
 
       // Approved-package fill takes priority on every step (user wants it on every page).
       const item = await resolveReadyApplication();
       if (item) {
-        if (getFormFields(detectPlatform()).length && !autoFilledUrls.has(location.href)) {
-          autoFilledUrls.add(location.href);
+        const platform = detectPlatform();
+        const fields = getFormFields(platform);
+        const radioGroups = getRadioGroups(platform);
+        const key = approvedFillGuardKey(item, platform, fields);
+        if ((fields.length || Object.keys(radioGroups).length) && !autoFilledUrls.has(key)) {
+          autoFilledUrls.add(key);
           panelLog("↻ New step — filling from approved package…");
           runApprovedFill(item).catch(e => panelLog("Approved fill error: " + e.message));
         }

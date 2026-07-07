@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 from tracker import match as tracker_match  # noqa: E402
 from tracker import store as tracker_store  # noqa: E402
-from tracker.config import STATUS_APPROVED, STATUS_READY  # noqa: E402
+from tracker.config import STATUS_APPLIED, STATUS_APPROVED, STATUS_READY  # noqa: E402
 
 PID = "default"
 
@@ -98,6 +98,41 @@ def test_shared_host_without_company_does_not_match():
     ) is None
 
 
+def test_greenhouse_apply_host_matches_posting_job_id():
+    items = [
+        {"id": "a", "company": "Acme", "url": "https://boards.greenhouse.io/acme/jobs/1234567"},
+        {"id": "b", "company": "Beta", "url": "https://boards.greenhouse.io/beta/jobs/7654321"},
+    ]
+    m = tracker_match.best_match(
+        items,
+        host="apply.greenhouse.io",
+        url="https://apply.greenhouse.io/acme/jobs/1234567?gh_jid=1234567",
+    )
+    assert m and m["id"] == "a"
+
+
+def test_lever_apply_step_matches_uuid_posting():
+    job_id = "3db71e58-063f-461b-bf90-edf08dd53264"
+    items = [{"id": "a", "company": "Acme", "url": f"https://jobs.lever.co/acme/{job_id}"}]
+    m = tracker_match.best_match(
+        items,
+        host="jobs.lever.co",
+        url=f"https://jobs.lever.co/acme/{job_id}/apply",
+    )
+    assert m and m["id"] == "a"
+
+
+def test_ashby_application_step_matches_uuid_posting():
+    job_id = "3db71e58-063f-461b-bf90-edf08dd53264"
+    items = [{"id": "a", "company": "Ready", "url": f"https://jobs.ashbyhq.com/ready/{job_id}"}]
+    m = tracker_match.best_match(
+        items,
+        host="jobs.ashbyhq.com",
+        url=f"https://jobs.ashbyhq.com/ready/{job_id}/application",
+    )
+    assert m and m["id"] == "a"
+
+
 # ── 2. GET /tracker/match end-to-end ──────────────────────────────────────────
 def test_tracker_match_endpoint_only_ready(client, dbs):
     # An approved-but-not-yet-released item must NOT be offered for autofill.
@@ -138,3 +173,18 @@ def test_patch_merges_answers(client, dbs):
     assert r.json()["answers"] == {"Q1": "a1", "Q2": "a2"}
     # Persisted, not just echoed.
     assert tracker_store.get_application(PID, app["id"])["answers"] == {"Q1": "a1", "Q2": "a2"}
+
+
+def test_queue_mark_applied_endpoint(client, dbs):
+    app = tracker_store.create_application(PID, {
+        "company": "Acme", "role": "ML Engineer", "status": STATUS_READY,
+        "url": "https://boards.greenhouse.io/acme/jobs/1",
+    })
+    r = client.post(f"/queue/{app['id']}/mark-applied")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["application"]["status"] == STATUS_APPLIED
+    assert body["application"]["date_applied"]
+    transitions = [(h["from_status"], h["to_status"]) for h in tracker_store.status_history(PID, app["id"])]
+    assert (STATUS_READY, STATUS_APPLIED) in transitions
