@@ -2381,136 +2381,30 @@ async def analyze_deep(req: DeepAnalyzeRequest, request: Request):
     pid = get_pid(request)
     log_event(log, "INFO", "request", endpoint="POST /analyze-deep", pid=pid,
               jd_len=len(req.jd_text), company=req.company or "?", llm=req.llm)
-    async with processing_lock:
-        user_data = load_pdata(get_pid(request))
-        # Pull all candidate skills (flat list)
-        all_skills = []
-        for cat, items in (user_data.get("skills") or {}).items():
-            if isinstance(items, list):
-                all_skills.extend(items)
+    user_data = load_pdata(pid)
+    try:
+        async with llm_semaphore:
+            extracted = await asyncio.to_thread(
+                scoring.extract_jd_requirements, req.jd_text, req.llm, req.company)
+    except Exception as e:
+        log.error(f"POST /analyze-deep failed — pid={pid}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-        candidate_skills_text = ", ".join(all_skills[:120]).lower()
-        # Pre-extract company from JD text with regex before asking LLM
-        def _extract_company(text: str, hint: str = "") -> str:
-            if hint and hint.strip() and len(hint.strip()) < 80:
-                return hint.strip()
-            # Common patterns: "at CompanyName", "Company: X", first capitalised org
-            m = (re.search(r'\bat\s+([A-Z][A-Za-z0-9\s&,\.]+?)(?:\.|,|\n|$)', text[:600]) or
-                 re.search(r'Company[:\s]+([A-Z][A-Za-z0-9\s&,\.]+?)(?:\.|,|\n|$)', text[:600]))
-            return m.group(1).strip()[:60] if m else ""
-        inferred_company = _extract_company(req.jd_text, req.company)
+    # Same deterministic judgment + rubric as /analyze — one scorer everywhere.
+    must = [s["skill"] for s in extracted.get("must_have_skills") or []]
+    nice = [s["skill"] for s in extracted.get("nice_to_have_skills") or []]
+    judgments = await asyncio.to_thread(
+        scoring.judge_requirements, pid, must, user_data, knowledge_semantic.search)
+    nice_judgments = await asyncio.to_thread(
+        scoring.judge_requirements, pid, nice, user_data, knowledge_semantic.search)
+    scored = scoring.compute_match_score(judgments, nice_judgments)
+    profile_haystack = scoring.build_profile_haystack(user_data)
 
-        prompt = f"""You are a senior technical recruiter parsing a SPECIFIC job description.
-
-YOUR ONLY SOURCES OF TRUTH:
-1. THE JOB DESCRIPTION below — this is where ALL skills you list must come from.
-2. THE CANDIDATE PROFILE below — used ONLY to compute the "matched" boolean for each JD skill.
-
-DO NOT invent skills. DO NOT pad lists. DO NOT list the candidate's full skill catalog. Only return skills that are LITERALLY mentioned (or clearly implied) in the JD text.
-
-═══ JOB DESCRIPTION ═══
-{req.jd_text[:6000]}
-═══════════════════════
-
-INFERRED COMPANY (pre-extracted, use this if JD doesn't clearly state one): {inferred_company}
-CANDIDATE TITLE: {user_data.get('autofill',{}).get('current_title','')}
-CANDIDATE SUMMARY: {user_data.get('summary','')[:400]}
-CANDIDATE SKILLS LIST (just for the "matched" flag): {candidate_skills_text[:1500]}
-
-OUTPUT EXACTLY THIS JSON SHAPE — no extra keys, no commentary:
-{{
-  "role": "Exact job title from JD header",
-  "company": "Company name from JD — use INFERRED COMPANY above if the JD body doesn't explicitly state the company name",
-  "level": "Intern|Entry|Mid|Senior|Staff|Manager",
-  "summary": "Plain 2-3 sentence summary of what the role does, in your own words",
-  "responsibilities": ["3-5 concise bullets, each <=15 words, taken from the JD"],
-  "must_have_skills":   [array of 4-8 items],
-  "nice_to_have_skills":[array of 0-5 items],
-  "keywords": [array of 8-12 ATS keywords lifted from the JD],
-  "match_score": <integer 0-100>,
-  "gaps": [array of 0-4 short phrases of what the candidate lacks],
-  "recommendations": [array of 0-3 short phrases of skills candidate likely has but should add]
-}}
-
-Each skill object: {{"skill":"<short name>", "matched":<true if the skill word/phrase appears anywhere in CANDIDATE SKILLS LIST or CANDIDATE TITLE/SUMMARY, case-insensitive — else false>}}
-
-HARD RULES:
-- must_have_skills: ONLY skills that the JD lists as REQUIRED. Cap at 8.
-- nice_to_have_skills: ONLY skills the JD calls "plus", "preferred", "nice to have", "bonus". Cap at 5.
-- Do NOT return more than 8 must-haves under any circumstance.
-- Each skill name must be 1-4 words max. e.g. "AWS" not "Familiarity with AWS/Azure cloud platforms".
-- If the JD doesn't mention a category, return an empty list — do NOT pad with generic skills.
-- match_score = round(100 * matched_must_have_count / total_must_have_count)."""
-        try:
-            content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.1, prefer=req.llm)
-            result = json.loads(clean_json(content))
-
-            # Post-validation: drop any skill not literally found in the JD text.
-            # Small LLMs frequently fabricate "Python", "SQL", etc. as nice-to-haves.
-            jd_lower = req.jd_text.lower()
-            def skill_in_jd(skill_obj):
-                s = (skill_obj.get("skill") or "").strip()
-                if not s or len(s) > 60: return False
-                # Match if any whole word/phrase of the skill appears in the JD
-                tokens = re.split(r"[/,\s]+", s.lower())
-                for t in tokens:
-                    if len(t) >= 3 and t in jd_lower:
-                        return True
-                return s.lower() in jd_lower
-            # Deterministic matching: synonym-aware lookup against candidate's profile text
-            cand_haystack = (
-                candidate_skills_text + " " +
-                (user_data.get("autofill",{}).get("current_title","") or "") + " " +
-                (user_data.get("summary","") or "")
-            ).lower()
-            SYNONYMS = {
-                "ml/dl": ["machine learning", "deep learning", "ml", "dl", "neural"],
-                "llm/rag/fine-tuning": ["llm", "rag", "fine-tuning", "fine tuning", "language model"],
-                "aws/azure cloud": ["aws", "azure", "cloud", "ec2", "s3"],
-                "large data sets": ["big data", "data sets", "dataset", "data pipeline", "etl"],
-                "vector embeddings/databases": ["vector", "embedding", "pinecone", "chroma", "weaviate", "pgvector", "qdrant"],
-                "ml pipelines": ["pipeline", "mlops", "airflow", "kubeflow"],
-                "advanced degree": ["m.s", "master", "ms ", "phd", "ph.d", "doctorate"],
-            }
-            def is_matched(skill_name) -> bool:
-                if isinstance(skill_name, dict):
-                    skill_name = skill_name.get("skill", "")
-                s = str(skill_name or "").lower().strip()
-                if not s: return False
-                # direct token check
-                for tok in re.split(r"[/,\s]+", s):
-                    if len(tok) >= 3 and tok in cand_haystack:
-                        return True
-                # synonym fallback
-                for syns in SYNONYMS.values():
-                    if s in syns or any(syn in s for syn in syns):
-                        if any(syn in cand_haystack for syn in syns):
-                            return True
-                return False
-            for s in result.get("must_have_skills", []):
-                s["matched"] = is_matched(s.get("skill",""))
-            for s in result.get("nice_to_have_skills", []):
-                s["matched"] = is_matched(s.get("skill",""))
-            result["must_have_skills"] = [s for s in result.get("must_have_skills", []) if skill_in_jd(s)][:8]
-            result["nice_to_have_skills"] = [s for s in result.get("nice_to_have_skills", []) if skill_in_jd(s)][:5]
-            # Recompute match_score from validated must-haves
-            mh = result["must_have_skills"]
-            if mh:
-                result["match_score"] = round(100 * sum(1 for s in mh if s.get("matched")) / len(mh))
-            # Fallback: if LLM returned empty/generic company, use inferred
-            if not result.get("company") or len(result.get("company","")) < 3:
-                result["company"] = inferred_company or req.company or ""
-            result["jd_extracted"] = req.jd_text[:4000]
-
-            # Split keywords into covered (already in profile) vs missing (gaps to fill)
-            keywords = result.get("keywords") or []
-            result["keywords_covered"] = [kw for kw in keywords if is_matched(kw)]
-            result["keywords_missing"] = [kw for kw in keywords if not is_matched(kw)]
-            return result
-        except Exception as e:
-            log.error(f"POST /analyze-deep failed — pid={pid}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=str(e))
+    result = _analysis_deep_block(extracted, judgments, nice_judgments,
+                                  scored, profile_haystack, req.jd_text)
+    log_event(log, "INFO", "analyze_deep_ok", pid=pid, score=result.get("match_score"),
+              musts=len(must), gaps=len(result.get("gaps") or []))
+    return result
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 6c: TAILOR RESUME — per-section diff
@@ -2523,6 +2417,9 @@ class TailorResumeRequest(BaseModel):
     selected_projects: list = []
     user_instruction: str = ""
     llm: str = "ollama"
+    # /analyze or /analyze-deep result (with _judgments) — lets the tailor
+    # score on the shared rubric without re-extracting the JD.
+    analysis: dict = Field(default_factory=dict)
 
 def _build_style_fingerprint(user_data: dict) -> dict:
     """Compute style metrics from the candidate's actual resume bullets — feeds into prompts as constraint."""
@@ -2825,7 +2722,7 @@ async def tailor_resume(req: TailorResumeRequest, request: Request):
     return await run_tailoring(
         pid, req.jd_text, role=req.role, company=req.company,
         selected_skills=req.selected_skills, selected_projects=req.selected_projects,
-        user_instruction=req.user_instruction, llm=req.llm,
+        user_instruction=req.user_instruction, llm=req.llm, analysis=req.analysis,
     )
 
 
@@ -2839,6 +2736,7 @@ async def run_tailoring(
     user_instruction: str = "",
     llm: str = "",
     sequential_llm: bool = False,
+    analysis: dict | None = None,
 ) -> dict:
     """Core resume-tailoring pipeline shared by POST /tailor-resume and the nightly
     queue run (M6). Emits grounded `_edits` (evidence rule 2) and passes untrusted LLM
@@ -2942,8 +2840,7 @@ OUTPUT JSON ONLY:
 {{
   "tailored_summary": "<actual rewritten summary>",
   "summary_diff": {{"original": "{user_data.get("summary", "")[:200]}", "tailored": "<same as tailored_summary>"}},
-  "keywords_inserted": ["keywords added in the summary"],
-  "score_estimate": 0
+  "keywords_inserted": ["keywords added in the summary"]
 }}"""
 
         experience_prompt = f"""You are a technical resume editor rewriting ONLY one experience section.
@@ -3049,8 +2946,6 @@ OUTPUT JSON ONLY:
             result["tailored_summary"] = summary_raw.get("tailored_summary", result["tailored_summary"])
             result["summary_diff"] = summary_raw.get("summary_diff", result["summary_diff"])
             result["keywords_inserted"].extend(summary_raw.get("keywords_inserted", []))
-            if summary_raw.get("score_estimate") is not None:
-                result["score_estimate"] = summary_raw.get("score_estimate")
             result["_sections"]["summary"] = {"ok": True, "fallback": False}
 
         if isinstance(experience_raw, Exception):
@@ -3140,6 +3035,28 @@ OUTPUT JSON ONLY:
             master=user_data,
             tailored=result,
         )
+        # ── STEP 6: score estimate on the shared rubric (no extra LLM calls) ──
+        # Uses the analysis judgments when the caller supplies them; otherwise
+        # re-judges the analysis' must-have skills. No analysis → no estimate.
+        base_judgments = (analysis or {}).get("_judgments") or []
+        nice_judgments = (analysis or {}).get("_nice_judgments") or []
+        if not base_judgments:
+            must = [s.get("skill") for s in (analysis or {}).get("must_have_skills") or []
+                    if isinstance(s, dict) and s.get("skill")]
+            if must:
+                base_judgments = await asyncio.to_thread(
+                    scoring.judge_requirements, pid, must, user_data,
+                    knowledge_semantic.search)
+        if base_judgments:
+            tailored_texts = [result.get("tailored_summary", "")]
+            for e in result.get("experience", []):
+                tailored_texts.extend(str(b.get("text") or "") for b in e.get("bullets", []))
+            for lst in (result.get("tailored_skills") or {}).values():
+                if isinstance(lst, list):
+                    tailored_texts.extend(str(s) for s in lst)
+            result["score_estimate"] = scoring.score_after_tailoring(
+                base_judgments, tailored_texts, nice_judgments or None)["score"]
+
         result["_meta"] = {
             "model_used": active_model,
             "profile": pid,

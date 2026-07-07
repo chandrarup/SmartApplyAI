@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
 import main  # noqa: E402
+import scoring  # noqa: E402
 import tailor_edits  # noqa: E402
 
 
@@ -112,15 +113,10 @@ class PromptRecorder:
                 }],
                 "keywords_inserted": ["Kubernetes"],
             })
-        # /analyze
-        if '"skills_matched"' in prompt and "CANDIDATE PROFILE" in prompt:
+        # /analyze summary rewrite (its own call since the grounded rewrite)
+        if '"tailored_summary"' in prompt and "CANDIDATE CURRENT SUMMARY" in prompt:
             return json.dumps({
-                "role": "ML Engineer",
-                "skills_matched": ["Python"],
-                "missing_skill": "Kubernetes",
-                "score": "75",
-                "tailored_summary": "Mock summary.",
-                "selected_projects": [],
+                "tailored_summary": "Mock resume summary long enough to pass the placeholder length check.",
             })
         # cover letter / answer — return benign text (we inspect prompt for exfil risk)
         if "cover letter" in prompt.lower() or "CANDIDATE PROFILE" in prompt:
@@ -150,6 +146,7 @@ def recorder(monkeypatch):
         return []
 
     monkeypatch.setattr(main, "call_llm", rec)
+    monkeypatch.setattr(scoring, "call_llm", rec)
     monkeypatch.setattr(main.constraints_engine, "validate_tailored_resume", _ok_validation)
     monkeypatch.setattr(main.constraints_engine, "humanize_tailored_output", lambda x: x)
     monkeypatch.setattr(main.knowledge_semantic, "search", _no_evidence_search)
@@ -170,10 +167,12 @@ def test_analyze_embeds_hostile_jd_verbatim(client, recorder):
     assert r.status_code == 200
     body = r.json()
     assert "role" in body
-    prompt = recorder.prompts[-1]
-    assert jd in prompt
-    # Vulnerability: full profile serialized in prompt
-    assert "contact_info" in prompt or "CANDIDATE PROFILE" in prompt
+    # JD reaches the extraction prompt verbatim, delimited as data.
+    # (Extraction + summary run concurrently, so check all recorded prompts.)
+    assert any(jd in p for p in recorder.prompts)
+    # Fixed vulnerability: the full profile is no longer raw-dumped into any
+    # /analyze prompt (evidence is retrieved, not serialized wholesale).
+    assert all("contact_info" not in p for p in recorder.prompts)
 
 
 def test_analyze_deep_truncates_stuffed_jd(client, recorder):

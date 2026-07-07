@@ -37,7 +37,10 @@ def test_returns_answers_and_unanswered_shape(client, monkeypatch):
         {"label": "Email", "type": "email"},
         {"label": "Favorite ice cream flavor", "type": "text"},
     ])
-    assert set(data.keys()) == {"answers", "unanswered"}
+    # Hybrid shape: nested answers/unanswered plus answered labels echoed flat
+    # at the top level so a pre-reload content.js keeps filling (see _hybrid).
+    assert {"answers", "unanswered"} <= set(data.keys())
+    assert set(data.keys()) - {"answers", "unanswered"} <= set(data["answers"].keys())
     # Email is grounded by rules; flavor is not answerable and must come back to the user.
     assert data["answers"].get("Email")
     labels = [u["label"] for u in data["unanswered"]]

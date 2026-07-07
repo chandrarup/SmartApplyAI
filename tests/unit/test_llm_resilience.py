@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"
 
 import main  # noqa: E402
 import llm_provider  # noqa: E402
+import scoring  # noqa: E402
 
 
 @pytest.fixture
@@ -25,15 +26,26 @@ def client():
     return TestClient(main.app)
 
 
-def _analyze_json(score="82", projects=None):
+def _extraction_json():
+    """scoring.extract_jd_requirements response for a 'Python ML' JD."""
     return json.dumps({
-        "role": "ML Engineer",
-        "skills_matched": ["Python", "ML"],
-        "missing_skill": "Kubernetes",
-        "score": score,
-        "tailored_summary": "Experienced ML engineer.",
-        "selected_projects": projects or ["GPT-2 Style Small Language Model --- Built from Scratch"],
+        "role": "ML Engineer", "company": "", "level": "Mid", "summary": "ML role.",
+        "responsibilities": [],
+        "must_have_skills": [{"skill": "Python"}, {"skill": "ML"}],
+        "nice_to_have_skills": [], "keywords": ["Python"],
     })
+
+
+def _summary_json():
+    return json.dumps({
+        "tailored_summary": "Experienced ML engineer shipping Python systems in production environments.",
+    })
+
+
+def _mock_analyze_pipeline(monkeypatch):
+    monkeypatch.setattr(scoring, "call_llm", lambda *a, **kw: _extraction_json())
+    monkeypatch.setattr(main, "call_llm", lambda *a, **kw: _summary_json())
+    monkeypatch.setattr(main.knowledge_semantic, "search", lambda *a, **kw: [])
 
 
 # ── call_llm unit tests ───────────────────────────────────────────────────────
@@ -182,13 +194,9 @@ def test_analyze_both_providers_down_graceful_message(client, monkeypatch):
 
 
 def test_analyze_ollama_down_uses_claude_fallback(client, monkeypatch):
-    def smart_llm(messages, temperature=0.3, system="", prefer="ollama", timeout=600, model=None):
-        if prefer == "ollama":
-            # simulate internal fallback already happened at call_llm level
-            pass
-        return _analyze_json()
-
-    monkeypatch.setattr(main, "call_llm", smart_llm)
+    # call_llm's internal provider fallback is opaque to /analyze — as long as
+    # the provider layer returns content, the endpoint succeeds.
+    _mock_analyze_pipeline(monkeypatch)
     r = client.post(
         "/analyze",
         json={"jd_text": "Python ML", "llm": "ollama"},
@@ -295,25 +303,19 @@ def test_autofill_truncation_essential_contact_in_first_5500(client, monkeypatch
 
 # ── Determinism (informational) ───────────────────────────────────────────────
 
-def test_analyze_twice_reports_score_drift(client, monkeypatch):
-    responses = [_analyze_json("75"), _analyze_json("88", projects=["Other Project"])]
-
-    def drifting_llm(*args, **kwargs):
-        return responses.pop(0)
-
-    monkeypatch.setattr(main, "call_llm", drifting_llm)
+def test_analyze_twice_is_deterministic(client, monkeypatch):
+    # The score comes from the deterministic rubric, not LLM free text — the
+    # same JD + profile must score identically run to run (the old test here
+    # documented the drift this fixed).
+    _mock_analyze_pipeline(monkeypatch)
 
     jd = "Machine learning engineer with Python."
     r1 = client.post("/analyze", json={"jd_text": jd, "llm": "ollama"}, headers={"X-Profile-ID": "default"})
     r2 = client.post("/analyze", json={"jd_text": jd, "llm": "ollama"}, headers={"X-Profile-ID": "default"})
     assert r1.status_code == 200 and r2.status_code == 200
-    s1, s2 = r1.json()["score"], r2.json()["score"]
-    p1 = r1.json()["selected_projects"]
-    p2 = r2.json()["selected_projects"]
-    # Informational assertions — documents drift when LLM non-deterministic
-    assert s1 != s2
-    assert p1 != p2
-    pytest.drift_report = {"score_delta": abs(int(s1) - int(s2)), "projects_changed": p1 != p2}
+    assert r1.json()["score"] == r2.json()["score"]
+    assert r1.json()["selected_projects"] == r2.json()["selected_projects"]
+    assert r1.json()["missing_skills"] == r2.json()["missing_skills"]
 
 
 def test_call_ollama_forwards_timeout_to_http_post(monkeypatch):
