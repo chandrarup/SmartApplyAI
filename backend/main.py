@@ -2628,7 +2628,11 @@ def _build_grounded_edits(
     master: dict,
     tailored: dict,
 ) -> list[dict]:
-    """Create additive _edits with evidence grounding and review statuses."""
+    """Create additive _edits with evidence grounding and review statuses.
+
+    Each edit carries an origin_ref (the evidence_ref of the text it rewrites)
+    so ground_edit can treat pure rewrites as self-evidenced (corrected rule 2).
+    """
     edits: list[dict] = []
 
     # Summary edit
@@ -2649,6 +2653,7 @@ def _build_grounded_edits(
                 "evidence_ref": None,
                 "confidence": 0.8,
                 "status": "accepted",
+                "_origin_ref": "summary:summary",
             }
         )
 
@@ -2675,6 +2680,9 @@ def _build_grounded_edits(
                     "evidence_ref": None,
                     "confidence": 0.78,
                     "status": "accepted",
+                    # Matches the semantic corpus ref format (kind:exp:bullet);
+                    # empty original (added bullet) gets no origin.
+                    "_origin_ref": f"experience_bullet:{e_idx}:{b_idx}" if old_text else None,
                 }
             )
 
@@ -2697,17 +2705,22 @@ def _build_grounded_edits(
                 "evidence_ref": None,
                 "confidence": 0.74,
                 "status": "accepted",
+                "_origin_ref": f"skill_category:{key}" if old_items else None,
             }
         )
 
+    profile_terms = tailor_edits.collect_profile_terms(master)
     grounded: list[dict] = []
     for e in edits:
+        origin_ref = e.pop("_origin_ref", None)
         grounded.append(
             tailor_edits.ground_edit(
                 e,
                 pid=pid,
                 jd_text=jd_text,
                 knowledge_search=knowledge_semantic.search,
+                origin_ref=origin_ref,
+                profile_terms=profile_terms,
             )
         )
     return tailor_edits.validate_edits(grounded)
@@ -2787,6 +2800,20 @@ async def run_tailoring(
             for b in (e.get("details") or e.get("bullets") or [])
         ))
 
+        # JD-relevant profile facts retrieved from the knowledge store, so the
+        # rewriter sees the candidate's real angles (client-facing work, custom
+        # tooling, research) instead of a blind concatenation prefix.
+        try:
+            retrieved_hits = knowledge_semantic.search(pid, req.jd_text[:1000], 8)
+        except Exception as e:
+            print(f"[tailor-resume] evidence retrieval failed (continuing): {e}")
+            retrieved_hits = []
+        retrieved_block = ""
+        if retrieved_hits:
+            retrieved_block = "RELEVANT CANDIDATE EVIDENCE (retrieved):\n" + "\n".join(
+                f"- {str(h.get('text') or '')[:220]}" for h in retrieved_hits
+            ) + "\n\n"
+
         # ── STEP 3: Section-specific LLM calls ─────────────────────────────
         # Keep high-risk sections isolated: deterministic project/skills selection,
         # then separate prompts for summary and experience bullets.
@@ -2834,7 +2861,7 @@ SOURCE SUMMARY:
 {user_data.get("summary", "")}
 
 EVIDENCE SNIPPET:
-{evidence_text[:1800]}
+{retrieved_block}{evidence_text[:1800]}
 
 OUTPUT JSON ONLY:
 {{
@@ -2876,7 +2903,7 @@ Bullets:
 {bullets_json}
 
 CANDIDATE EVIDENCE:
-{evidence_text[:2600]}
+{retrieved_block}{evidence_text[:2600]}
 
 OUTPUT JSON ONLY:
 {{
