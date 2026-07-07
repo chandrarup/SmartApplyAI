@@ -349,6 +349,23 @@ log.info(f"PDF output dir: {PDF_OUTPUT_DIR}")
 log.info(f"Profiles dir:   {PROFILES_DIR}")
 log_event(log, "INFO", "startup", logs_dir=LOGS_DIR, log_enabled=is_logging_enabled())
 
+
+def _reindex_default_profile_background():
+    """Refresh the semantic evidence index off the request path at startup.
+
+    embed_profile is incremental (hash-diffed), so this is cheap when nothing
+    changed and picks up newly indexed kinds (education, publications, ...)."""
+    def _run():
+        try:
+            count = knowledge_client.embed_profile("default")
+            log_event(log, "INFO", "startup_reindex", pid="default", evidence_rows=count)
+        except Exception as e:
+            log.warning(f"Startup semantic reindex skipped: {e}")
+    _threading.Thread(target=_run, name="semantic-reindex", daemon=True).start()
+
+
+_reindex_default_profile_background()
+
 # GLOBAL LOCK (The "Traffic Light")
 processing_lock = asyncio.Lock()
 
