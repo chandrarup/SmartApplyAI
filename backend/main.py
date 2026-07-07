@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 import uuid, hashlib
+import contextlib
 import threading as _threading
 from datetime import date as _date
 from datetime import datetime, timezone
@@ -2201,18 +2202,17 @@ async def analyze_job(req: JobRequest, request: Request):
 async def suggest_questions(req: JobRequest, request: Request):
     log_event(log, "INFO", "request", endpoint="POST /suggest-questions",
               pid=get_pid(request), jd_len=len(req.jd_text), llm=req.llm)
-    async with processing_lock:
-        prompt = f"""Analyze this job posting:
+    prompt = f"""Analyze this job posting:
 "{req.jd_text[:7000]}"
 
 Generate 3 short, specific questions a candidate should ask about this role.
 OUTPUT JSON LIST ONLY: ["Question 1", "Question 2", "Question 3"]"""
-        try:
-            content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.4, prefer=req.llm)
-            return json.loads(clean_json(content))
-        except Exception:
-            return ["What is the expected tech stack?", "Is sponsorship available?", "What is the salary range?"]
+    try:
+        content = await _run_llm([{"role": "user", "content": prompt}],
+                                 temperature=0.4, prefer=req.llm)
+        return json.loads(clean_json(content))
+    except Exception:
+        return ["What is the expected tech stack?", "Is sponsorship available?", "What is the salary range?"]
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 3: CHAT
@@ -2221,20 +2221,19 @@ OUTPUT JSON LIST ONLY: ["Question 1", "Question 2", "Question 3"]"""
 async def chat_with_page(request: ChatRequest):
     log_event(log, "INFO", "request", endpoint="POST /chat",
               context_len=len(request.context), history_turns=len(request.history), llm=request.llm)
-    async with processing_lock:
-        system = f"""You are a helpful assistant. Answer the user's question based ONLY on the following webpage context. If the answer isn't in the context, say "I couldn't find that info on this page."
+    system = f"""You are a helpful assistant. Answer the user's question based ONLY on the following webpage context. If the answer isn't in the context, say "I couldn't find that info on this page."
 
 WEBPAGE CONTEXT:
 {request.context[:3000]}"""
-        messages = []
-        if request.history:
-            messages.extend(request.history)
-        messages.append({"role": "user", "content": request.question})
-        try:
-            answer = call_llm(messages, temperature=0.3, system=system, prefer=request.llm)
-            return {"answer": answer}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    messages = []
+    if request.history:
+        messages.extend(request.history)
+    messages.append({"role": "user", "content": request.question})
+    try:
+        answer = await _run_llm(messages, temperature=0.3, system=system, prefer=request.llm)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 4: AUTOFILL
@@ -2391,9 +2390,8 @@ OUTPUT: JSON object where keys are EXACTLY the "label" values shown above and va
 async def answer_question(req: QuestionRequest, request: Request):
     log_event(log, "INFO", "request", endpoint="POST /answer-question",
               pid=get_pid(request), company=req.company or "?", llm=req.llm)
-    async with processing_lock:
-        user_data = _enrich_profile_with_resume_sources(load_pdata(get_pid(request)))
-        prompt = f"""You are an expert job application assistant answering a question on behalf of the candidate.
+    user_data = _enrich_profile_with_resume_sources(load_pdata(get_pid(request)))
+    prompt = f"""You are an expert job application assistant answering a question on behalf of the candidate.
 
 CANDIDATE PROFILE:
 {json.dumps(user_data, indent=2)[:5000]}
@@ -2410,12 +2408,12 @@ INSTRUCTIONS:
 - Approximately {req.word_limit} words
 - Output ONLY the answer text, no preamble."""
 
-        try:
-            content = call_llm([{"role": "user", "content": prompt}],
-                               temperature=0.3, prefer=req.llm)
-            return {"answer": content.strip()}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    try:
+        content = await _run_llm([{"role": "user", "content": prompt}],
+                                 temperature=0.3, prefer=req.llm)
+        return {"answer": content.strip()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 6: COVER LETTER
@@ -2424,12 +2422,11 @@ INSTRUCTIONS:
 async def generate_cover_letter(req: CoverLetterRequest, request: Request):
     log_event(log, "INFO", "request", endpoint="POST /cover-letter",
               pid=get_pid(request), company=req.company or "?", role=req.role or "?", llm=req.llm)
-    async with processing_lock:
-        user_data = load_pdata(get_pid(request))
-        contact = user_data.get("contact_info", {})
-        today = __import__("datetime").date.today().strftime("%B %d, %Y")
+    user_data = load_pdata(get_pid(request))
+    contact = user_data.get("contact_info", {})
+    today = __import__("datetime").date.today().strftime("%B %d, %Y")
 
-        prompt = f"""You are an expert career coach writing a compelling cover letter.
+    prompt = f"""You are an expert career coach writing a compelling cover letter.
 
 CANDIDATE PROFILE:
 {json.dumps(user_data, indent=2)[:5000]}
@@ -2451,20 +2448,20 @@ INSTRUCTIONS:
 - Use the candidate's REAL name, contact info, and experiences
 - Output ONLY the cover letter text, no explanation."""
 
-        try:
-            letter = call_llm([{"role": "user", "content": prompt}],
-                              temperature=0.5, prefer=req.llm, timeout=600)
-            return {
-                "cover_letter": letter.strip(),
-                "metadata": {
-                    "company": req.company,
-                    "role": req.role,
-                    "candidate": contact.get("name", ""),
-                    "generated_date": today
-                }
+    try:
+        letter = await _run_llm([{"role": "user", "content": prompt}],
+                                temperature=0.5, prefer=req.llm, timeout=600)
+        return {
+            "cover_letter": letter.strip(),
+            "metadata": {
+                "company": req.company,
+                "role": req.role,
+                "candidate": contact.get("name", ""),
+                "generated_date": today
             }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 6b: DEEP ANALYZE — categorized skills, summary, role
@@ -2860,7 +2857,11 @@ async def run_tailoring(
         selected_skills=selected_skills or [], selected_projects=selected_projects or [],
         user_instruction=user_instruction or "", llm=llm or "",
     )
-    async with processing_lock:
+    # This pipeline is read-only (LLM calls are capped by llm_semaphore inside
+    # _llm_json) — it no longer holds processing_lock, which is reserved for
+    # pdflatex compiles and the shared tailored_resume.* files. The block shape
+    # is kept to avoid re-indenting the prompt f-strings below.
+    async with contextlib.nullcontext():
         user_data = _enrich_profile_with_resume_sources(load_pdata(pid))
         style = _build_style_fingerprint(user_data)
         bundle = resume_source.build_resume_source_bundle()
@@ -3029,14 +3030,12 @@ OUTPUT JSON ONLY:
                 fallback_model = active_model.split("/", 1)[1]
             elif active_model and active_model not in {"ollama", "claude"} and "/" not in active_model:
                 fallback_model = active_model
-            content = await asyncio.to_thread(
-                call_llm,
+            content = await _run_llm(
                 [{"role": "user", "content": prompt_text}],
-                temperature,
-                "",
-                prefer,
-                600,
-                fallback_model,
+                temperature=temperature,
+                prefer=prefer,
+                timeout=600,
+                model=fallback_model,
             )
             return sanitize_untrusted_text(json.loads(clean_json(content)))
 
