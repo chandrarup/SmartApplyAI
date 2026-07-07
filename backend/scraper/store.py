@@ -218,3 +218,30 @@ def count_all_rows(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT COUNT(*) AS c FROM jobs").fetchone()
     return int(row["c"]) if row else 0
 
+
+
+def stats(db_path: Path | str = DB_PATH) -> dict[str, Any]:
+    """Read-only jobs.db summary for the dashboard sourcing page."""
+    with get_conn(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
+                SUM(CASE WHEN status = 'active' AND is_internship = 1 THEN 1 ELSE 0 END) AS internships,
+                SUM(CASE WHEN status = 'active' AND location_match = 1 THEN 1 ELSE 0 END) AS location_matches,
+                SUM(CASE WHEN first_seen >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS new_24h,
+                COUNT(DISTINCT company) AS companies,
+                MAX(last_seen) AS last_seen
+            FROM jobs
+            """
+        ).fetchone()
+    return {
+        "total": row["total"] or 0,
+        "active": row["active"] or 0,
+        "internships": row["internships"] or 0,
+        "location_matches": row["location_matches"] or 0,
+        "new_24h": row["new_24h"] or 0,
+        "companies": row["companies"] or 0,
+        "last_seen": row["last_seen"],
+    }

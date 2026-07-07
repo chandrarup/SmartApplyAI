@@ -264,6 +264,24 @@ def get_learned_answers(pid: str, host_prefix: str) -> dict:
     }
 
 
+def list_all_learned_answers(pid: str) -> dict:
+    """Every learned answer for a profile, keyed by the raw 'host::label' key."""
+    with _connect() as conn:
+        learned = _section_row(conn, pid, "learned_answers")
+    return learned if isinstance(learned, dict) else {}
+
+
+def delete_learned_answer(pid: str, key: str) -> bool:
+    with _connect() as conn:
+        learned = _section_row(conn, pid, "learned_answers")
+        if not isinstance(learned, dict) or key not in learned:
+            return False
+        del learned[key]
+        _write_section(conn, pid, "learned_answers", learned)
+        conn.commit()
+    return True
+
+
 def create_stub(pid: str, name: str) -> None:
     save_profile(
         pid,
@@ -277,3 +295,47 @@ def create_stub(pid: str, name: str) -> None:
             "summary": "",
         },
     )
+
+
+def list_events(pid: str, limit: int = 100) -> list[dict]:
+    """Memory log: capture events newest-first, for dashboard browsing."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, ts, source_type, raw_text, extracted_json, status, provenance
+            FROM events
+            WHERE profile_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (pid, max(1, min(int(limit), 500))),
+        ).fetchall()
+    out = []
+    for row in rows:
+        try:
+            delta = json.loads(row["extracted_json"] or "{}")
+        except (ValueError, TypeError):
+            delta = {}
+        out.append(
+            {
+                "id": int(row["id"]),
+                "ts": row["ts"],
+                "source_type": row["source_type"],
+                "raw_text": row["raw_text"],
+                "delta": delta,
+                "status": row["status"],
+                "provenance": row["provenance"],
+            }
+        )
+    return out
+
+
+def delete_event(pid: str, event_id: int) -> bool:
+    """Remove one memory event. Committed profile changes are NOT rolled back."""
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM events WHERE id = ? AND profile_id = ?",
+            (int(event_id), pid),
+        )
+        conn.commit()
+    return cur.rowcount > 0

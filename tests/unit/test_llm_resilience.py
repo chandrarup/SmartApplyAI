@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
 import main  # noqa: E402
+import llm_provider  # noqa: E402
 
 
 @pytest.fixture
@@ -48,8 +49,8 @@ def test_ollama_unreachable_falls_back_to_claude(monkeypatch):
         calls.append("claude")
         return "claude-response"
 
-    monkeypatch.setattr(main, "call_ollama", fail_ollama)
-    monkeypatch.setattr(main, "call_claude", ok_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", fail_ollama)
+    monkeypatch.setattr(llm_provider, "call_claude", ok_claude)
 
     out = main.call_llm([{"role": "user", "content": "hi"}], prefer="ollama")
     assert out == "claude-response"
@@ -60,8 +61,8 @@ def test_both_providers_down_raises_runtime_error(monkeypatch):
     def fail(*args, **kwargs):
         raise RuntimeError("provider down")
 
-    monkeypatch.setattr(main, "call_ollama", fail)
-    monkeypatch.setattr(main, "call_claude", fail)
+    monkeypatch.setattr(llm_provider, "call_ollama", fail)
+    monkeypatch.setattr(llm_provider, "call_claude", fail)
 
     with pytest.raises(RuntimeError, match="All LLM providers failed"):
         main.call_llm([{"role": "user", "content": "hi"}], prefer="ollama")
@@ -79,8 +80,8 @@ def test_ollama_timeout_passes_ceiling_and_falls_back(monkeypatch):
         seen["providers"].append("claude")
         return "fallback-ok"
 
-    monkeypatch.setattr(main, "call_ollama", timeout_ollama)
-    monkeypatch.setattr(main, "call_claude", ok_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", timeout_ollama)
+    monkeypatch.setattr(llm_provider, "call_claude", ok_claude)
 
     out = main.call_llm([{"role": "user", "content": "hi"}], prefer="ollama", timeout=600)
     assert out == "fallback-ok"
@@ -99,9 +100,9 @@ def test_prefer_claude_missing_api_key_falls_back_to_ollama(monkeypatch):
         calls.append("ollama")
         return "ollama-wins"
 
-    monkeypatch.setattr(main, "get_anthropic_key", lambda: "")
-    monkeypatch.setattr(main, "call_claude", no_key_claude)
-    monkeypatch.setattr(main, "call_ollama", ok_ollama)
+    monkeypatch.setattr(llm_provider, "get_anthropic_key", lambda: "")
+    monkeypatch.setattr(llm_provider, "call_claude", no_key_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", ok_ollama)
 
     out = main.call_llm([{"role": "user", "content": "hi"}], prefer="claude")
     assert out == "ollama-wins"
@@ -109,7 +110,7 @@ def test_prefer_claude_missing_api_key_falls_back_to_ollama(monkeypatch):
 
 
 def test_prefer_claude_missing_key_and_ollama_down_raises(monkeypatch):
-    monkeypatch.setattr(main, "get_anthropic_key", lambda: "")
+    monkeypatch.setattr(llm_provider, "get_anthropic_key", lambda: "")
 
     def fail_claude(*args, **kwargs):
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
@@ -117,8 +118,8 @@ def test_prefer_claude_missing_key_and_ollama_down_raises(monkeypatch):
     def fail_ollama(*args, **kwargs):
         raise ConnectionError("ollama down")
 
-    monkeypatch.setattr(main, "call_claude", fail_claude)
-    monkeypatch.setattr(main, "call_ollama", fail_ollama)
+    monkeypatch.setattr(llm_provider, "call_claude", fail_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", fail_ollama)
 
     with pytest.raises(RuntimeError, match="All LLM providers failed"):
         main.call_llm([{"role": "user", "content": "hi"}], prefer="claude")
@@ -157,8 +158,11 @@ def test_empty_llm_response_autofill_returns_rule_based_only(client, monkeypatch
     )
     assert r.status_code == 200
     data = r.json()
-    assert "First Name" in data
-    assert "Obscure custom question XYZ?" not in data or data.get("Obscure custom question XYZ?") in ("", None)
+    # New contract: {answers, unanswered}. Rules ground First Name; the obscure
+    # question the empty LLM can't answer must come back as the user's call.
+    assert data["answers"].get("First Name")
+    assert any(u["label"] == "Obscure custom question XYZ?" for u in data["unanswered"])
+    assert "Obscure custom question XYZ?" not in data["answers"]
 
 
 def test_analyze_both_providers_down_graceful_message(client, monkeypatch):
@@ -321,7 +325,9 @@ def test_call_ollama_forwards_timeout_to_http_post(monkeypatch):
         mock.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
         return mock
 
-    monkeypatch.setattr(main.http_requests, "post", fake_post)
+    import requests
+    monkeypatch.setattr(requests, "post", fake_post)
     out = main.call_ollama([{"role": "user", "content": "x"}], timeout=600)
     assert out == "ok"
-    assert seen["timeout"] == 600
+    # call_ollama sends (connect_timeout, read_timeout) so a dead host fails fast
+    assert seen["timeout"] == (llm_provider.OLLAMA_CONNECT_TIMEOUT, 600)

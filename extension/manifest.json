@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LocalHire Agent",
-  "version": "2.0",
+  "version": "2.1",
   "description": "AI-powered job application auto-filler and resume tailoring tool",
   "permissions": [
     "activeTab",
@@ -18,6 +18,9 @@
   "host_permissions": [
     "http://localhost:5001/*",
     "http://127.0.0.1:5001/*",
+    "*://api.ashbyhq.com/*",
+    "*://boards-api.greenhouse.io/*",
+    "*://api.lever.co/*",
     "*://*.myworkdayjobs.com/*",
     "*://*.wd1.myworkdayjobs.com/*",
     "*://*.wd3.myworkdayjobs.com/*",
@@ -44,16 +47,64 @@
   ],
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.myworkdayjobs.com/*",
+        "*://*.wd1.myworkdayjobs.com/*",
+        "*://*.wd3.myworkdayjobs.com/*",
+        "*://*.wd5.myworkdayjobs.com/*",
+        "*://boards.greenhouse.io/*",
+        "*://apply.greenhouse.io/*",
+        "*://*.greenhouse.io/*",
+        "*://jobs.lever.co/*",
+        "*://*.lever.co/*",
+        "*://*.bamboohr.com/*",
+        "*://*.icims.com/*",
+        "*://careers.smartrecruiters.com/*",
+        "*://*.smartrecruiters.com/*",
+        "*://www.linkedin.com/*",
+        "*://*.taleo.net/*",
+        "*://*.successfactors.com/*",
+        "*://*.jobvite.com/*",
+        "*://*.paylocity.com/*",
+        "*://*.ashbyhq.com/*",
+        "*://*.rippling.com/*",
+        "*://*.paycom.com/*",
+        "*://*.workable.com/*",
+        "*://*.recruitee.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_start",
-      "all_frames": true
+      "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
       "resources": ["injected.js"],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "*://*.myworkdayjobs.com/*",
+        "*://*.wd1.myworkdayjobs.com/*",
+        "*://*.wd3.myworkdayjobs.com/*",
+        "*://*.wd5.myworkdayjobs.com/*",
+        "*://boards.greenhouse.io/*",
+        "*://apply.greenhouse.io/*",
+        "*://*.greenhouse.io/*",
+        "*://jobs.lever.co/*",
+        "*://*.lever.co/*",
+        "*://*.bamboohr.com/*",
+        "*://*.icims.com/*",
+        "*://careers.smartrecruiters.com/*",
+        "*://*.smartrecruiters.com/*",
+        "*://www.linkedin.com/*",
+        "*://*.taleo.net/*",
+        "*://*.successfactors.com/*",
+        "*://*.jobvite.com/*",
+        "*://*.paylocity.com/*",
+        "*://*.ashbyhq.com/*",
+        "*://*.rippling.com/*",
+        "*://*.paycom.com/*",
+        "*://*.workable.com/*",
+        "*://*.recruitee.com/*"
+      ]
     }
   ]
 }

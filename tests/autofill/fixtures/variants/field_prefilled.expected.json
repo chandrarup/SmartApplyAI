@@ -13,5 +13,5 @@
   "expect_values": {
     "Phone": "5551234567"
   },
-  "expect_clobber": ["First Name", "Email"]
+  "note": "fillField skips non-empty inputs unless force; empty Phone still fills"
 }

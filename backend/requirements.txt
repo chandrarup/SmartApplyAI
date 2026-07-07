@@ -4,3 +4,4 @@ requests
 jinja2
 sqlite-vec
 sentence-transformers
+pylatexenc

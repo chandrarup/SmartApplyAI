@@ -930,32 +930,10 @@ document.getElementById("dashboardBtn").addEventListener("click", () => {
 // LOG APPLICATION BANNER (appears after autofill)
 // ─────────────────────────────────────────────
 document.getElementById("logAppBtn").addEventListener("click", async () => {
-  const company = lastDetectedCompany || document.getElementById("companyInput")?.value?.trim() || "";
-  const role    = lastDetectedRole    || document.getElementById("roleInput")?.value?.trim()    || "";
-  const platform = lastDetectedPlatform || "";
-
-  try {
-    await fetch(`${getApiUrl()}/applications`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        company: company || "Unknown Company",
-        role: role || "Unknown Role",
-        platform,
-        status: "Applied",
-        date_applied: new Date().toISOString().split("T")[0],
-        url: "",
-        notes: ""
-      })
-    });
-    hideEl("logAppBanner");
-    // Flash success on button
-    const btn = document.getElementById("logAppBtn");
-    btn.textContent = "Logged ✓";
-    btn.style.background = "#166534";
-  } catch (e) {
-    console.error("Log app failed:", e);
-  }
+  hideEl("logAppBanner");
+  const apiUrl = getApiUrl().replace(/\/$/, "");
+  // Use extension panel "Mark as applied" on the posting, or Review Queue in dashboard.
+  chrome.tabs.create({ url: apiUrl + "/dashboard" });
 });
 
 document.getElementById("skipLogBtn").addEventListener("click", () => {

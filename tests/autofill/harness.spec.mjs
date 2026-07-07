@@ -75,6 +75,11 @@ async function runAutofillHarness(page, platform, config) {
         if (el.contentEditable === "true" || el.getAttribute("role") === "textbox") {
           return (el.innerText || el.textContent || "").trim();
         }
+        // Custom widget triggers (div/button comboboxes) carry their value as
+        // data-value or visible text, not .value
+        if (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA" && el.tagName !== "SELECT") {
+          return (el.dataset?.value || el.innerText || el.textContent || "").trim();
+        }
         return (el.value || "").trim();
       }
 
@@ -119,7 +124,7 @@ async function runAutofillHarness(page, platform, config) {
 
           let ok = false;
           try {
-            ok = fillField(platform, f, answer);
+            ok = await fillField(platform, f, answer);
           } catch (e) {
             report.errors.push(`${label}: ${e.message || e}`);
           }
@@ -135,8 +140,10 @@ async function runAutofillHarness(page, platform, config) {
             if (exp !== undefined && after !== exp && !after.includes(exp)) {
               report.wrong.push({ label, kind: "value_mismatch", expected: exp, got: after });
             } else {
-              report.filled.push({ label, value: after, events: ev });
+              report.filled.push({ label, value: after, events: ev, widget: f.widget });
             }
+          } else if (before && after === before) {
+            report.skipped.push({ label, reason: "prefilled_preserved" });
           } else {
             report.unsupported.push({ label, reason: "fillField_false" });
           }
@@ -190,6 +197,12 @@ function assertCase(name, expected, report, errors) {
     if (!w) errors.push(`${name}: expected clobber of prefilled "${label}" but value was preserved`);
   }
 
+  // Prefilled values must survive autofill untouched
+  for (const label of Object.keys(expected.must_not_overwrite || {})) {
+    const w = report.wrong.find((x) => x.label === label && x.kind === "clobber");
+    if (w) errors.push(`${name}: clobbered prefilled "${label}": "${w.expected}" -> "${w.got}"`);
+  }
+
   if (expected.custom_dropdown_unsupported && report.mapped.length > 0) {
     errors.push(`${name}: custom dropdown should not map inputs, got ${labels.join(", ")}`);
   }
@@ -202,6 +215,9 @@ function assertCase(name, expected, report, errors) {
   }
 
   for (const f of report.filled) {
+    // Widget fills (click-to-open comboboxes) select by clicking an option; no
+    // input/change events fire on the trigger element itself.
+    if (f.widget) continue;
     if (f.events && (f.events.input < 1 || f.events.change < 1)) {
       errors.push(`${name}: "${f.label}" fill did not fire input+change events`);
     }

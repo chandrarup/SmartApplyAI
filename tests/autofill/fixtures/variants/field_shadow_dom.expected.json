@@ -1,6 +1,13 @@
 {
   "platform": "workday",
-  "must_map_labels": [],
-  "expect_zero_fields": true,
-  "note": "Shadow DOM fields are not visible to document.querySelector"
+  "must_map_labels": ["First Name", "Email"],
+  "fill": {
+    "First Name": "Alex",
+    "Email": "alex@example.com"
+  },
+  "expect_values": {
+    "First Name": "Alex",
+    "Email": "alex@example.com"
+  },
+  "note": "queryAllDeep descends into open shadow roots; labels resolve via root-aware label[for]"
 }

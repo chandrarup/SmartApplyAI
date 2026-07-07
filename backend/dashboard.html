@@ -255,6 +255,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   <div class="ni" data-pg="pg-review"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review Queue<span class="nbadge" id="queuebadge">0</span></div>
   <div class="ni" data-pg="pg-apps"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>Applications<span class="nbadge" id="navbadge">0</span></div>
 
+  <div class="ns">Automation</div>
+  <div class="ni" data-pg="pg-sourcing"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Job Sourcing</div>
+  <div class="ni" data-pg="pg-knowledge"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Knowledge &amp; Memory</div>
+
   <div class="ns">System</div>
   <div class="ni" data-pg="pg-settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</div>
 </nav>
@@ -305,6 +309,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
         <div class="fld"><label>Company (optional)</label><input id="jd-co" type="text" placeholder="e.g. Google, Meta, Stripe…"></div>
         <div class="fld"><label>Role / Title (optional)</label><input id="jd-role" type="text" placeholder="e.g. Software Engineer L4…"></div>
       </div>
+      <div id="llm-offline-banner" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:8px;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;font-size:13px;line-height:1.45"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <select id="jd-llm" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:#fff;color:var(--t2)">
           <option value="ollama">Loading models…</option>
@@ -710,6 +715,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
     </div>
   </div></div>
   <button class="btn bp" id="saveAutofillBtn">Save Autofill Data</button>
+
+  <div class="card" style="margin-top:16px">
+    <div class="ch"><h3>Learned answers</h3><button class="btn bo bsm" id="af-learnedRefresh">Refresh</button></div>
+    <div class="cb"><p style="font-size:12.5px;color:var(--t4);margin:0 0 10px">Answers you gave in the extension (on "Save &amp; fill" or "Update on page") — reused automatically next time on the same site. Delete any that are wrong.</p>
+      <div id="af-learned"><p style="font-size:13px;color:var(--t4);margin:0">Loading…</p></div>
+    </div>
+  </div>
 </div>
 
 <!-- EXPERIENCE -->
@@ -813,6 +825,67 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   </div>
 </div>
 
+<!-- JOB SOURCING (Automation) -->
+<div id="pg-sourcing" class="pg">
+  <div class="ph"><h2>Job Sourcing</h2><p>Scrape public ATS feeds (Greenhouse / Lever / Ashby), then run matching to fill the Review Queue. Nothing is ever auto-submitted.</p></div>
+  <div class="pipe">
+    <div class="pcol cw"><div class="pl">Active jobs</div><div class="pn" id="js-active">—</div></div>
+    <div class="pcol ca"><div class="pl">New (24h)</div><div class="pn" id="js-new">—</div></div>
+    <div class="pcol ci"><div class="pl">Internships</div><div class="pn" id="js-intern">—</div></div>
+    <div class="pcol cs"><div class="pl">Location match</div><div class="pn" id="js-loc">—</div></div>
+    <div class="pcol co"><div class="pl">Companies</div><div class="pn" id="js-companies">—</div></div>
+  </div>
+  <div class="card">
+    <div class="ch"><h3>1. Scrape job boards</h3></div>
+    <div class="cb" style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn bp" id="scrapeNowBtn">⛏ Scrape Now</button>
+        <span id="scrapeStatus" style="font-size:12.5px;color:var(--g500)">Idle</span>
+      </div>
+      <div class="fhint">Sources come from <code>backend/scraper/companies.yaml</code>. A run takes ~1 minute; boards that 404 are dropped automatically.</div>
+      <pre id="scrapeResult" style="display:none;margin:0;padding:10px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;color:var(--t2);font-size:12px;white-space:pre-wrap"></pre>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><h3>2. Match against your profile</h3></div>
+    <div class="cb" style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn bp" id="matchNowBtn">▶ Run Matching</button>
+        <span id="matchStatus" style="font-size:12.5px;color:var(--g500)">Idle</span>
+      </div>
+      <div class="fhint">Recall → rerank → LLM fit scoring. 70+ enters the Review Queue (Strong 85+, Stretch 70–84). Runs for several minutes with a local model.</div>
+      <pre id="matchResult" style="display:none;margin:0;padding:10px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;color:var(--t2);font-size:12px;white-space:pre-wrap"></pre>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><h3>3. Review</h3></div>
+    <div class="cb"><p style="font-size:13px;color:var(--g500);margin:0">Matched jobs land in the <a href="#" id="gotoQueueLink">Review Queue</a>. Tailor, review edits, approve — you always click submit yourself.</p></div>
+  </div>
+</div>
+
+<!-- KNOWLEDGE & MEMORY (Automation) -->
+<div id="pg-knowledge" class="pg">
+  <div class="ph"><h2>Knowledge &amp; Memory</h2><p>Everything the tailoring engine knows about you — search it, inspect the memory log, and re-index after profile changes.</p></div>
+  <div class="card">
+    <div class="ch"><h3>Semantic search</h3><button class="btn bo bsm" id="kn-embedBtn" title="Re-index profile for semantic search">↻ Re-embed profile</button></div>
+    <div class="cb" style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="kn-query" type="text" placeholder="e.g. distributed training, RAG pipeline, PyTorch…" style="flex:1;min-width:220px">
+        <button class="btn bp" id="kn-searchBtn">Search</button>
+      </div>
+      <div id="kn-results"><p style="font-size:13px;color:var(--t4);margin:0">Search your knowledge store — this is exactly what the evidence rule uses when tailoring.</p></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><h3>Memory log</h3><button class="btn bo bsm" id="kn-eventsRefreshBtn">Refresh</button></div>
+    <div class="cb" id="kn-events"><p style="font-size:13px;color:var(--t4);margin:0">Loading…</p></div>
+  </div>
+  <div class="card">
+    <div class="ch"><h3>All skills in store</h3><span style="font-size:11.5px;color:var(--g500)" id="kn-skillsCount"></span></div>
+    <div class="cb" id="kn-skills"><p style="font-size:13px;color:var(--t4);margin:0">Loading…</p></div>
+  </div>
+</div>
+
 <!-- SETTINGS -->
 <div id="pg-settings" class="pg">
   <div class="ph"><h2>Settings</h2><p>Backend connection and AI model configuration</p></div>
@@ -890,14 +963,39 @@ document.querySelectorAll('.ni').forEach(n=>{
     if(pg) pg.classList.add('active');
     if(n.dataset.pg==='pg-review') loadQueue();
     if(n.dataset.pg==='pg-apps'){ loadApps(); loadAnalytics(); }
+    if(n.dataset.pg==='pg-sourcing') loadSourcing();
+    if(n.dataset.pg==='pg-knowledge') loadKnowledgePage();
+    if(n.dataset.pg==='pg-autofill') loadLearnedAnswers();
   });
 });
 
 // ── API STATUS ───────────────────────────────────
 async function checkApi(){
   const dot=document.getElementById('apiDot'), txt=document.getElementById('apiTxt');
-  try{ await api('/health'); dot.classList.remove('off'); txt.textContent='Backend Online'; }
+  try{
+    await api('/health');
+    dot.classList.remove('off');
+    txt.textContent='Backend Online';
+    await updateLlmBanner();
+  }
   catch{ dot.classList.add('off'); txt.textContent='Backend Offline'; }
+}
+async function updateLlmBanner(){
+  const banner=document.getElementById('llm-offline-banner');
+  if(!banner) return;
+  try{
+    const st=await api('/llm-status');
+    const model=st.ollama_model||'qwen2.5-coder:7b';
+    if(st.ollama){
+      banner.style.display='none';
+      return;
+    }
+    banner.style.display='';
+    const claudeHint=st.claude?' Claude API key is set — switch model to Claude in Settings.':'';
+    banner.innerHTML=`⚠️ <strong>Ollama is offline.</strong> Start the Ollama app (or run <code>ollama serve</code>) and pull <code>${model}</code>. Analyze Match will fail until Ollama responds.${claudeHint}`;
+  }catch{
+    banner.style.display='none';
+  }
 }
 
 // ── LOAD PROFILE ─────────────────────────────────
@@ -966,6 +1064,30 @@ function fillAutofill(){
     if(el && a[key]!==undefined) el.value=a[key];
   });
 }
+async function loadLearnedAnswers(){
+  const box=document.getElementById('af-learned'); if(!box) return;
+  try{
+    const {items=[]}=await api('/autofill/learned/all');
+    if(!items.length){ box.innerHTML='<p style="font-size:13px;color:var(--t4);margin:0">Nothing learned yet. Answers you give in the extension will appear here.</p>'; return; }
+    const byHost={};
+    items.forEach(it=>{ (byHost[it.host]=byHost[it.host]||[]).push(it); });
+    box.innerHTML=Object.entries(byHost).map(([host,rows])=>`
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">${host||'(any site)'}</div>
+        ${rows.map(r=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)">
+          <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">${tlrEsc(r.label)}</div><div style="font-size:12px;color:var(--t3);word-break:break-word">${tlrEsc(r.value)}</div></div>
+          <button class="btn bo bsm" data-del-learned="${tlrEsc(r.key).replace(/"/g,'&quot;')}">Delete</button>
+        </div>`).join('')}
+      </div>`).join('');
+    box.querySelectorAll('[data-del-learned]').forEach(b=>{
+      b.onclick=async()=>{ b.disabled=true; b.textContent='…';
+        try{ await api('/autofill/learned?key='+encodeURIComponent(b.dataset.delLearned),{method:'DELETE'}); toast('Deleted'); loadLearnedAnswers(); }
+        catch(e){ toast('Delete failed: '+e.message,'err'); b.disabled=false; b.textContent='Delete'; }
+      };
+    });
+  }catch(e){ box.innerHTML='<p style="font-size:13px;color:var(--err)">Could not load: '+tlrEsc(e.message)+'</p>'; }
+}
+document.getElementById('af-learnedRefresh')?.addEventListener('click',loadLearnedAnswers);
 document.getElementById('saveAutofillBtn').addEventListener('click',async()=>{
   const btn=document.getElementById('saveAutofillBtn'); btn.disabled=true; btn.textContent='Saving…';
   const g=id=>document.getElementById(id)?.value?.trim()||'';
@@ -1205,6 +1327,154 @@ document.getElementById('kc-proposeBtn').addEventListener('click', proposeKnowle
 document.getElementById('kc-commitBtn').addEventListener('click', commitKnowledgeCapture);
 document.getElementById('ks-refreshBtn').addEventListener('click', loadUnratedSkills);
 
+// ── JOB SOURCING (pipeline control) ──────────────────
+let pipePoll=null;
+function fmtTime(iso){ return iso?new Date(iso).toLocaleTimeString():''; }
+
+async function loadJobsStats(){
+  try{
+    const s=await api('/jobs/stats');
+    document.getElementById('js-active').textContent=s.active;
+    document.getElementById('js-new').textContent=s.new_24h;
+    document.getElementById('js-intern').textContent=s.internships;
+    document.getElementById('js-loc').textContent=s.location_matches;
+    document.getElementById('js-companies').textContent=s.companies;
+  }catch(e){ /* stats are best-effort */ }
+}
+
+function renderPipeJob(kind, st){
+  const statusEl=document.getElementById(kind==='scrape'?'scrapeStatus':'matchStatus');
+  const resEl=document.getElementById(kind==='scrape'?'scrapeResult':'matchResult');
+  const btn=document.getElementById(kind==='scrape'?'scrapeNowBtn':'matchNowBtn');
+  if(!statusEl||!btn) return;
+  btn.disabled = st.state==='running';
+  if(st.state==='running'){ statusEl.textContent='⏳ Running… started '+fmtTime(st.started_at); statusEl.style.color='#b45309'; }
+  else if(st.state==='done'){ statusEl.textContent='✓ Done at '+fmtTime(st.finished_at); statusEl.style.color='#166534'; }
+  else if(st.state==='error'){ statusEl.textContent='✗ Failed: '+(st.error||'unknown'); statusEl.style.color='#b91c1c'; }
+  else { statusEl.textContent='Idle'; statusEl.style.color='var(--g500)'; }
+  if(st.result){ resEl.style.display='block'; resEl.textContent=JSON.stringify(st.result,null,2); }
+}
+
+async function refreshPipelineStatus(){
+  let st;
+  try{ st=await api('/pipeline/status'); }catch(e){ return; }
+  renderPipeJob('scrape', st.scrape||{});
+  renderPipeJob('match', st.match||{});
+  const running=(st.scrape&&st.scrape.state==='running')||(st.match&&st.match.state==='running');
+  if(running && !pipePoll){ pipePoll=setInterval(refreshPipelineStatus, 3000); }
+  if(!running && pipePoll){
+    clearInterval(pipePoll); pipePoll=null;
+    loadJobsStats();                      // fresh counts after a scrape
+    loadQueue().catch(()=>{});            // fresh badge after a match
+  }
+}
+
+async function startPipeline(kind){
+  try{
+    await api('/pipeline/'+kind,{method:'POST'});
+    toast(kind==='scrape'?'Scrape started':'Matching started');
+  }catch(e){ toast('Could not start: '+e.message,'err'); }
+  refreshPipelineStatus();
+}
+
+function loadSourcing(){ loadJobsStats(); refreshPipelineStatus(); }
+document.getElementById('scrapeNowBtn').addEventListener('click',()=>startPipeline('scrape'));
+document.getElementById('matchNowBtn').addEventListener('click',()=>startPipeline('match'));
+document.getElementById('gotoQueueLink').addEventListener('click',e=>{
+  e.preventDefault();
+  document.querySelector('[data-pg="pg-review"]')?.click();
+});
+
+// ── KNOWLEDGE & MEMORY page ──────────────────────────
+async function knSearch(){
+  const q=document.getElementById('kn-query').value.trim();
+  const box=document.getElementById('kn-results');
+  if(!q){ toast('Type a query first','err'); return; }
+  box.innerHTML='<p style="font-size:13px;color:var(--t4);margin:0">Searching…</p>';
+  try{
+    const r=await api('/knowledge/search',{method:'POST',body:JSON.stringify({query_text:q,k:8})});
+    const hits=r.results||[];
+    if(!hits.length){ box.innerHTML='<p style="font-size:13px;color:var(--t4);margin:0">No matches in the knowledge store.</p>'; return; }
+    box.innerHTML=hits.map(h=>`
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">${tlrEsc(h.kind||'item')} · ${tlrEsc(h.evidence_ref||'')} ${h.score!=null?('· '+Number(h.score).toFixed(3)):''}</div>
+        <div style="font-size:13px;color:var(--t2);margin-top:4px;white-space:pre-wrap">${tlrEsc(h.text||'')}</div>
+      </div>`).join('');
+  }catch(e){ box.innerHTML=`<p style="font-size:13px;color:#b91c1c;margin:0">Search failed: ${tlrEsc(e.message)}</p>`; }
+}
+
+async function knEmbed(){
+  const btn=document.getElementById('kn-embedBtn');
+  btn.disabled=true; btn.textContent='Re-embedding…';
+  try{ const r=await api('/knowledge/embed',{method:'POST'}); toast(`Re-embedded ${r.embedded} evidence chunks`); }
+  catch(e){ toast('Re-embed failed: '+e.message,'err'); }
+  finally{ btn.disabled=false; btn.textContent='↻ Re-embed profile'; }
+}
+
+async function loadKnEvents(){
+  const box=document.getElementById('kn-events');
+  try{
+    const r=await api('/knowledge/events?limit=100');
+    const evs=r.events||[];
+    if(!evs.length){ box.innerHTML='<p style="font-size:13px;color:var(--t4);margin:0">No memory events yet. Capture notes from the Skills page to build memory.</p>'; return; }
+    box.innerHTML=evs.map(ev=>{
+      const stColor=ev.status==='committed'?'#166534':'#b45309';
+      const stBg=ev.status==='committed'?'#dcfce7':'#fef3c7';
+      const delta=(ev.delta&&Object.keys(ev.delta).length)?`<pre style="margin:6px 0 0;padding:8px;border:1px solid var(--border);border-radius:6px;background:#f8fafc;font-size:11.5px;white-space:pre-wrap">${tlrEsc(JSON.stringify(ev.delta,null,2))}</pre>`:'';
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px" data-evid="${ev.id}">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--g500)">#${ev.id} · ${fmtDate(ev.ts)} ${fmtTime(ev.ts)} · ${tlrEsc(ev.provenance||ev.source_type||'')}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${stBg};color:${stColor}">${tlrEsc(ev.status||'')}</span>
+          <button class="btn bo bsm" style="margin-left:auto" data-del-ev="${ev.id}">Delete</button>
+        </div>
+        <div style="font-size:12.5px;color:var(--t2);margin-top:6px;white-space:pre-wrap">${tlrEsc((ev.raw_text||'').slice(0,600))}</div>
+        ${delta}
+      </div>`;
+    }).join('');
+    box.querySelectorAll('[data-del-ev]').forEach(b=>b.addEventListener('click',()=>knDeleteEvent(b)));
+  }catch(e){ box.innerHTML=`<p style="font-size:13px;color:#b91c1c;margin:0">Failed to load memory log: ${tlrEsc(e.message)}</p>`; }
+}
+
+async function knDeleteEvent(btn){
+  // two-click confirm — first click arms, second click deletes
+  const id=btn.dataset.delEv;
+  if(btn.dataset.armed!=='1'){
+    btn.dataset.armed='1'; btn.textContent='Really delete?'; btn.style.color='#b91c1c';
+    setTimeout(()=>{ btn.dataset.armed='0'; btn.textContent='Delete'; btn.style.color=''; },3000);
+    return;
+  }
+  try{
+    await api('/knowledge/events/'+id,{method:'DELETE'});
+    toast('Memory event deleted');
+    loadKnEvents();
+  }catch(e){ toast('Delete failed: '+e.message,'err'); }
+}
+
+async function loadKnSkills(){
+  const box=document.getElementById('kn-skills');
+  try{
+    const r=await api('/knowledge/skills');
+    const rows=r.skills||[];
+    document.getElementById('kn-skillsCount').textContent=rows.length+' skills';
+    if(!rows.length){ box.innerHTML='<p style="font-size:13px;color:var(--t4);margin:0">No skills in the store yet.</p>'; return; }
+    box.innerHTML=`<table class="at"><thead><tr><th>Category</th><th>Skill</th><th>Proficiency</th><th>Evidence</th><th>Source</th></tr></thead><tbody>${
+      rows.map(s=>`<tr>
+        <td style="font-size:12px;color:var(--g500)">${tlrEsc(s.category||'')}</td>
+        <td>${tlrEsc(s.name||'')}</td>
+        <td>${s.proficiency!=null?('★'.repeat(s.proficiency)+'☆'.repeat(5-s.proficiency)):'<span style="color:var(--g400)">unrated</span>'}</td>
+        <td style="font-size:12px;max-width:340px">${tlrEsc(s.evidence||'—')}</td>
+        <td style="font-size:12px;color:var(--g500)">${tlrEsc(s.source||'—')}</td>
+      </tr>`).join('')
+    }</tbody></table>`;
+  }catch(e){ box.innerHTML=`<p style="font-size:13px;color:#b91c1c;margin:0">Failed to load skills: ${tlrEsc(e.message)}</p>`; }
+}
+
+function loadKnowledgePage(){ loadKnEvents(); loadKnSkills(); }
+document.getElementById('kn-searchBtn').addEventListener('click', knSearch);
+document.getElementById('kn-query').addEventListener('keydown',e=>{ if(e.key==='Enter') knSearch(); });
+document.getElementById('kn-embedBtn').addEventListener('click', knEmbed);
+document.getElementById('kn-eventsRefreshBtn').addEventListener('click', loadKnEvents);
+
 // ── COMMON ANSWERS ───────────────────────────────
 const QMAP={
   why_this_company:'Why this company?',why_this_role:'Why this role?',
@@ -1239,8 +1509,9 @@ async function loadApps(){
 }
 
 // M6 pipeline vocabulary (matches backend tracker.config)
-const STATUS_ORDER=['approved','ready_to_apply','applied','confirmed','screen','interview','offer','rejected','ghosted'];
+const STATUS_ORDER=['applied','confirmed','screen','interview','offer','rejected','ghosted'];
 const STATUS_LABEL={approved:'Approved',ready_to_apply:'Ready to Apply',applied:'Applied',confirmed:'Confirmed',screen:'Screen',interview:'Interview',offer:'Offer',rejected:'Rejected',ghosted:'Ghosted'};
+const APPS_DEFAULT_STATUSES=new Set(['applied','confirmed','screen','interview','offer','rejected','ghosted']);
 const SCL={approved:'sw',ready_to_apply:'sa',applied:'sa',confirmed:'ss2',screen:'ss2',interview:'si',offer:'so',rejected:'sr',ghosted:'sw'};
 function stLabel(s){ return STATUS_LABEL[s]||s||'—'; }
 
@@ -1255,7 +1526,8 @@ function renderApps(){
   const fpl=document.getElementById('appFiltPl')?.value||'';
   let rows=[...apps].filter(a=>{
     const t=`${a.company} ${a.role} ${a.platform}`.toLowerCase();
-    return(!srch||t.includes(srch))&&(!fst||a.status===fst)&&(!fpl||a.platform===fpl);
+    const statusOk=fst?a.status===fst:APPS_DEFAULT_STATUSES.has(a.status);
+    return(!srch||t.includes(srch))&&statusOk&&(!fpl||a.platform===fpl);
   }).sort((a,b)=>new Date(b.date_applied||b.date_approved||0)-new Date(a.date_applied||a.date_approved||0));
 
   const tb=document.getElementById('appTbody');
@@ -1350,31 +1622,33 @@ async function loadQueue(){
   try{ const r=await api('/queue'); queueItems=r.items||[]; }
   catch(e){ list.innerHTML=`<p style="color:var(--red);font-size:13px;padding:20px">Failed to load queue: ${tlrEsc(e.message)}</p>`; return; }
   const badge=document.getElementById('queuebadge');
-  const openCount=queueItems.filter(i=>i.review_status==='new').length;
-  if(badge) badge.textContent=openCount;
+  const actionCount=queueItems.filter(i=>i.review_status==='new'||i.review_status==='customized').length;
+  if(badge) badge.textContent=actionCount;
   renderQueue();
 }
 
-function chip(txt,kind){
-  const col=kind==='ok'?'#166534':'#b45309', bg=kind==='ok'?'#dcfce7':'#fef3c7';
-  return `<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:${bg};color:${col};margin:2px 3px 0 0">${tlrEsc(txt)}</span>`;
+function _queueSection(title, items, renderFn){
+  if(!items.length) return '';
+  return `<h3 style="margin:18px 0 8px;font-size:13px;color:var(--t2);font-weight:700">${title} · ${items.length}</h3>`+
+    items.map(renderFn).join('');
 }
 
 function renderQueue(){
   const list=document.getElementById('queueList');
   const summary=document.getElementById('queueSummary');
-  const open=queueItems.filter(i=>i.review_status==='new');
-  const strong=open.filter(i=>i.band==='strong').length;
-  summary.textContent=`${open.length} to review · ${strong} strong · ${open.length-strong} stretch`;
-  if(!open.length){ list.innerHTML='<p style="color:var(--g400);font-size:13px;padding:20px">Nothing to review. Run matching + tailoring, or check back after tonight\'s run.</p>'; return; }
-
-  const bands=[['strong','Strong matches (85+)'],['stretch','Stretch matches (70–84)']];
-  list.innerHTML=bands.map(([b,title])=>{
-    const items=open.filter(i=>i.band===b);
-    if(!items.length) return '';
-    return `<h3 style="margin:14px 0 8px;font-size:13px;color:var(--t2)">${title} · ${items.length}</h3>`+
-      items.map(it=>renderQueueCard(it)).join('');
-  }).join('');
+  const needsTailor=queueItems.filter(i=>i.review_status==='new'&&(i.tailor_status==='pending'||i.tailor_status==='failed'));
+  const reviewEdits=queueItems.filter(i=>i.review_status==='new'&&i.tailor_status==='tailored');
+  const readyFill=queueItems.filter(i=>i.review_status==='customized');
+  const open=needsTailor.length+reviewEdits.length+readyFill.length;
+  summary.textContent=`${open} in queue · ${needsTailor.length} to tailor · ${reviewEdits.length} to review · ${readyFill.length} ready to fill`;
+  if(!open){
+    list.innerHTML='<p style="color:var(--g400);font-size:13px;padding:20px">Nothing in the queue. Run matching + tailoring, or check back after tonight\'s run.</p>';
+    return;
+  }
+  list.innerHTML=
+    _queueSection('Needs tailoring', needsTailor, it=>renderQueueCard(it,{mode:'tailor'}))+
+    _queueSection('Review edits', reviewEdits, it=>renderQueueCard(it,{mode:'review'}))+
+    _queueSection('Ready to fill', readyFill, it=>renderQueueCard(it,{mode:'ready'}));
 
   list.querySelectorAll('[data-qexpand]').forEach(h=>h.addEventListener('click',()=>{
     const body=document.getElementById('qbody-'+h.dataset.qexpand);
@@ -1389,15 +1663,40 @@ function renderQueue(){
   }));
   list.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>approveQueueItem(b.dataset.approve)));
   list.querySelectorAll('[data-skip]').forEach(b=>b.addEventListener('click',()=>skipQueueItem(b.dataset.skip)));
+  list.querySelectorAll('[data-tailor-one]').forEach(b=>b.addEventListener('click',()=>tailorOneQueueItem(b.dataset.tailorOne)));
+  list.querySelectorAll('[data-mark-applied]').forEach(b=>b.addEventListener('click',()=>markQueueApplied(b.dataset.markApplied)));
 }
 
-function renderQueueCard(it){
+function chip(txt,kind){
+  const col=kind==='ok'?'#166534':'#b45309', bg=kind==='ok'?'#dcfce7':'#fef3c7';
+  return `<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:${bg};color:${col};margin:2px 3px 0 0">${tlrEsc(txt)}</span>`;
+}
+
+function _fallbackDiffHtml(it){
+  const sd=it.summary_diff;
+  let html='';
+  if(sd&&sd.original&&sd.tailored&&sd.original!==sd.tailored){
+    html+=`<div class="tlr-edit-row" style="margin-top:6px">
+      <div style="font-size:12px;font-weight:700;color:var(--t2)">Summary</div>
+      <div style="font-size:11px;color:#6b7280;margin-top:4px">Before</div>
+      <div style="font-size:12px;color:#6b7280;text-decoration:line-through">${tlrEsc(sd.original)}</div>
+      <div style="font-size:11px;color:#166534;margin-top:4px">After</div>
+      <div style="font-size:12.5px">${tlrEsc(sd.tailored)}</div></div>`;
+  }
+  const secs=it.tailor_sections||{};
+  if(secs.summary&&!secs.summary.ok) html+=`<div style="font-size:11.5px;color:#b45309;margin-top:4px">Summary LLM fallback — master profile kept.</div>`;
+  if(secs.experience&&!secs.experience.ok) html+=`<div style="font-size:11.5px;color:#b45309;margin-top:4px">Experience LLM fallback — original bullets kept.</div>`;
+  return html;
+}
+
+function renderQueueCard(it, opts={}){
+  const mode=opts.mode||'review';
   const mid=it.id;
   if(!queueEdits[mid]) queueEdits[mid]=JSON.parse(JSON.stringify(it.edits||[])).map(e=>({...e,status:e.status||(e.evidence_ref?'accepted':'needs_your_call')}));
   const edits=queueEdits[mid];
   const matched=(it.matched_skills||[]).map(s=>chip(s.skill||s,'ok')).join('');
   const missing=(it.missing_skills||[]).map(s=>chip(s.skill||s,'warn')).join('');
-  const tailorWarn=it.tailor_status!=='tailored'?`<div style="font-size:11.5px;color:#b45309;margin-top:4px">Tailoring ${tlrEsc(it.tailor_status||'pending')}${it.tailor_error?': '+tlrEsc(it.tailor_error):''} — run "Tailor pending".</div>`:'';
+  const tailorWarn=it.tailor_status!=='tailored'?`<div style="font-size:11.5px;color:#b45309;margin-top:4px">Tailoring ${tlrEsc(it.tailor_status||'pending')}${it.tailor_error?': '+tlrEsc(it.tailor_error):''}${mode==='tailor'?' — click Tailor this job below.':' — run "Tailor pending".'}</div>`:'';
   const pf=it.page_fit||{};
   const overflowBadge=pf.wont_fit_one_page?`<span class="pc" style="margin-left:6px;background:#fee2e2;color:#b91c1c;border-color:#fca5a5" title="${tlrEsc((pf.reasons||[]).join(' · '))}">⚠ won't fit one page</span>`:'';
   const overflowDetail=pf.wont_fit_one_page?`<div style="font-size:11.5px;color:#b91c1c;margin-top:4px"><strong>Won't fit one page:</strong> ${tlrEsc((pf.reasons||[]).join(' · '))} — shorten before approving.</div>`:'';
@@ -1417,12 +1716,20 @@ function renderQueueCard(it){
         <button data-editbtn="1" data-mid="${mid}" data-idx="${idx}" data-status="rejected" class="${st==='rejected'?'on':''}">Reject</button>
         <button data-editbtn="1" data-mid="${mid}" data-idx="${idx}" data-status="needs_your_call" class="${st==='needs_your_call'?'on':''}">Needs Call</button>
       </div></div>`;
-  }).join(''):'<span style="font-size:12px;color:var(--t4)">No structured edits — resume uses your master profile as-is.</span>';
+  }).join(''):(_fallbackDiffHtml(it)||'<span style="font-size:12px;color:var(--t4)">No structured edits — resume uses your master profile as-is.</span>');
+
+  const bandBadge=it.band==='strong'?'<span class="pc" style="margin-left:6px;background:#dcfce7;color:#166534">strong</span>':'';
+  const pdfLink=it.resume_variant_id?`<a class="btn bo" href="${apiBase()}/resume/versions/${it.resume_variant_id}/pdf" target="_blank">View PDF ↗</a>`:'';
+  const actions=mode==='tailor'
+    ?`<button class="btn bp" data-tailor-one="${mid}">Tailor this job</button><button class="btn bo" data-skip="${mid}">Skip</button>${it.apply_url?`<a class="btn bo" href="${it.apply_url}" target="_blank">Open posting ↗</a>`:''}`
+    :mode==='ready'
+    ?`${pdfLink}<button class="btn bp" data-mark-applied="${mid}">Mark as applied</button>${it.apply_url?`<a class="btn bo" href="${it.apply_url}" target="_blank">Open posting ↗</a>`:''}`
+    :`<button class="btn bp" data-approve="${mid}" ${it.tailor_status!=='tailored'?'disabled title="Tailor first"':''}>Approve edits</button><button class="btn bo" data-skip="${mid}">Skip</button>${it.apply_url?`<a class="btn bo" href="${it.apply_url}" target="_blank">Open posting ↗</a>`:''}`;
 
   return `<div class="card" style="margin-bottom:10px">
     <div class="ch" data-qexpand="${mid}" style="cursor:pointer">
-      <h3>${tlrEsc(it.company)} — ${tlrEsc(it.title)} <span class="pc" style="margin-left:6px">${it.match_pct}%</span>${overflowBadge}</h3>
-      <span style="font-size:11.5px;color:var(--g500)">▾ review</span>
+      <h3>${tlrEsc(it.company)} — ${tlrEsc(it.title)} <span class="pc" style="margin-left:6px">${it.match_pct}%</span>${bandBadge}${overflowBadge}</h3>
+      <span style="font-size:11.5px;color:var(--g500)">▾ ${mode==='ready'?'ready to fill':'review'}</span>
     </div>
     <div class="cb" id="qbody-${mid}" style="display:none">
       <div style="font-size:12.5px;color:var(--t2);margin-bottom:6px"><strong>Why:</strong> ${tlrEsc(it.rationale||'—')}</div>
@@ -1430,12 +1737,10 @@ function renderQueueCard(it){
       <div style="margin-bottom:8px"><span style="font-size:11px;color:var(--g500)">Missing:</span> ${missing||'—'}</div>
       ${tailorWarn}
       ${overflowDetail}
-      <div style="margin-top:8px;font-weight:600;font-size:12.5px">Proposed edits</div>
-      ${editsHtml}
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn bp" data-approve="${mid}">Approve</button>
-        <button class="btn bo" data-skip="${mid}">Skip</button>
-        ${it.apply_url?`<a class="btn bo" href="${it.apply_url}" target="_blank">Open posting ↗</a>`:''}
+      ${mode!=='ready'?`<div style="margin-top:8px;font-weight:600;font-size:12.5px">Proposed edits</div>${editsHtml}`:''}
+      ${mode==='ready'?`<div style="font-size:12.5px;color:var(--t2);margin-top:8px">Resume customized. Open the posting and use the extension to autofill, then mark as applied when you submit.</div>`:''}
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        ${actions}
       </div>
     </div></div>`;
 }
@@ -1445,18 +1750,51 @@ async function approveQueueItem(mid, force=false){
   try{
     const body={edits:queueEdits[mid]||[]}; if(force) body.force=true;
     await api(`/queue/${mid}/approve`,{method:'POST',body:JSON.stringify(body)});
-    toast('Approved — added to tracker as "approved"');
-    await loadQueue(); await loadApps(); loadAnalytics();
+    toast('Approved — resume customized, ready to fill');
+    await loadQueue();
   }catch(e){
     let detail; try{ detail=JSON.parse(e.message).detail; }catch{ detail=null; }
     if(detail&&detail.error==='dedupe_block'){
       if(confirm('⚠ '+detail.dedupe.reason+'\n\nApprove anyway?')){ return approveQueueItem(mid,true); }
-      btns.forEach(b=>{b.disabled=false;b.textContent='Approve';});
+      btns.forEach(b=>{b.disabled=false;b.textContent='Approve edits';});
       return;
     }
-    toast('Approve failed: '+e.message,'err');
-    btns.forEach(b=>{b.disabled=false;b.textContent='Approve';});
+    const detailStr=typeof detail==='string'?detail:(e.message||'');
+    if(/no tailoring|tailor first/i.test(detailStr)){
+      btns.forEach(b=>{b.textContent='Tailoring…';});
+      try{
+        await api(`/queue/${mid}/tailor`,{method:'POST',body:'{}'});
+        toast('Tailored — review edits and approve');
+        await loadQueue();
+      }catch(te){
+        toast('Tailoring failed: '+te.message,'err');
+      }
+      btns.forEach(b=>{b.disabled=false;b.textContent='Approve edits';});
+      return;
+    }
+    toast('Approve failed: '+(detailStr||e.message),'err');
+    btns.forEach(b=>{b.disabled=false;b.textContent='Approve edits';});
   }
+}
+
+async function tailorOneQueueItem(mid){
+  const btns=document.querySelectorAll(`[data-tailor-one="${mid}"]`);
+  btns.forEach(b=>{b.disabled=true;b.textContent='Tailoring…';});
+  try{
+    await api(`/queue/${mid}/tailor`,{method:'POST',body:'{}'});
+    toast('Tailored — expand card to review edits');
+    await loadQueue();
+  }catch(e){ toast('Tailoring failed: '+e.message,'err'); }
+  finally{ btns.forEach(b=>{b.disabled=false;b.textContent='Tailor this job';}); }
+}
+
+async function markQueueApplied(mid){
+  if(!confirm('Mark this job as applied? It will move to Applications.')) return;
+  try{
+    await api(`/queue/${mid}/mark-applied`,{method:'POST',body:JSON.stringify({})});
+    toast('Marked as applied');
+    await loadQueue(); await loadApps(); loadAnalytics();
+  }catch(e){ toast('Failed: '+e.message,'err'); }
 }
 
 async function skipQueueItem(mid){
@@ -1593,17 +1931,20 @@ async function loadModels(){
   let data;
   try{ data=await api('/models'); }
   catch{
-    // Offline fallback: leave "Loading models…" placeholder replaced with offline message
+    const fallback='ollama/qwen2.5-coder:7b';
     ['jd-llm','tlr-llm','set-llm'].forEach(id=>{
       const sel=document.getElementById(id);
-      sel.innerHTML='<option value="ollama">Ollama (offline — default)</option>';
+      sel.innerHTML=`<option value="${fallback}">Ollama offline — qwen2.5-coder:7b (default)</option>`;
       const saved=localStorage.getItem('lh_llm');
-      if(saved) sel.value=saved;
+      if(saved) _applyModelValue(sel, saved);
     });
+    await updateLlmBanner();
     return;
   }
   const models=data.models||[];
   const saved=localStorage.getItem('lh_llm');
+  // Migrate legacy bare "ollama" localStorage value
+  const savedNorm=(saved==='ollama'&&data.system_default)?`ollama/${data.system_default}`:saved;
   ['jd-llm','tlr-llm','set-llm'].forEach(id=>{
     const sel=document.getElementById(id);
     sel.innerHTML='';
@@ -1614,21 +1955,22 @@ async function loadModels(){
       const og=document.createElement('optgroup');
       og.label=provider==='ollama'?'Ollama (Local)':'Claude (Cloud)';
       group.forEach(m=>{
+        if(m.installed===false) return;
         const opt=document.createElement('option');
         opt.value=m.id;
         opt.textContent=_buildModelLabel(m);
         opt.dataset.isDefault=m.default?'1':'0';
+        const offlineNote=m.reachable===false?' Ollama offline.':'';
         const noteStr = m.note ? ` ${m.note}.` : '';
         opt.dataset.hint=m.provider==='ollama'
-          ?`Local (Ollama)${m.size_gb?' · '+m.size_gb+'GB':''}.${noteStr}`
+          ?`Local (Ollama)${m.size_gb?' · '+m.size_gb+'GB':''}.${noteStr}${offlineNote}`
           :`Cloud (Anthropic API · requires key).${noteStr}`;
         og.appendChild(opt);
       });
       sel.appendChild(og);
     });
-    _applyModelValue(sel, saved);
-    // Sync: if a new resolved value differs from stored, update storage
-    if(sel.value&&sel.value!==saved) localStorage.setItem('lh_llm',sel.value);
+    _applyModelValue(sel, savedNorm);
+    if(sel.value&&sel.value!==savedNorm) localStorage.setItem('lh_llm',sel.value);
   });
   // Sync all three selects to same value
   const resolved=document.getElementById('set-llm').value;
@@ -1641,6 +1983,7 @@ async function loadModels(){
   const hint=document.getElementById('set-llm-hint');
   const opt=document.getElementById('set-llm').selectedOptions[0];
   if(opt&&opt.dataset.hint){ hint.textContent=opt.dataset.hint; hint.style.display=''; }
+  await updateLlmBanner();
 }
 
 // ── SETTINGS ─────────────────────────────────────
@@ -1700,7 +2043,12 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     renderAnalysis(analysis, questions);
     toast('Analysis complete!');
   } catch(e) {
-    toast('Analysis failed: ' + (e.message || 'Check backend/LLM'), 'err');
+    let msg = e.message || 'Check backend/LLM';
+    try { const j = JSON.parse(msg); msg = j.detail || msg; } catch {}
+    if (msg.includes('Ollama') || msg.includes('All LLM providers failed')) {
+      msg = 'LLM unavailable — start Ollama or switch to Claude in Settings. ' + msg.slice(0, 120);
+    }
+    toast('Analysis failed: ' + msg, 'err');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze Match';

@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from backend.knowledge import store as knowledge_store
+try:
+    from backend.knowledge import store as knowledge_store
+except ImportError:
+    from knowledge import store as knowledge_store  # type: ignore
 
 from .llm import call_llm, clean_json
 

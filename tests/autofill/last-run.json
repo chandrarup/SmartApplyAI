@@ -971,12 +971,49 @@
     "pass": true,
     "errors": [],
     "report": {
-      "mapped": [],
-      "filled": [],
+      "mapped": [
+        {
+          "label": "First Name",
+          "type": "text",
+          "name": "wd-first"
+        },
+        {
+          "label": "Email",
+          "type": "email",
+          "name": "wd-email"
+        }
+      ],
+      "filled": [
+        {
+          "label": "First Name",
+          "value": "Alex",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        },
+        {
+          "label": "Email",
+          "value": "alex@example.com",
+          "events": {
+            "input": 1,
+            "change": 1
+          }
+        }
+      ],
       "skipped": [],
       "wrong": [],
       "unsupported": [],
-      "events": {},
+      "events": {
+        "First Name": {
+          "input": 1,
+          "change": 1
+        },
+        "Email": {
+          "input": 1,
+          "change": 1
+        }
+      },
       "errors": [],
       "completed": true,
       "fileScan": {
@@ -1145,12 +1182,33 @@
     "pass": true,
     "errors": [],
     "report": {
-      "mapped": [],
-      "filled": [],
+      "mapped": [
+        {
+          "label": "Work Authorization",
+          "type": "combobox",
+          "name": "custom-dd"
+        }
+      ],
+      "filled": [
+        {
+          "label": "Work Authorization",
+          "value": "Yes",
+          "events": {
+            "input": 0,
+            "change": 0
+          },
+          "widget": "combobox"
+        }
+      ],
       "skipped": [],
       "wrong": [],
       "unsupported": [],
-      "events": {},
+      "events": {
+        "Work Authorization": {
+          "input": 0,
+          "change": 0
+        }
+      },
       "errors": [],
       "completed": true,
       "fileScan": {
@@ -1206,22 +1264,6 @@
       ],
       "filled": [
         {
-          "label": "First Name",
-          "value": "ShouldNotApply",
-          "events": {
-            "input": 1,
-            "change": 1
-          }
-        },
-        {
-          "label": "Email",
-          "value": "overwrite@example.com",
-          "events": {
-            "input": 1,
-            "change": 1
-          }
-        },
-        {
           "label": "Phone",
           "value": "5551234567",
           "events": {
@@ -1230,30 +1272,26 @@
           }
         }
       ],
-      "skipped": [],
-      "wrong": [
+      "skipped": [
         {
           "label": "First Name",
-          "kind": "clobber",
-          "expected": "UserTyped",
-          "got": "ShouldNotApply"
+          "reason": "prefilled_preserved"
         },
         {
           "label": "Email",
-          "kind": "clobber",
-          "expected": "user@example.com",
-          "got": "overwrite@example.com"
+          "reason": "prefilled_preserved"
         }
       ],
+      "wrong": [],
       "unsupported": [],
       "events": {
         "First Name": {
-          "input": 1,
-          "change": 1
+          "input": 0,
+          "change": 0
         },
         "Email": {
-          "input": 1,
-          "change": 1
+          "input": 0,
+          "change": 0
         },
         "Phone": {
           "input": 1,

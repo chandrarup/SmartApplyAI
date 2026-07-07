@@ -106,6 +106,20 @@ def get_learned_answers(pid: str, host_prefix: str) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def list_all_learned_answers(pid: str) -> dict[str, Any]:
+    if not _use_http():
+        return store.list_all_learned_answers(pid)
+    data = _request("GET", "/autofill/learned/all", pid)
+    return data if isinstance(data, dict) else {}
+
+
+def delete_learned_answer(pid: str, key: str) -> bool:
+    if not _use_http():
+        return store.delete_learned_answer(pid, key)
+    data = _request("DELETE", "/autofill/learned", pid, params={"key": key}) or {}
+    return bool(data.get("deleted"))
+
+
 def list_unrated(pid: str) -> list[dict[str, Any]]:
     if not _use_http():
         return rating.list_unrated(pid)
@@ -179,3 +193,31 @@ def create_stub(pid: str, name: str) -> None:
             "summary": "",
         },
     )
+
+
+def list_events(pid: str, limit: int = 100) -> list[dict[str, Any]]:
+    if not _use_http():
+        return store.list_events(pid, limit)
+    data = _request("GET", "/events", pid, params={"limit": int(limit)})
+    return data if isinstance(data, list) else []
+
+
+def delete_event(pid: str, event_id: int) -> bool:
+    if not _use_http():
+        return store.delete_event(pid, event_id)
+    data = _request("DELETE", f"/events/{int(event_id)}", pid) or {}
+    return bool(data.get("deleted"))
+
+
+def list_all_skills(pid: str) -> list[dict[str, Any]]:
+    if not _use_http():
+        return rating.list_all(pid)
+    data = _request("GET", "/skills", pid)
+    return data if isinstance(data, list) else []
+
+
+def embed_profile(pid: str) -> int:
+    if not _use_http():
+        return semantic.embed_profile(pid)
+    data = _request("POST", "/embed", pid) or {}
+    return int(data.get("embedded", 0))

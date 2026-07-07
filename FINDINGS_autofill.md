@@ -2,7 +2,7 @@
 
 **TEST ONLY** — `extension/content.js` was not modified.
 
-Generated: 2026-07-02T23:22:12.877Z
+Generated: 2026-07-03T16:40:18.985Z
 Harness: `tests/autofill/harness.spec.mjs` (Playwright + Chromium)
 
 **Summary:** 13 passed, 0 failed (13 total; smartrecruiters/taleo/workday skipped — no expected.json)
@@ -23,13 +23,13 @@ Harness: `tests/autofill/harness.spec.mjs` (Playwright + Chromium)
 | platform/test_icims | PASS | Low | 15 | 3 | 12 | 0 | 0 |
 | platform/test_bamboohr | PASS | Low | 16 | 3 | 13 | 0 | 0 |
 | platform/test_generic | PASS | Low | 21 | 4 | 17 | 0 | 0 |
-| variant/field_shadow_dom | PASS | **High** | 0 | 0 | 0 | 0 | 0 |
+| variant/field_shadow_dom | PASS | **High** | 2 | 2 | 0 | 0 | 0 |
 | variant/field_dynamic | PASS | Medium | 2 | 2 | 0 | 0 | 0 |
 | variant/field_typeahead | PASS | Medium | 1 | 1 | 0 | 0 | 0 |
 | variant/field_dropdown_native | PASS | Low | 2 | 2 | 0 | 0 | 0 |
-| variant/field_dropdown_custom | PASS | **High** | 0 | 0 | 0 | 0 | 0 |
+| variant/field_dropdown_custom | PASS | **High** | 1 | 1 | 0 | 0 | 0 |
 | variant/field_file_upload | PASS | **High** | 0 | 0 | 0 | 0 | 0 |
-| variant/field_prefilled | PASS | **Critical** | 3 | 3 | 0 | 2 | 0 |
+| variant/field_prefilled | PASS | **Critical** | 3 | 1 | 2 | 0 | 0 |
 | variant/field_multistep | PASS | Medium | 3 | 2 | 1 | 0 | 0 |
 
 ## Per-case detail
@@ -92,8 +92,8 @@ Harness: `tests/autofill/harness.spec.mjs` (Playwright + Chromium)
 ### variant/field_shadow_dom
 
 - **Pass:** true
-- **Mapped:** (none)
-- **Filled:** []
+- **Mapped:** First Name, Email
+- **Filled:** [{"label":"First Name","value":"Alex","events":{"input":1,"change":1}},{"label":"Email","value":"alex@example.com","events":{"input":1,"change":1}}]
 - **Skipped:** []
 - **Wrong:** []
 - **Unsupported:** []
@@ -136,8 +136,8 @@ Harness: `tests/autofill/harness.spec.mjs` (Playwright + Chromium)
 ### variant/field_dropdown_custom
 
 - **Pass:** true
-- **Mapped:** (none)
-- **Filled:** []
+- **Mapped:** Work Authorization
+- **Filled:** [{"label":"Work Authorization","value":"Yes","events":{"input":0,"change":0},"widget":"combobox"}]
 - **Skipped:** []
 - **Wrong:** []
 - **Unsupported:** []
@@ -159,9 +159,9 @@ Harness: `tests/autofill/harness.spec.mjs` (Playwright + Chromium)
 
 - **Pass:** true
 - **Mapped:** First Name, Email, Phone
-- **Filled:** [{"label":"First Name","value":"ShouldNotApply","events":{"input":1,"change":1}},{"label":"Email","value":"overwrite@example.com","events":{"input":1,"change":1}},{"label":"Phone","value":"5551234567","events":{"input":1,"change":1}}]
-- **Skipped:** []
-- **Wrong:** [{"label":"First Name","kind":"clobber","expected":"UserTyped","got":"ShouldNotApply"},{"label":"Email","kind":"clobber","expected":"user@example.com","got":"overwrite@example.com"}]
+- **Filled:** [{"label":"Phone","value":"5551234567","events":{"input":1,"change":1}}]
+- **Skipped:** [{"label":"First Name","reason":"prefilled_preserved"},{"label":"Email","reason":"prefilled_preserved"}]
+- **Wrong:** []
 - **Unsupported:** []
 - **Root cause:** Main fillField path does not skip non-empty fields (BUG 5 fix only in Workday fillByLabelMap).
 - **Proposed fix:** Skip fill when field has user value unless force-overwrite flag set.

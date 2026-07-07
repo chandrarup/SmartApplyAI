@@ -430,6 +430,8 @@
         "remote_work_experience": "Extensive experience working in distributed team environments. Comfortable with async communication, documentation-first workflows, and remote collaboration tools."
     },
     "learned_answers": {
-        "test.workdayjobs.com::custom question": "My answer"
+        "test.workdayjobs.com::custom question": "My answer",
+        "jobs.ashbyhq.com::veteran status": "I am not a protected veteran",
+        "jobs.ashbyhq.com::gender": "Male"
     }
 }

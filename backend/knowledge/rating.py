@@ -168,3 +168,32 @@ def set_rating_by_name(
         "proficiency": proficiency_int,
         "evidence": (evidence or "").strip(),
     }
+
+
+def list_all(pid: str) -> list[dict[str, Any]]:
+    """All skill rows with rating state, for the dashboard knowledge view."""
+    with store._connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, category, name, sort_index, proficiency, evidence, source, first_seen, last_used
+            FROM skills
+            WHERE profile_id = ?
+            ORDER BY category, sort_index, id
+            """,
+            (pid,),
+        ).fetchall()
+
+    return [
+        {
+            "id": int(row["id"]),
+            "category": row["category"],
+            "name": row["name"],
+            "sort_index": int(row["sort_index"]),
+            "proficiency": row["proficiency"],
+            "evidence": row["evidence"],
+            "source": row["source"],
+            "first_seen": row["first_seen"],
+            "last_used": row["last_used"],
+        }
+        for row in rows
+    ]

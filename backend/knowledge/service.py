@@ -168,6 +168,21 @@ def get_autofill_learned(
     return store.get_learned_answers(_pid_or_default(x_profile_id=x_profile_id), host)
 
 
+@app.get("/autofill/learned/all")
+def get_autofill_learned_all(
+    x_profile_id: str | None = Header(default=None),
+) -> dict[str, Any]:
+    return store.list_all_learned_answers(_pid_or_default(x_profile_id=x_profile_id))
+
+
+@app.delete("/autofill/learned")
+def delete_autofill_learned(
+    key: str,
+    x_profile_id: str | None = Header(default=None),
+) -> dict[str, Any]:
+    return {"deleted": store.delete_learned_answer(_pid_or_default(x_profile_id=x_profile_id), key)}
+
+
 @app.get("/skills/unrated")
 def get_skills_unrated(pid: str | None = None, x_profile_id: str | None = Header(default=None)) -> list[dict[str, Any]]:
     return rating.list_unrated(_pid_or_default(pid=pid, x_profile_id=x_profile_id))
@@ -241,3 +256,41 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+@app.get("/events")
+def get_events(
+    limit: int = 100,
+    pid: str | None = None,
+    x_profile_id: str | None = Header(default=None),
+) -> list[dict[str, Any]]:
+    return store.list_events(_pid_or_default(pid=pid, x_profile_id=x_profile_id), limit)
+
+
+@app.delete("/events/{event_id}")
+def delete_event(
+    event_id: int,
+    pid: str | None = None,
+    x_profile_id: str | None = Header(default=None),
+) -> dict[str, Any]:
+    deleted = store.delete_event(_pid_or_default(pid=pid, x_profile_id=x_profile_id), event_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"event {event_id} not found")
+    return {"deleted": True, "event_id": int(event_id)}
+
+
+@app.get("/skills")
+def get_all_skills(
+    pid: str | None = None,
+    x_profile_id: str | None = Header(default=None),
+) -> list[dict[str, Any]]:
+    return rating.list_all(_pid_or_default(pid=pid, x_profile_id=x_profile_id))
+
+
+@app.post("/embed")
+def post_embed(
+    pid: str | None = None,
+    x_profile_id: str | None = Header(default=None),
+) -> dict[str, Any]:
+    count = semantic.embed_profile(_pid_or_default(pid=pid, x_profile_id=x_profile_id))
+    return {"embedded": int(count)}

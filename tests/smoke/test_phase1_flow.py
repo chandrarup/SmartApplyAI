@@ -22,7 +22,7 @@ def _client():
     return TestClient(main.app)
 
 
-def _fake_call_llm(messages, temperature=0.3, system="", prefer="ollama", timeout=600):
+def _fake_call_llm(messages, temperature=0.3, system="", prefer="ollama", timeout=600, model=None, **kwargs):
     prompt = messages[-1]["content"]
     if '"must_have_skills"' in prompt and '"keywords"' in prompt:
         return json.dumps({

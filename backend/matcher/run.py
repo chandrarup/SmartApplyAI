@@ -19,13 +19,9 @@ def _resolve(root: Path, maybe_relative: str) -> Path:
     return path if path.is_absolute() else (root / path)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Matcher pipeline")
-    parser.add_argument("--profile-id", default="default")
-    parser.add_argument("--config", default="")
-    args = parser.parse_args()
-
-    cfg = load_config(args.config or None)
+def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
+    """Full recall → rerank → fit → gate run. Callable from CLI, nightly, or the API."""
+    cfg = load_config(config or None)
     root = Path(__file__).resolve().parents[2]
 
     jobs_db = _resolve(root, cfg.jobs_db_path)
@@ -39,20 +35,20 @@ def main() -> int:
     )
     if not survivors:
         print("[done] no survivors after prefilter")
-        return 0
+        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "prefilter"}
 
     recalled = recall_candidates(
-        profile_id=args.profile_id,
+        profile_id=profile_id,
         jobs=survivors,
         top_recall=cfg.top_recall,
         evidence_k=cfg.recall_evidence_k,
     )
     if not recalled:
         print("[done] no candidates after stage1 recall")
-        return 0
+        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "recall"}
 
     reranked = rerank_candidates(
-        profile_id=args.profile_id,
+        profile_id=profile_id,
         recalled=recalled,
         rerank_model=cfg.rerank_model,
     )
@@ -74,7 +70,7 @@ def main() -> int:
     }
     try:
         fitted = fit_candidates(
-            profile_id=args.profile_id,
+            profile_id=profile_id,
             reranked=reranked,
             top_fit=cfg.top_fit,
             llm_prefer=cfg.llm_prefer,
@@ -89,7 +85,7 @@ def main() -> int:
         print(json.dumps(fitted[0].get("fit", {}), indent=2, ensure_ascii=False))
         stored = gate_and_store(
             matches_db_path=matches_db,
-            profile_id=args.profile_id,
+            profile_id=profile_id,
             fitted=fitted,
             match_threshold=cfg.match_threshold,
             strong_threshold=cfg.strong_threshold,
@@ -102,9 +98,17 @@ def main() -> int:
         f"strong={stored['strong']} stretch={stored['stretch']} "
         f"(MATCH_THRESHOLD={cfg.match_threshold}, STRONG={cfg.strong_threshold})"
     )
+    return {**stored, "stage": "done"}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Matcher pipeline")
+    parser.add_argument("--profile-id", default="default")
+    parser.add_argument("--config", default="")
+    args = parser.parse_args()
+    run_pipeline(profile_id=args.profile_id, config=args.config)
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

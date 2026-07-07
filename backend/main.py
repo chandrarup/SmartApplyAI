@@ -2,13 +2,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 import uuid, hashlib
+import threading as _threading
 from datetime import date as _date
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 import requests as http_requests
 import json
 import os
 import re
 import sqlite3
+import shutil
 import subprocess
 import asyncio
 import time as _time
@@ -48,10 +51,9 @@ app = FastAPI()
 # --- CONFIGURATION ---
 # LLM provider seam lives in llm_provider.py (shared with matcher/teach — CLAUDE.md rule 9)
 from llm_provider import (
-    OLLAMA_MODEL, OLLAMA_API_URL, get_anthropic_key,
-    call_ollama, call_claude, call_llm, clean_json,
+    OLLAMA_MODEL, OLLAMA_API_URL, OLLAMA_HEALTH_URL, get_anthropic_key,
+    call_ollama, call_claude, call_llm, clean_json, ollama_reachable, normalize_llm_prefer,
 )
-OLLAMA_HEALTH_URL = os.getenv("OLLAMA_HEALTH_URL", "http://localhost:11434/api/tags")
 PDF_OUTPUT_DIR = os.path.join(os.getcwd(), "generated_resumes")
 os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
 
@@ -909,6 +911,28 @@ def autofill_learned(host: str, request: Request):
     return knowledge_client.get_learned_answers(pid, host)
 
 
+@app.get("/autofill/learned/all")
+def autofill_learned_all(request: Request):
+    """Every answer the user has taught the autofiller, grouped by host for the UI."""
+    pid = get_pid(request)
+    raw = knowledge_client.list_all_learned_answers(pid)
+    items = []
+    for key, value in (raw or {}).items():
+        host, _, label = str(key).partition("::")
+        items.append({"key": key, "host": host, "label": label, "value": value})
+    items.sort(key=lambda x: (x["host"], x["label"]))
+    return {"items": items}
+
+
+@app.delete("/autofill/learned")
+def autofill_learned_delete(key: str, request: Request):
+    pid = get_pid(request)
+    deleted = knowledge_client.delete_learned_answer(pid, key)
+    if deleted:
+        _mirror_pdata_json(pid)
+    return {"deleted": deleted}
+
+
 @app.post("/knowledge/search")
 def knowledge_search(req: KnowledgeSearchRequest, request: Request):
     pid = get_pid(request)
@@ -938,22 +962,19 @@ def set_claude_key(req: ClaudeKeyRequest):
 @app.get("/llm-status")
 def llm_status():
     """Return provider availability plus local PDF toolchain status."""
-    ollama_ok = False
+    ollama_ok = ollama_reachable(timeout=1.5)
     claude_ok = bool(get_anthropic_key())
-    try:
-        r = http_requests.get(OLLAMA_HEALTH_URL, timeout=2)
-        ollama_ok = r.status_code == 200
-    except Exception:
-        pass
     return {
         "default_provider": "ollama",
         "ollama": ollama_ok,
+        "ollama_model": OLLAMA_MODEL,
+        "ollama_api_url": OLLAMA_API_URL,
         "claude": claude_ok,
         "claude_key_set": claude_ok,
         "pdf_toolchain": {
             "pdflatex": bool(compile_loop.PDFLATEX_BIN and os.path.exists(compile_loop.PDFLATEX_BIN)),
             "pdftotext": bool(compile_loop.PDFTOTEXT_BIN and os.path.exists(compile_loop.PDFTOTEXT_BIN)),
-            "pdfinfo": bool(subprocess.which("pdfinfo")),
+            "pdfinfo": bool(shutil.which("pdfinfo")),
         },
     }
 
@@ -994,7 +1015,7 @@ def list_models(request: Request):
     models = []
     # Ollama models
     try:
-        r = http_requests.get(OLLAMA_HEALTH_URL, timeout=3)
+        r = http_requests.get(OLLAMA_HEALTH_URL, timeout=1.5)
         if r.status_code == 200:
             raw = r.json().get("models", [])
             # Filter out non-text-gen models
@@ -1010,22 +1031,43 @@ def list_models(request: Request):
                 except ValueError:
                     return len(_ORDER)
             filtered.sort(key=_sort_key)
+            installed_names = [m.get("name", "") for m in filtered]
+            default_name = OLLAMA_MODEL if OLLAMA_MODEL in installed_names else (
+                next((n for n in _ORDER if n in installed_names), installed_names[0] if installed_names else OLLAMA_MODEL)
+            )
             for m in filtered:
                 name = m.get("name", "")
+                is_default = name == default_name
+                note = _MODEL_NOTES.get(name, "")
+                if name == OLLAMA_MODEL and OLLAMA_MODEL not in installed_names:
+                    note = (note + " (configured default — not installed; run `ollama pull " + OLLAMA_MODEL + "`)").strip()
                 models.append({
                     "id": f"ollama/{name}",
                     "label": name,
                     "provider": "ollama",
-                    "default": name == OLLAMA_MODEL,
+                    "default": is_default,
                     "size_gb": round(m.get("size", 0) / 1e9, 1),
-                    "note": _MODEL_NOTES.get(name, ""),
+                    "reachable": True,
+                    "note": note,
+                })
+            # Configured default missing from disk — still list it so UI can show pull hint
+            if OLLAMA_MODEL not in installed_names:
+                models.insert(0, {
+                    "id": f"ollama/{OLLAMA_MODEL}",
+                    "label": OLLAMA_MODEL,
+                    "provider": "ollama",
+                    "default": False,
+                    "size_gb": None,
+                    "reachable": True,
+                    "installed": False,
+                    "note": "Configured default — run `ollama pull " + OLLAMA_MODEL + "`",
                 })
     except Exception:
-        # Ollama not reachable — return the configured default as fallback entry
+        # Ollama not reachable — still expose the configured default with canonical id
         models.append({
-            "id": "ollama", "label": OLLAMA_MODEL, "provider": "ollama",
-            "default": True, "size_gb": None,
-            "note": _MODEL_NOTES.get(OLLAMA_MODEL, ""),
+            "id": f"ollama/{OLLAMA_MODEL}", "label": OLLAMA_MODEL, "provider": "ollama",
+            "default": True, "size_gb": None, "reachable": False,
+            "note": f"{_MODEL_NOTES.get(OLLAMA_MODEL, '')} (Ollama offline — start Ollama to use)".strip(),
         })
 
     # Claude (cloud — always available if key set)
@@ -1048,7 +1090,8 @@ def list_models(request: Request):
     cfg = load_profile_config(pid)
     profile_default = cfg.get("preferred_model", "ollama")
 
-    return {"models": models, "profile_default": profile_default, "system_default": OLLAMA_MODEL}
+    return {"models": models, "profile_default": profile_default, "system_default": OLLAMA_MODEL,
+            "ollama_reachable": ollama_reachable(timeout=1.5)}
 
 # ─────────────────────────────────────────────────────────────────
 # PAGES
@@ -1248,6 +1291,130 @@ def knowledge_rate_skill(skill_id: int, request: Request, payload: SkillRatingRe
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+
+# ── Knowledge memory browsing (dashboard Knowledge & Memory page) ────────────
+
+@app.get("/knowledge/events")
+def knowledge_list_events(request: Request, limit: int = 100):
+    pid = get_pid(request)
+    _ensure_profile_in_store(pid)
+    return {"events": knowledge_client.list_events(pid, limit)}
+
+
+@app.delete("/knowledge/events/{event_id}")
+def knowledge_delete_event(event_id: int, request: Request):
+    pid = get_pid(request)
+    if not knowledge_client.delete_event(pid, event_id):
+        raise HTTPException(status_code=404, detail=f"event {event_id} not found")
+    return {"deleted": True, "event_id": event_id}
+
+
+@app.get("/knowledge/skills")
+def knowledge_list_skills(request: Request):
+    pid = get_pid(request)
+    _ensure_profile_in_store(pid)
+    return {"skills": knowledge_client.list_all_skills(pid)}
+
+
+@app.post("/knowledge/embed")
+def knowledge_embed(request: Request):
+    pid = get_pid(request)
+    _ensure_profile_in_store(pid)
+    return {"embedded": knowledge_client.embed_profile(pid)}
+
+
+# ── Pipeline control (dashboard Job Sourcing page) ───────────────────────────
+# Scrape/match run in daemon threads; one at a time per kind (rule 7: a failed
+# run is recorded and surfaced, never silently swallowed).
+
+_PIPELINE_LOCK = _threading.Lock()
+_PIPELINE_STATE: dict = {
+    "scrape": {"state": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+    "match": {"state": "idle", "started_at": None, "finished_at": None, "result": None, "error": None},
+}
+
+
+def _start_pipeline_job(kind: str, target) -> bool:
+    with _PIPELINE_LOCK:
+        if _PIPELINE_STATE[kind]["state"] == "running":
+            return False
+        _PIPELINE_STATE[kind] = {
+            "state": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+
+    def _worker():
+        try:
+            result = target()
+            _PIPELINE_STATE[kind].update(
+                state="done",
+                finished_at=datetime.now(timezone.utc).isoformat(),
+                result=result,
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.error(f"pipeline {kind} failed: {exc}")
+            _PIPELINE_STATE[kind].update(
+                state="error",
+                finished_at=datetime.now(timezone.utc).isoformat(),
+                error=str(exc),
+            )
+
+    _threading.Thread(target=_worker, daemon=True, name=f"pipeline-{kind}").start()
+    return True
+
+
+@app.post("/pipeline/scrape")
+def pipeline_scrape():
+    try:
+        from backend.scraper.run import execute_run
+    except ImportError:
+        from scraper.run import execute_run  # type: ignore
+    if not _start_pipeline_job("scrape", execute_run):
+        raise HTTPException(status_code=409, detail="A scrape run is already in progress")
+    return {"started": True, "kind": "scrape"}
+
+
+@app.post("/pipeline/match")
+def pipeline_match(request: Request):
+    pid = get_pid(request)
+    try:
+        from backend.matcher.run import run_pipeline
+    except ImportError:
+        from matcher.run import run_pipeline  # type: ignore
+
+    def _match_then_tailor():
+        # Match, then tailor the pending queue so every item reaches review already
+        # tailored and can be approved without a separate step (mirrors the nightly flow).
+        matched = run_pipeline(profile_id=pid)
+        try:
+            tailored = asyncio.run(tailor_pending_queue(pid))
+        except Exception as exc:  # noqa: BLE001 — tailoring failure must not lose match results
+            log.error(f"pipeline match: tailoring pass failed: {exc}")
+            tailored = {"error": str(exc)}
+        return {"match": matched, "tailor": tailored}
+
+    if not _start_pipeline_job("match", _match_then_tailor):
+        raise HTTPException(status_code=409, detail="A matcher run is already in progress")
+    return {"started": True, "kind": "match", "profile_id": pid}
+
+
+@app.get("/pipeline/status")
+def pipeline_status():
+    return _PIPELINE_STATE
+
+
+@app.get("/jobs/stats")
+def jobs_stats():
+    try:
+        from backend.scraper.store import stats as jobs_store_stats
+    except ImportError:
+        from scraper.store import stats as jobs_store_stats  # type: ignore
+    return jobs_store_stats()
+
+
 @app.put("/profile/contact")
 def update_contact(request: Request, payload: dict):
     pid = get_pid(request)
@@ -1386,11 +1553,33 @@ def tracker_analytics(request: Request):
 
 @app.get("/tracker/match")
 def tracker_match_page(request: Request, host: str = "", url: str = "", company: str = ""):
-    """Find the ready-to-apply application whose approved package should drive autofill
-    on the current page. Returns {"match": item | None}. The extension calls this on every
-    page load (rule 1 human gate: this only *prepares*, never submits)."""
+    """Find the package that should drive autofill on the current page.
+
+    Checks customized queue items first, then legacy ready_to_apply tracker rows.
+    """
     pid = get_pid(request)
     _ensure_tracker_migrated(pid)
+
+    # Customized queue items (primary path after M6 workflow fix).
+    customized = matcher_store.list_customized(_matcher_db_path(), pid)
+    queue_candidates = [
+        {
+            "id": f"queue:{it.get('id')}",
+            "queue_match_id": it.get("id"),
+            "company": it.get("company", ""),
+            "role": it.get("title", ""),
+            "url": it.get("apply_url", ""),
+            "platform": it.get("source_ats", "") or "Other",
+            "resume_variant_id": it.get("resume_variant_id"),
+            "answers": {},
+            "source": "queue",
+        }
+        for it in customized
+    ]
+    item = tracker_match.best_match(queue_candidates, host=host, url=url, company=company)
+    if item:
+        return {"match": item}
+
     ready = tracker_store.list_applications(pid, status=_STATUS_READY)
     item = tracker_match.best_match(ready, host=host, url=url, company=company)
     if not item:
@@ -1403,6 +1592,7 @@ def tracker_match_page(request: Request, host: str = "", url: str = "", company:
         "platform": item.get("platform", ""),
         "resume_variant_id": item.get("resume_variant_id"),
         "answers": item.get("answers") or {},
+        "source": "tracker",
     }}
 
 # ─────────────────────────────────────────────────────────────────
@@ -1426,7 +1616,10 @@ def _queue_item_view(item: dict) -> dict:
         "tailor_status": item.get("tailor_status"),
         "tailor_error": item.get("tailor_error"),
         "review_status": item.get("review_status"),
+        "resume_variant_id": item.get("resume_variant_id"),
         "edits": (tailored or {}).get("_edits", []) if isinstance(tailored, dict) else [],
+        "summary_diff": (tailored or {}).get("summary_diff") if isinstance(tailored, dict) else None,
+        "tailor_sections": (tailored or {}).get("_sections") if isinstance(tailored, dict) else None,
         "has_tailoring": isinstance(tailored, dict),
         # Hard, visible page-fit flag (FINDINGS_tailoring §5) — no longer a silent PDF warning.
         "page_fit": constraints_engine.page_fit_summary(
@@ -1455,6 +1648,20 @@ def get_queue_item_detail(match_id: int, request: Request):
     view["jd_text"] = item.get("jd_text", "")
     return view
 
+async def _tailor_one_item(
+    pid: str, item: dict, *, sequential_llm: bool = True, db_path: str | None = None
+) -> dict:
+    """Tailor a single queue item; raises on failure."""
+    db = db_path or _matcher_db_path()
+    result = await run_tailoring(
+        pid, item.get("jd_text", "") or "",
+        role=item.get("title", ""), company=item.get("company", ""),
+        sequential_llm=sequential_llm,
+    )
+    matcher_store.set_tailoring(db, item["id"], status="tailored", tailored=result)
+    return result
+
+
 async def tailor_pending_queue(pid: str, db_path: str | None = None) -> dict:
     """Tailor every pending queue item for a profile. Per-item failure isolation:
     one bad item is recorded as tailor_status='failed' and never kills the run (rule 7).
@@ -1464,11 +1671,7 @@ async def tailor_pending_queue(pid: str, db_path: str | None = None) -> dict:
     tailored = failed = 0
     for item in pending:
         try:
-            result = await run_tailoring(
-                pid, item.get("jd_text", "") or "",
-                role=item.get("title", ""), company=item.get("company", ""),
-            )
-            matcher_store.set_tailoring(db, item["id"], status="tailored", tailored=result)
+            await _tailor_one_item(pid, item, sequential_llm=True, db_path=db)
             tailored += 1
         except Exception as e:  # one bad item never kills the run
             log.error(f"[queue] tailoring failed for match {item.get('id')}: {e}", exc_info=True)
@@ -1482,6 +1685,23 @@ async def tailor_queue(request: Request):
     step). Per-item failure isolation (rule 7)."""
     return await tailor_pending_queue(get_pid(request))
 
+
+@app.post("/queue/{match_id}/tailor")
+async def tailor_queue_item(match_id: int, request: Request):
+    """Tailor a single queue item (used by per-card actions and approve fallback)."""
+    pid = get_pid(request)
+    db = _matcher_db_path()
+    item = matcher_store.get_queue_item(db, pid, match_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    try:
+        result = await _tailor_one_item(pid, item, sequential_llm=True, db_path=db)
+        return {"ok": True, "match_id": match_id, "tailor_status": "tailored", "edits": result.get("_edits", [])}
+    except Exception as e:
+        log.error(f"[queue] single-item tailoring failed for match {match_id}: {e}", exc_info=True)
+        matcher_store.set_tailoring(db, match_id, status="failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/queue/{match_id}/skip")
 def skip_queue_item(match_id: int, request: Request):
     pid = get_pid(request)
@@ -1493,10 +1713,10 @@ def skip_queue_item(match_id: int, request: Request):
 
 @app.post("/queue/{match_id}/approve")
 async def approve_queue_item(match_id: int, request: Request, payload: dict = None):
-    """Approve a reviewed queue item: dedupe guard → versioned PDF → tracker row.
+    """Approve reviewed edits: compile PDF, mark queue item customized.
 
-    Nothing is submitted (rule 1); this only creates an 'approved' application that the
-    pacing gate later releases to 'ready_to_apply'.
+    Stays in Review Queue until the human submits the application form (mark-applied).
+    Does NOT create a tracker application row yet.
     """
     payload = payload or {}
     pid = get_pid(request)
@@ -1505,15 +1725,20 @@ async def approve_queue_item(match_id: int, request: Request, payload: dict = No
     if not item:
         raise HTTPException(status_code=404, detail="Queue item not found")
 
+    if item.get("tailor_status") != "tailored":
+        raise HTTPException(
+            status_code=400,
+            detail="Item has no tailoring to approve; run /queue/{id}/tailor first.",
+        )
+
     company = item.get("company", "")
     title = item.get("title", "")
 
-    # 1. Dedupe / rejection-history guard (block unless force) — rule: warn or block.
+    # Dedupe / rejection-history guard (block unless force).
     verdict = tracker_dedupe.check(pid, company, title)
     if verdict["blocked"] and not payload.get("force"):
         raise HTTPException(status_code=409, detail={"error": "dedupe_block", "dedupe": verdict})
 
-    # 2. Produce the exact resume artifact (unless the dashboard already generated one).
     variant_id = payload.get("variant_id")
     if not variant_id:
         tailored = payload.get("tailored") or item.get("tailored") or {}
@@ -1537,24 +1762,53 @@ async def approve_queue_item(match_id: int, request: Request, payload: dict = No
             })
         variant_id = ctx["variant_meta"]["id"]
 
-    # 3. Record the application (approved; not yet released).
+    matcher_store.set_customized(db, match_id, resume_variant_id=variant_id)
+    return {
+        "ok": True,
+        "variant_id": variant_id,
+        "review_status": "customized",
+        "dedupe": verdict,
+    }
+
+
+@app.post("/queue/{match_id}/mark-applied")
+async def mark_queue_item_applied(match_id: int, request: Request, payload: dict = None):
+    """After extension autofill + human submit: create tracker row as applied."""
+    payload = payload or {}
+    pid = get_pid(request)
+    db = _matcher_db_path()
+    item = matcher_store.get_queue_item(db, pid, match_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    if item.get("review_status") != "customized":
+        raise HTTPException(status_code=400, detail="Item must be customized before marking applied.")
+
+    company = item.get("company", "")
+    title = item.get("title", "")
+    variant_id = item.get("resume_variant_id") or payload.get("variant_id")
+    if not variant_id:
+        raise HTTPException(status_code=400, detail="No resume variant on this queue item.")
+
+    verdict = tracker_dedupe.check(pid, company, title)
+    if verdict["blocked"] and not payload.get("force"):
+        raise HTTPException(status_code=409, detail={"error": "dedupe_block", "dedupe": verdict})
+
     application = tracker_store.create_application(pid, {
         "company": company,
         "role": title,
         "band": item.get("band"),
         "match_pct": item.get("match_pct"),
-        "status": tracker_store.STATUS_APPROVED,
+        "status": tracker_store.STATUS_APPLIED,
         "resume_variant_id": variant_id,
         "jd_text": item.get("jd_text", ""),
         "answers": payload.get("answers"),
         "match_ref": f"{item.get('source_ats','')}:{item.get('external_id','')}",
-        "url": item.get("apply_url", ""),
-        "platform": item.get("source_ats", "") or "Other",
+        "url": payload.get("url") or item.get("apply_url", ""),
+        "platform": item.get("source_ats", "") or payload.get("platform") or "Other",
+        "notes": payload.get("notes", ""),
     })
-
-    # 4. Mark the queue item reviewed.
-    matcher_store.set_review_status(db, match_id, "approved")
-    return {"ok": True, "application": application, "variant_id": variant_id, "dedupe": verdict}
+    matcher_store.set_review_status(db, match_id, "applied")
+    return {"ok": True, "application": application, "variant_id": variant_id}
 
 # ─────────────────────────────────────────────────────────────────
 # MATCHER QUEUE (approved items for extension fill override)
@@ -1782,19 +2036,42 @@ async def autofill_fields(req: AutofillRequest2, request: Request):
         if label in host_answers:
             base_answers[f.get("label", "")] = host_answers[label]
 
-    # Phase 2: find fields rule-based couldn't answer — send only those to LLM
-    # Skip sensitive fields entirely (never ask the LLM about health/legal/political)
+    # Answers we're confident about = rule-based/learned hits that aren't blank or "SKIP".
+    def _grounded(v):
+        return bool(v) and str(v).strip().upper() != "SKIP"
+
+    answers = {label: val for label, val in base_answers.items() if _grounded(val)}
+
+    # Phase 2: fields rule-based couldn't ground — try the LLM, but ONLY let it answer
+    # when it can cite the candidate's own data. Anything left goes back to the user.
+    # Skip sensitive fields entirely (never ask the LLM about health/legal/political).
     custom_fields = [
         f for f in req.fields[:40]
-        if (not base_answers.get(f.get("label", "")) or base_answers.get(f.get("label", "")) == "SKIP")
+        if not _grounded(base_answers.get(f.get("label", "")))
         and not f.get("sensitive")
     ]
 
+    def _unanswered_payload(fields):
+        out = []
+        for f in fields:
+            out.append({
+                "label": f.get("label", ""),
+                "type": f.get("type", "text"),
+                "options": f.get("options", []),
+            })
+        return out
+
+    def _hybrid(answers_map, unanswered_list):
+        # Nested keys for the new extension, flat {label: value} echoed at the top
+        # level so an older content.js (pre-reload) keeps filling instead of
+        # silently matching nothing.
+        return {**answers_map, "answers": answers_map, "unanswered": unanswered_list}
+
     if not custom_fields:
-        return base_answers
+        return _hybrid(answers, [])
 
     field_list = json.dumps(custom_fields, indent=2)
-    prompt = f"""You are an expert job application assistant filling out a form on behalf of a candidate. The form has fields whose labels you have NEVER seen before — your job is to answer EACH ONE using the candidate's profile data.
+    prompt = f"""You are an expert job application assistant filling out a form on behalf of a candidate. Answer each field ONLY when the answer is grounded in the candidate's own profile data below — never invent facts the candidate did not provide.
 
 CANDIDATE PROFILE (full source of truth):
 {json.dumps(user_data, indent=2)[:5500]}
@@ -1805,31 +2082,43 @@ AUTOFILL QUICK REFERENCE (canonical values):
 JOB DESCRIPTION: {req.jd_text[:1200]}
 COMPANY: {req.company}
 
-UNANSWERED FORM FIELDS (standard fields already filled — only answer these):
+FORM FIELDS TO ANSWER:
 {field_list}
 
 ANSWERING STRATEGY (apply in order for each field):
 1. If the label is a synonym/paraphrase of an autofill key (e.g. "Mailing Address" ≈ address_line1, "Cell" ≈ phone, "Earliest start" ≈ start_date) → return the matching autofill value verbatim.
-2. If the label is a Yes/No or dropdown about availability/work-style/willingness → infer from profile (default to candidate-friendly answers).
-3. If the label is a date field (anything matching "date") → return today's date in MM/DD/YYYY.
-4. If the label is a percentage/numeric question (travel %, salary, years) → use a sensible value from profile or industry norm.
-5. If it's an open-ended written question (e.g. "Why this role?", "Describe a challenge") → write 2-3 sentences in implied first person citing real candidate experience.
-6. ONLY return "SKIP" if the question literally requires data the candidate cannot have (employee ID at this company, security clearance number, etc).
+2. If the label is a date field → return today's date in MM/DD/YYYY.
+3. If it's a percentage/numeric question (travel %, salary, years) and the profile supports a value → use it.
+4. If it's an open-ended written question (e.g. "Why this role?") and the profile has relevant experience → write 2-3 sentences in implied first person citing that real experience.
+5. Return "SKIP" whenever the field asks for information the candidate did NOT provide (a specific preference, an opinion, an employee ID, a number the profile doesn't contain, a free-text answer with no supporting experience). Do NOT guess. A field the candidate must decide belongs to them, not you.
 
-CRITICAL: Do NOT return "SKIP" for any field that can plausibly be answered from the profile. Be aggressive about inferring.
-
-OUTPUT: JSON object where keys are EXACTLY the "label" values shown above. OUTPUT JSON ONLY."""
+OUTPUT: JSON object where keys are EXACTLY the "label" values shown above and values are the grounded answer or "SKIP". OUTPUT JSON ONLY."""
 
     try:
         content = call_llm([{"role": "user", "content": prompt}],
                            temperature=0.1, prefer=req.llm, timeout=600)
         llm_answers = json.loads(clean_json(content))
-        log_event(log, "INFO", "autofill_ok", rule_fields=len(base_answers),
-                  llm_fields=len(llm_answers))
-        return {**base_answers, **llm_answers}
     except Exception as e:
-        log.warning(f"Autofill LLM failed — using rule-based only. Error: {e}")
-        return base_answers
+        log.warning(f"Autofill LLM failed — returning rule-based answers only. Error: {e}")
+        # Everything the rules couldn't ground goes back to the user.
+        return _hybrid(answers, _unanswered_payload(custom_fields))
+
+    # Fold in only the grounded LLM answers; whatever it declined (SKIP/blank/missing)
+    # becomes an explicit "your call" question for the user (rule 2: no silent invention).
+    unanswered = []
+    for f in custom_fields:
+        label = f.get("label", "")
+        val = llm_answers.get(label)
+        if _grounded(val):
+            answers[label] = str(val)
+        else:
+            unanswered.append({
+                "label": label,
+                "type": f.get("type", "text"),
+                "options": f.get("options", []),
+            })
+    log_event(log, "INFO", "autofill_ok", answered=len(answers), unanswered=len(unanswered))
+    return _hybrid(answers, unanswered)
 
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 5: ANSWER SINGLE QUESTION
@@ -2384,6 +2673,7 @@ async def run_tailoring(
     selected_projects: list | None = None,
     user_instruction: str = "",
     llm: str = "",
+    sequential_llm: bool = False,
 ) -> dict:
     """Core resume-tailoring pipeline shared by POST /tailor-resume and the nightly
     queue run (M6). Emits grounded `_edits` (evidence rule 2) and passes untrusted LLM
@@ -2550,29 +2840,35 @@ OUTPUT JSON ONLY:
 }}"""
 
         async def _llm_json(prompt_text: str, temperature: float = 0.35):
-            # Prefer Claude for final edit quality; call_llm will fall back to local Ollama.
-            # Keep configured ollama model as fallback override when provided.
+            provider_key, _ = normalize_llm_prefer(active_model or "ollama")
+            prefer = active_model if active_model else "ollama"
+            if not prefer or prefer in {"ollama", "claude"}:
+                prefer = provider_key
             fallback_model = None
-            if active_model and active_model not in {"ollama", "claude"}:
-                fallback_model = active_model.split("/", 1)[1] if active_model.startswith("ollama/") else active_model
+            if active_model and active_model.startswith("ollama/"):
+                fallback_model = active_model.split("/", 1)[1]
+            elif active_model and active_model not in {"ollama", "claude"} and "/" not in active_model:
+                fallback_model = active_model
             content = await asyncio.to_thread(
                 call_llm,
                 [{"role": "user", "content": prompt_text}],
                 temperature,
                 "",
-                "claude",
+                prefer,
                 600,
                 fallback_model,
             )
-            # LLM output is untrusted: strip control chars / cap length before it
-            # flows into diffs, merges, and eventually the .tex template.
             return sanitize_untrusted_text(json.loads(clean_json(content)))
 
-        summary_task = asyncio.create_task(_llm_json(summary_prompt, 0.3))
-        experience_task = asyncio.create_task(_llm_json(experience_prompt, 0.4))
-        summary_raw, experience_raw = await asyncio.gather(
-            summary_task, experience_task, return_exceptions=True
-        )
+        if sequential_llm:
+            summary_raw = await _llm_json(summary_prompt, 0.3)
+            experience_raw = await _llm_json(experience_prompt, 0.4)
+        else:
+            summary_task = asyncio.create_task(_llm_json(summary_prompt, 0.3))
+            experience_task = asyncio.create_task(_llm_json(experience_prompt, 0.4))
+            summary_raw, experience_raw = await asyncio.gather(
+                summary_task, experience_task, return_exceptions=True
+            )
 
         if isinstance(summary_raw, Exception) and isinstance(experience_raw, Exception):
             print(f"Tailor resume error: summary={summary_raw} experience={experience_raw}")
