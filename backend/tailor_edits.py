@@ -1,4 +1,10 @@
-"""Schema + helpers for evidence-grounded, user-controlled resume edits."""
+"""Schema + helpers for evidence-grounded, user-controlled resume edits.
+
+Three-band stretch_level (interview-backtrack test):
+  grounded     — rewrite/reorder/synonym of existing content → accept
+  stretch      — JD terminology for similar/adjacent work → Keep/Soften/Drop
+  fabrication  — no backing anywhere → auto-reject, never rendered
+"""
 
 from __future__ import annotations
 
@@ -7,6 +13,7 @@ import re
 from typing import Any, Callable
 
 STATUSES = {"proposed", "needs_your_call", "accepted", "rejected"}
+STRETCH_LEVELS = {"grounded", "stretch", "fabrication"}
 
 # Minimum semantic-search score (cosine, same scale on both search paths) for
 # a knowledge hit to count as evidence.
@@ -49,6 +56,11 @@ def _safe_status(status: str | None, default: str = "proposed") -> str:
     return s if s in STATUSES else default
 
 
+def _safe_stretch(level: str | None, default: str = "grounded") -> str:
+    s = (level or "").strip().lower()
+    return s if s in STRETCH_LEVELS else default
+
+
 def validate_edit_object(edit: dict[str, Any]) -> dict[str, Any]:
     """Validate and normalize one edit object; raises ValueError on shape errors."""
     if not isinstance(edit, dict):
@@ -68,9 +80,14 @@ def validate_edit_object(edit: dict[str, Any]) -> dict[str, Any]:
         "evidence_ref": edit.get("evidence_ref"),
         "confidence": float(edit.get("confidence") or 0.0),
         "status": _safe_status(edit.get("status"), default="proposed"),
+        "stretch_level": _safe_stretch(edit.get("stretch_level"), default="grounded"),
     }
+    if edit.get("stretch_reason"):
+        normalized["stretch_reason"] = _norm(edit["stretch_reason"])
     if edit.get("ungrounded_terms"):
         normalized["ungrounded_terms"] = [str(t) for t in edit["ungrounded_terms"]]
+    if edit.get("lint_flags"):
+        normalized["lint_flags"] = list(edit["lint_flags"])
 
     if not normalized["section"] or not normalized["field"] or not normalized["reason"]:
         raise ValueError("Edit section/field/reason cannot be empty.")
@@ -90,6 +107,14 @@ def validate_edits(edits: list[Any] | None) -> list[dict[str, Any]]:
         except ValueError:
             continue
     return out
+
+
+def renderable_edits(edits: list[Any] | None) -> list[dict[str, Any]]:
+    """Filter fabrications out of the review list (rejected inventions never render)."""
+    return [
+        e for e in validate_edits(edits)
+        if e.get("stretch_level") != "fabrication"
+    ]
 
 
 def _jd_terms(jd_text: str) -> set[str]:
@@ -160,6 +185,21 @@ def collect_profile_terms(profile: dict[str, Any]) -> set[str]:
     return {t for t in re.findall(r"\b[a-z][a-z0-9\+\#\.\-/]{2,}\b", text) if len(t) >= 3}
 
 
+def _claim_terms_for_edit(
+    before: str,
+    after: str,
+    jd_text: str,
+    profile_terms: set[str] | None,
+) -> set[str]:
+    added_terms = _new_terms(before, after)
+    known = profile_terms or set()
+    meaningful = {
+        t for t in added_terms - STYLE_STOPWORDS if not _known_in_profile(t, known)
+    }
+    jd_claims = meaningful & _jd_terms(jd_text)
+    return jd_claims or meaningful
+
+
 def ground_edit(
     edit: dict[str, Any],
     *,
@@ -169,32 +209,27 @@ def ground_edit(
     origin_ref: str | None = None,
     profile_terms: set[str] | None = None,
 ) -> dict[str, Any]:
-    """Attach evidence_ref and enforce the evidence rule (rule 2), correctly:
+    """Attach evidence_ref and classify stretch_level (rule 2 + three-band).
 
     Rewriting EXISTING text is grounded by the original text itself — only
-    genuinely NEW claims (tokens absent from the whole profile, beyond style
-    vocabulary) must be backed by a knowledge hit or flagged needs_your_call.
-
-    origin_ref: evidence_ref of the text being rewritten (e.g.
-    "experience_bullet:0:2"); profile_terms: precomputed token set from
-    collect_profile_terms, built once per request by the caller.
+    genuinely NEW claims must be backed by a knowledge hit. Unbacked new claims
+    are fabrications (auto-rejected). JD terminology for similar work with
+    evidence is a stretch (Keep / Soften / Drop).
     """
     out = copy.deepcopy(validate_edit_object(edit))
+    claim_terms = _claim_terms_for_edit(
+        out.get("before", ""), out.get("after", ""), jd_text, profile_terms,
+    )
     added_terms = _new_terms(out.get("before", ""), out.get("after", ""))
-    # Strip style vocabulary and profile-known terms FIRST (plural-tolerant),
-    # then prefer the JD-overlapping remainder (likely injected keywords).
-    known = profile_terms or set()
-    meaningful = {
-        t for t in added_terms - STYLE_STOPWORDS if not _known_in_profile(t, known)
-    }
-    jd_claims = meaningful & _jd_terms(jd_text)
-    claim_terms = jd_claims or meaningful
 
     if not claim_terms and out.get("before", "").strip() and origin_ref:
         # Pure rewrite/reorder of the candidate's own text: self-evidenced.
         out["evidence_ref"] = origin_ref
-        out["status"] = _safe_status(out.get("status"), default="accepted")
+        out["status"] = "accepted"
+        out["stretch_level"] = "grounded"
         out["confidence"] = max(out.get("confidence") or 0.0, 0.72)
+        out.pop("ungrounded_terms", None)
+        out.pop("stretch_reason", None)
         return out
 
     query = " ".join(
@@ -206,17 +241,128 @@ def ground_edit(
     ).strip()
     evidence_ref = _pick_evidence_ref(pid, query, claim_terms, knowledge_search)
     out["evidence_ref"] = evidence_ref
-    if evidence_ref:
-        out["status"] = _safe_status(out.get("status"), default="accepted")
-        out["confidence"] = max(out.get("confidence") or 0.0, 0.72)
-    elif claim_terms:
-        # New claim with no backing evidence — never silently insert (rule 2).
+
+    if claim_terms and evidence_ref:
+        # Posting's terminology for related work — explainable with care.
+        terms = ", ".join(sorted(claim_terms)[:6])
+        out["stretch_level"] = "stretch"
+        out["stretch_reason"] = (
+            f"Uses JD wording ({terms}) for related experience "
+            f"(backed by {evidence_ref})"
+        )
         out["status"] = "needs_your_call"
-        out["confidence"] = min(out.get("confidence") or 0.5, 0.55)
+        out["confidence"] = max(out.get("confidence") or 0.0, 0.68)
+        out.pop("ungrounded_terms", None)
+        return out
+
+    if claim_terms and not evidence_ref:
+        # No backing anywhere — fabrication; never silently insert (rule 2).
+        out["stretch_level"] = "fabrication"
+        out["stretch_reason"] = (
+            f"No profile evidence for: {', '.join(sorted(claim_terms)[:8])}"
+        )
+        out["status"] = "rejected"
+        out["confidence"] = min(out.get("confidence") or 0.5, 0.4)
         out["ungrounded_terms"] = sorted(claim_terms)
-    else:
-        # No new claims but nothing retrievable either (e.g. added text with no
-        # origin): leave it to the human.
-        out["status"] = "needs_your_call"
-        out["confidence"] = min(out.get("confidence") or 0.5, 0.6)
+        return out
+
+    # No new claims but nothing retrievable either (e.g. added text with no
+    # origin): treat as stretch for human Keep/Soften/Drop.
+    out["stretch_level"] = "stretch"
+    out["stretch_reason"] = "Added or reframed text without a clear origin bullet"
+    out["status"] = "needs_your_call"
+    out["confidence"] = min(out.get("confidence") or 0.5, 0.6)
+    return out
+
+
+def soften_edit_text(
+    edit: dict[str, Any],
+    *,
+    llm_call: Callable[..., str],
+    llm: str = "ollama",
+) -> str:
+    """One targeted LLM call: more conservative rewrite of edit.after only."""
+    before = (edit.get("before") or "").strip()
+    after = (edit.get("after") or "").strip()
+    reason = (edit.get("stretch_reason") or edit.get("reason") or "").strip()
+    prompt = (
+        "Soften this resume edit to a more conservative, interview-safe phrasing. "
+        "Keep the same facts as the BEFORE text; do not invent skills or tools. "
+        "Prefer the candidate's original wording over JD buzzwords when unsure. "
+        "Output ONLY the softened sentence.\n\n"
+        f"Stretch reason: {reason or 'adjacent framing'}\n"
+        f"BEFORE:\n{before or '(new bullet)'}\n\n"
+        f"CURRENT (too strong):\n{after}\n"
+    )
+    try:
+        raw = llm_call([{"role": "user", "content": prompt}], temperature=0.2, prefer=llm)
+        line = (raw or "").strip().splitlines()[0].strip().strip('"')
+        return line or after
+    except Exception:
+        return after
+
+
+def apply_soften(
+    edit: dict[str, Any],
+    *,
+    pid: str,
+    jd_text: str,
+    knowledge_search: Callable[[str, str, int], list[dict[str, Any]]],
+    llm_call: Callable[..., str],
+    llm: str = "ollama",
+    origin_ref: str | None = None,
+    profile_terms: set[str] | None = None,
+) -> dict[str, Any]:
+    """Soften → re-run ground/band. Softened grounded edits auto-accept."""
+    softened = soften_edit_text(edit, llm_call=llm_call, llm=llm)
+    next_edit = copy.deepcopy(validate_edit_object(edit))
+    next_edit["after"] = softened
+    next_edit["status"] = "proposed"
+    next_edit["reason"] = next_edit.get("reason") or "Softened stretch"
+    # Prefer origin from evidence_ref when rewriting an existing bullet.
+    origin = origin_ref or (
+        next_edit.get("evidence_ref")
+        if next_edit.get("before", "").strip()
+        else None
+    )
+    return ground_edit(
+        next_edit,
+        pid=pid,
+        jd_text=jd_text,
+        knowledge_search=knowledge_search,
+        origin_ref=origin,
+        profile_terms=profile_terms,
+    )
+
+
+def attach_lint_flags_to_edits(
+    edits: list[dict[str, Any]],
+    lint_flags: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Copy payload-level lint flags onto matching edit cards by field."""
+    by_field: dict[str, list[dict[str, Any]]] = {}
+    for flag in lint_flags or []:
+        field = str(flag.get("field") or "")
+        if not field:
+            continue
+        by_field.setdefault(field, []).append(flag)
+    out = []
+    for e in edits:
+        e2 = copy.deepcopy(e)
+        field = e2.get("field") or ""
+        matched = list(by_field.get(field) or [])
+        if field == "summary":
+            matched.extend(by_field.get("summary") or [])
+        # Dedup by label+match
+        seen = set()
+        uniq = []
+        for f in matched:
+            key = (f.get("label"), f.get("match"), f.get("sentence"))
+            if key in seen:
+                continue
+            seen.add(key)
+            uniq.append(f)
+        if uniq:
+            e2["lint_flags"] = uniq
+        out.append(e2)
     return out

@@ -34,6 +34,7 @@ from teach import fsrs as teach_fsrs
 from teach import lesson as teach_lesson
 from teach import store as teach_store
 import tailor_edits
+import style_lint
 
 # M6 review queue + application tracker
 from matcher import store as matcher_store
@@ -2557,8 +2558,21 @@ INSTRUCTIONS:
     try:
         letter = await _run_llm([{"role": "user", "content": prompt}],
                                 temperature=0.5, prefer=req.llm, timeout=600)
+        letter_text = letter.strip()
+        # Style lint + company-claim flags (detection is rule-based; no silent company facts).
+        try:
+            letter_text, style_flags = style_lint.lint_and_rewrite_text(
+                letter_text, llm_call=call_llm, llm=req.llm,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"[cover-letter] style lint failed (non-fatal): {e}")
+            style_flags = []
+        claim_flags = style_lint.flag_cover_letter_company_claims(
+            letter_text, req.company or "",
+        )
         return {
-            "cover_letter": letter.strip(),
+            "cover_letter": letter_text,
+            "lint_flags": style_flags + claim_flags,
             "metadata": {
                 "company": req.company,
                 "role": req.role,
@@ -2620,6 +2634,38 @@ async def analyze_deep(req: DeepAnalyzeRequest, request: Request):
 # ─────────────────────────────────────────────────────────────────
 # ENDPOINT 6c: TAILOR RESUME — per-section diff
 # ─────────────────────────────────────────────────────────────────
+class SoftenEditRequest(BaseModel):
+    edit: dict
+    jd_text: str = ""
+    llm: str = "ollama"
+    origin_ref: str | None = None
+
+
+@app.post("/tailor/soften-edit")
+async def soften_edit(req: SoftenEditRequest, request: Request):
+    """One targeted LLM soften of a stretch edit, then re-run ground/band."""
+    pid = get_pid(request)
+    log_event(log, "INFO", "request", endpoint="POST /tailor/soften-edit", pid=pid)
+    master = load_pdata(pid)
+    profile_terms = tailor_edits.collect_profile_terms(master)
+    try:
+        updated = await asyncio.to_thread(
+            tailor_edits.apply_soften,
+            req.edit,
+            pid=pid,
+            jd_text=req.jd_text,
+            knowledge_search=knowledge_semantic.search,
+            llm_call=call_llm,
+            llm=req.llm,
+            origin_ref=req.origin_ref,
+            profile_terms=profile_terms,
+        )
+    except Exception as e:  # noqa: BLE001
+        log.error(f"[soften-edit] failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Soften failed: {e}")
+    return {"edit": updated}
+
+
 class TailorResumeRequest(BaseModel):
     jd_text: str
     role: str = ""
@@ -2838,8 +2884,11 @@ def _build_grounded_edits(
     jd_text: str,
     master: dict,
     tailored: dict,
-) -> list[dict]:
-    """Create additive _edits with evidence grounding and review statuses.
+) -> tuple[list[dict], int]:
+    """Create additive _edits with evidence grounding and three-band stretch levels.
+
+    Returns (renderable_edits, fabrication_count). Fabrications are auto-rejected
+    and omitted from the returned list (never rendered in the review UI).
 
     Each edit carries an origin_ref (the evidence_ref of the text it rewrites)
     so ground_edit can treat pure rewrites as self-evidenced (corrected rule 2).
@@ -2934,7 +2983,8 @@ def _build_grounded_edits(
                 profile_terms=profile_terms,
             )
         )
-    return tailor_edits.validate_edits(grounded)
+    fabrication_count = sum(1 for g in grounded if g.get("stretch_level") == "fabrication")
+    return tailor_edits.renderable_edits(grounded), fabrication_count
 
 
 @app.post("/tailor-resume")
@@ -3213,8 +3263,17 @@ OUTPUT JSON ONLY:
             deduped_keywords.append(str(kw).strip())
         result["keywords_inserted"] = deduped_keywords
 
-        # ── STEP 4: Post-process — de-AI, validate summary, attach deterministic fields ──
+        # ── STEP 4: Post-process — de-AI, style lint, validate summary ──
         result = constraints_engine.humanize_tailored_output(result)
+        try:
+            result = style_lint.lint_tailored_payload(
+                result,
+                llm_call=call_llm,
+                llm=req.llm,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"[tailor-resume] style lint failed (non-fatal): {e}")
+            result.setdefault("lint_flags", [])
 
         # Reject placeholder summaries
         summary = result.get("tailored_summary", "")
@@ -3269,12 +3328,16 @@ OUTPUT JSON ONLY:
             "editable_regions": bundle.get("editable_regions", []),
         }
         result["_preflight"] = constraints_engine.preflight_tailored_resume(user_data, result)
-        result["_edits"] = _build_grounded_edits(
+        edits, fab_count = _build_grounded_edits(
             pid=pid,
             jd_text=req.jd_text,
             master=user_data,
             tailored=result,
         )
+        result["_edits"] = tailor_edits.attach_lint_flags_to_edits(
+            edits, result.get("lint_flags"),
+        )
+        result["_fabrication_count"] = fab_count
         # ── STEP 6: score estimate on the shared five-dim scorer (no extra LLM
         # when analysis already carries a fit; else bump technical_skills from
         # tailored coverage on the must/nice judgments).
@@ -3616,6 +3679,23 @@ def _render_compile_version(pid: str, data: dict) -> dict:
               pid=pid, success=result.success, attempts=result.attempts,
               pages=result.page_count, latency_ms=result.latency_ms,
               repairs=len(result.repair_actions), ats_ok=result.ats_validation.get("overall_ok"))
+
+    # Hard page-count gate: multi-page PDFs are not downloadable/approvable.
+    if result.success and result.page_count is not None and int(result.page_count) != 1:
+        page_fit = constraints_engine.page_fit_summary(
+            preflight, pdf_page_count=result.page_count, target_pages=1,
+        )
+        log.warning(
+            f"[generate-pdf] page-count gate blocked — pages={result.page_count} pid={pid}"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "overflow — fix before download",
+                "page_fit": page_fit,
+                "compile_result": result.to_dict(),
+            },
+        )
 
     # 5. Persist variant
     variant_meta = None

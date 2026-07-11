@@ -1,0 +1,31 @@
+# Writing-style lint — editable without code changes.
+# Detection is rule-based (no LLM). Hits trigger one targeted rewrite, then re-lint.
+
+banned_phrases:
+  - pattern: "—"
+    label: em-dash
+  - pattern: "---"
+    label: latex-em-dash
+  - pattern: '(?i)\bpassionate about\b'
+    label: passionate about
+  - pattern: '(?i)\bleverage\b'
+    label: leverage
+  - pattern: '(?i)\bhit the ground running\b'
+    label: hit the ground running
+  - pattern: '(?i)\bdrive results\b'
+    label: drive results
+  - pattern: '(?i)\bsynergies\b'
+    label: synergies
+  - pattern: '(?i)\bI believe I would be a great fit\b'
+    label: great fit claim
+  - pattern: '(?i)\bproven track record\b'
+    label: proven track record
+  - pattern: '(?i)\bresults[- ]driven\b'
+    label: results-driven
+  - pattern: '(?i)\bteam player\b'
+    label: team player
+
+# Cover letters: flag company-specific claims that need a source or generic phrasing.
+company_claim_patterns:
+  - '(?i)\b(?:at|with|for)\s+{company}\b.{0,40}\b(?:leading|pioneer|innovator|mission|values)\b'
+  - '(?i)\b{company}\b.{0,60}\b(?:I admire|inspired by|excited about your)\b'

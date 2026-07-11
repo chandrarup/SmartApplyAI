@@ -245,12 +245,20 @@ def preflight_tailored_resume(
 PAGE_FIT_KINDS = {"page_overflow", "bullet_growth", "skills_overflow", "summary_length"}
 
 
-def page_fit_summary(preflight: dict | None) -> dict:
+def page_fit_summary(
+    preflight: dict | None,
+    *,
+    pdf_page_count: int | None = None,
+    target_pages: int = 1,
+) -> dict:
     """Collapse a preflight result into a single one-page-fit verdict for the queue UI.
 
     FINDINGS_tailoring §5: page overflow used to surface only as a silent PDF-compile
     warning. This lifts it to a hard, visible flag on the queue item so the reviewer
     sees "won't fit one page" before approving, not after the PDF is built.
+
+    After compile, pass pdf_page_count — any count other than target_pages blocks
+    download/approve with badge "overflow — fix before download".
     """
     issues = (preflight or {}).get("issues") or []
     reasons = [
@@ -258,7 +266,21 @@ def page_fit_summary(preflight: dict | None) -> dict:
         for i in issues
         if i.get("kind") in PAGE_FIT_KINDS
     ]
-    return {"wont_fit_one_page": bool(reasons), "reasons": reasons}
+    blocked = False
+    if pdf_page_count is not None and int(pdf_page_count) != int(target_pages):
+        blocked = True
+        reasons.append(
+            f"PDF is {pdf_page_count} pages (must be {target_pages}) — overflow, fix before download"
+        )
+    wont = bool(reasons) or blocked
+    return {
+        "wont_fit_one_page": wont,
+        "blocked": blocked,
+        "pdf_page_count": pdf_page_count,
+        "target_pages": target_pages,
+        "reasons": reasons,
+        "badge": "overflow — fix before download" if wont else None,
+    }
 
 
 def detect_authenticity_issues(text: str) -> list[Violation]:

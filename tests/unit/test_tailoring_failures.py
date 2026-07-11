@@ -247,8 +247,21 @@ def test_evidence_rule_never_accepts_fabricated_jd_skill(client, tailor_mocks, m
         and any(t in (e.get("after") or "").lower() for t in ("kubernetes", "cobaltdb"))
     ]
     assert not accepted_fabricated
-    flagged = [e for e in edits if e.get("status") == "needs_your_call"]
-    assert flagged, "expected needs_your_call for ungrounded JD terms"
+    # Fabrications are auto-rejected and omitted from the renderable edit list.
+    for e in edits:
+        assert e.get("stretch_level") != "fabrication"
+        assert not (
+            e.get("status") == "accepted"
+            and any(t in (e.get("after") or "").lower() for t in ("kubernetes", "cobaltdb"))
+        )
+    # Either fabrications were filtered out, or remaining k8s mentions are stretch (not accepted).
+    fab_count = r.json().get("_fabrication_count", 0)
+    stretch_or_gone = fab_count > 0 or any(
+        e.get("stretch_level") == "stretch" for e in edits
+    ) or not any(
+        t in (e.get("after") or "").lower() for e in edits for t in ("kubernetes", "cobaltdb")
+    )
+    assert stretch_or_gone, "expected fabrications auto-rejected or filtered from _edits"
 
 
 # ── 4. Project selection ──────────────────────────────────────────────────────
