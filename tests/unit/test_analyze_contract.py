@@ -47,7 +47,26 @@ def client(monkeypatch):
     monkeypatch.setattr(main, "load_pdata", lambda pid: PROFILE)
     monkeypatch.setattr(main.knowledge_semantic, "search",
                         lambda pid, q, k=10, kind_filter=None: [])
-    monkeypatch.setattr(scoring, "call_llm", lambda *a, **kw: EXTRACTION_JSON)
+
+    FIVE_DIM_JSON = (
+        '{"dimensions":{'
+        '"technical_skills":{"score":92,"note":"Python PyTorch RAG"},'
+        '"experience_match":{"score":88,"note":"GenAI work"},'
+        '"education_fit":{"score":80,"note":"relevant"},'
+        '"career_alignment":{"score":90,"note":"AI/ML path"}},'
+        '"matched_skills":[{"skill":"Python","evidence_ref":""}],'
+        '"missing_skills":[],'
+        '"best_projects":[{"title":"RAG Search","why":"direct"}],'
+        '"rationale":"Strong ML fit"}'
+    )
+
+    def _scoring_llm(messages, temperature=0.1, prefer="ollama", **kw):
+        text = " ".join(str(m.get("content", "")) for m in (messages or []))
+        if "Score EACH dimension" in text or "ANCHORED BANDS" in text:
+            return FIVE_DIM_JSON
+        return EXTRACTION_JSON
+
+    monkeypatch.setattr(scoring, "call_llm", _scoring_llm)
     monkeypatch.setattr(main, "call_llm", lambda *a, **kw: SUMMARY_JSON)
     return TestClient(main.app)
 

@@ -5,6 +5,7 @@ No live LLM or embedding calls — knowledge_search and llm_call are injected fa
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -189,3 +190,162 @@ def test_borderline_adjudication_upgrades_and_fails_soft():
         llm_call=_fake_llm("garbage {{"),
     )
     assert kept[0]["verdict"] == "gap"
+
+
+# ── Five-dimension scorer ────────────────────────────────────────────
+def test_weighted_match_pct_exact():
+    dims = {
+        "technical_skills": {"score": 100, "note": ""},
+        "experience_match": {"score": 100, "note": ""},
+        "education_fit": {"score": 100, "note": ""},
+        "career_alignment": {"score": 100, "note": ""},
+    }
+    assert scoring.weighted_match_pct(dims) == 100
+    # 0.35*80 + 0.30*70 + 0.15*90 + 0.20*60 = 28+21+13.5+12 = 74.5 → 74 or 75
+    dims2 = {
+        "technical_skills": {"score": 80},
+        "experience_match": {"score": 70},
+        "education_fit": {"score": 90},
+        "career_alignment": {"score": 60},
+    }
+    assert scoring.weighted_match_pct(dims2) == 74
+
+
+def test_queue_band_boundaries_70_and_85():
+    assert scoring.queue_band(69) == "below"
+    assert scoring.queue_band(70) == "stretch"
+    assert scoring.queue_band(84) == "stretch"
+    assert scoring.queue_band(85) == "strong"
+    assert scoring.queue_band(100) == "strong"
+
+
+def test_assemble_fit_knockout_zeros_overall():
+    fit = scoring.assemble_fit(
+        {
+            "technical_skills": {"score": 95, "note": "strong"},
+            "experience_match": {"score": 90, "note": "strong"},
+            "education_fit": {"score": 90, "note": "MS"},
+            "career_alignment": {"score": 90, "note": "AI path"},
+        },
+        knockouts={"location": "fail", "work_auth": "pass"},
+    )
+    assert fit["match_pct"] == 0
+    assert fit["band"] == "below"
+    assert fit["dimensions"]["technical_skills"]["score"] == 95  # subscores retained
+
+
+def test_overqualification_never_lowers_via_assemble():
+    # Exceeding requirements → high experience_match is valid; assemble does not
+    # clamp down for "too senior".
+    fit = scoring.assemble_fit(
+        {
+            "technical_skills": {"score": 92, "note": "exceeds stack"},
+            "experience_match": {"score": 95, "note": "more years than required — still high"},
+            "education_fit": {"score": 88, "note": "MS"},
+            "career_alignment": {"score": 90, "note": "AI/ML intern stepping stone"},
+        }
+    )
+    assert fit["dimensions"]["experience_match"]["score"] == 95
+    assert fit["match_pct"] >= 85
+    assert fit["band"] == "strong"
+
+
+def test_internship_career_alignment_not_penalized_in_prompt():
+    prompt = scoring._five_dim_prompt("AI Research Intern", "MS student", title="Intern")
+    assert "NEVER penalize internship" in prompt
+    assert "OVERQUALIFICATION NEVER lowers" in prompt
+    assert "technical_skills (weight 0.35" in prompt
+    assert "career_alignment (weight 0.20" in prompt
+
+
+def test_search_boost_caps_career_alignment():
+    fit = scoring.assemble_fit(
+        {
+            "technical_skills": {"score": 80, "note": ""},
+            "experience_match": {"score": 80, "note": ""},
+            "education_fit": {"score": 80, "note": ""},
+            "career_alignment": {"score": 98, "note": "aligned"},
+        },
+        search_boost=5,
+    )
+    assert fit["dimensions"]["career_alignment"]["score"] == 100  # capped
+    assert "search boost" in fit["dimensions"]["career_alignment"]["note"].lower()
+
+
+def test_work_auth_knockout_when_sponsorship_forbidden():
+    profile = {
+        "contact_info": {"location": "Houston, TX"},
+        "autofill": {"requires_sponsorship": True},
+    }
+    ko = scoring.evaluate_knockouts(
+        "Must be a US citizen. Sponsorship not available.", profile
+    )
+    assert ko["work_auth"] == "fail"
+
+
+def test_remote_jd_passes_location_knockout():
+    profile = {"contact_info": {"location": "Houston, TX"}, "autofill": {}}
+    ko = scoring.evaluate_knockouts(
+        "Remote US-based Machine Learning Intern. Hybrid OK.", profile
+    )
+    assert ko["location"] == "pass" and ko["work_auth"] == "pass"
+
+
+def test_score_job_with_fake_llm():
+    canned = json.dumps({
+        "dimensions": {
+            "technical_skills": {"score": 88, "note": "Python + RAG covered"},
+            "experience_match": {"score": 82, "note": "GenAI platform work"},
+            "education_fit": {"score": 90, "note": "MS in AI"},
+            "career_alignment": {"score": 85, "note": "AI/ML intern path"},
+        },
+        "matched_skills": [{"skill": "Python", "evidence_ref": "skills"}],
+        "missing_skills": [{"skill": "Kubernetes", "evidence_ref": ""}],
+        "best_projects": [{"title": "SLM from Scratch", "why": "LLM internals"}],
+        "rationale": "Strong AI/ML intern fit",
+    })
+    fit = scoring.score_job(
+        "ML Intern. Required: Python, RAG. Remote US.",
+        PROFILE,
+        title="ML Intern",
+        company="Initech",
+        llm_call=_fake_llm(canned),
+    )
+    assert fit["match_pct"] == scoring.weighted_match_pct(fit["dimensions"])
+    assert fit["band"] in ("strong", "stretch")
+    assert fit["dimensions"]["technical_skills"]["score"] == 88
+    assert fit["matched_skills"][0]["skill"] == "Python"
+    assert fit["knockouts"]["location"] == "pass"
+
+
+def test_score_job_llm_failure_falls_back():
+    fit = scoring.score_job("JD", PROFILE, llm_call=_fake_llm("not-json{{{"))
+    assert fit["match_pct"] == 0
+    assert "failed" in fit["rationale"].lower() or "Fit parsing failed" in fit["rationale"]
+
+
+def test_fit_from_requirement_score_bridge():
+    req = scoring.compute_match_score([_j("Python", "met"), _j("K8s", "gap")])
+    fit = scoring.fit_from_requirement_score(req, career_score=80)
+    assert fit["dimensions"]["technical_skills"]["score"] == req["score"]
+    assert fit["match_pct"] == scoring.weighted_match_pct(fit["dimensions"])
+
+
+def test_apply_tailoring_to_fit_never_lowers_tech():
+    base_fit = scoring.assemble_fit(
+        {
+            "technical_skills": {"score": 70, "note": "pre"},
+            "experience_match": {"score": 80, "note": ""},
+            "education_fit": {"score": 80, "note": ""},
+            "career_alignment": {"score": 80, "note": ""},
+        }
+    )
+    # Tailoring covers the gap → technical should rise, not fall.
+    updated = scoring.apply_tailoring_to_fit(
+        base_fit,
+        [_j("Kubernetes", "gap"), _j("Python", "met")],
+        ["Deployed on Kubernetes"],
+    )
+    assert updated["dimensions"]["technical_skills"]["score"] >= 70
+    assert updated["dimensions"]["experience_match"]["score"] == 80
+

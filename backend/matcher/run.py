@@ -32,6 +32,7 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
         jobs_db_path=jobs_db,
         role_mode=cfg.role_mode,
         filters_path=filters_path,
+        search_bypass_internship=cfg.search_bypass_internship,
     )
     if not survivors:
         print("[done] no survivors after prefilter")
@@ -60,6 +61,19 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
             f"{job.get('title', '')} @ {job.get('company', '')}"
         )
 
+    # Per-job search boost from matched_searches (config default, capped in scorer).
+    try:
+        from scraper.searches import max_boost_for_names
+    except ImportError:
+        from backend.scraper.searches import max_boost_for_names  # type: ignore
+    for item in reranked:
+        job = item.get("job") or {}
+        tags = job.get("matched_searches") or []
+        if tags:
+            # Config default (+5) is the cap; per-search boost from yaml can be lower.
+            configured = max_boost_for_names(tags)
+            item["search_boost"] = min(int(cfg.search_alignment_boost), configured or int(cfg.search_alignment_boost))
+
     fitted: list[dict] = []
     fallback_fit = {
         "match_pct": 0,
@@ -74,6 +88,9 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
             reranked=reranked,
             top_fit=cfg.top_fit,
             llm_prefer=cfg.llm_prefer,
+            search_boost=cfg.search_alignment_boost,
+            strong_threshold=cfg.strong_threshold,
+            enable_legitimacy_web=cfg.enable_legitimacy_web,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[stage3] blocked: {exc}")
@@ -83,6 +100,11 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
     if fitted:
         print("[stage3] sample fit object:")
         print(json.dumps(fitted[0].get("fit", {}), indent=2, ensure_ascii=False))
+        # Persist matched_searches onto fit for My Searches view
+        for item in fitted:
+            tags = (item.get("job") or {}).get("matched_searches") or []
+            fit = item.setdefault("fit", {})
+            fit["matched_searches"] = tags
         stored = gate_and_store(
             matches_db_path=matches_db,
             profile_id=profile_id,

@@ -1,74 +1,24 @@
-"""Stage 3 LLM fit scoring over reranked candidates."""
+"""Stage 3 fit scoring — thin wrapper over the shared five-dimension scorer.
+
+ONE implementation: backend.scoring.score_job. Analyze, Tailor, and matcher
+all use the same dimensions + weighted match_pct + knockouts.
+
+After scoring, attaches a legitimacy assessment (Block G) that never changes
+match_pct and never drops the job.
+"""
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 try:
     from backend.knowledge import store as knowledge_store
+    import backend.scoring as scoring
+    from backend.matcher.legitimacy import assess_legitimacy
 except ImportError:
     from knowledge import store as knowledge_store  # type: ignore
-
-from .llm import call_llm, clean_json
-
-
-def _profile_snapshot(profile: dict[str, Any]) -> str:
-    parts: list[str] = []
-    summary = profile.get("summary")
-    if isinstance(summary, str):
-        parts.append(f"Summary: {summary}")
-    for exp in profile.get("experience", [])[:2]:
-        if not isinstance(exp, dict):
-            continue
-        role = exp.get("role") or ""
-        company = exp.get("company") or ""
-        details = exp.get("details") or exp.get("bullets") or []
-        details_txt = " ".join(details[:3]) if isinstance(details, list) else str(details)
-        parts.append(f"Experience: {role} @ {company} | {details_txt}")
-    for proj in profile.get("projects", [])[:4]:
-        if not isinstance(proj, dict):
-            continue
-        parts.append(
-            "Project: {title} | {stack} | {desc}".format(
-                title=proj.get("title", ""),
-                stack=", ".join(proj.get("tech_stack", [])[:6]) if isinstance(proj.get("tech_stack"), list) else "",
-                desc=proj.get("description", ""),
-            )
-        )
-    return "\n".join([p for p in parts if p])[:7000]
-
-
-def _fit_prompt(job: dict[str, Any], profile_text: str) -> str:
-    jd = (job.get("description_text") or "")[:10000]
-    title = job.get("title") or ""
-    company = job.get("company") or ""
-    return (
-        "You are ranking job fit for a candidate. Return strict JSON only.\n"
-        "Schema:\n"
-        "{"
-        '"match_pct": number,'
-        '"matched_skills":[{"skill":"...", "evidence_ref":"..."}],'
-        '"missing_skills":[{"skill":"...", "evidence_ref":"..."}],'
-        '"best_projects":[{"title":"...", "why":"..."}],'
-        '"rationale":"one line"'
-        "}\n"
-        "Rules: match_pct must be 0-100 integer-like; keep arrays concise; no markdown.\n\n"
-        f"Job Title: {title}\n"
-        f"Company: {company}\n"
-        f"Job Description:\n{jd}\n\n"
-        f"Candidate Profile:\n{profile_text}\n"
-    )
-
-
-def _fallback_fit() -> dict[str, Any]:
-    return {
-        "match_pct": 0,
-        "matched_skills": [],
-        "missing_skills": [],
-        "best_projects": [],
-        "rationale": "Fit parsing failed",
-    }
+    import scoring  # type: ignore
+    from matcher.legitimacy import assess_legitimacy  # type: ignore
 
 
 def fit_candidates(
@@ -76,29 +26,56 @@ def fit_candidates(
     reranked: list[dict[str, Any]],
     top_fit: int = 30,
     llm_prefer: str = "ollama",
+    search_boost: int = 0,
+    strong_threshold: int = 85,
+    enable_legitimacy_web: bool = True,
+    web_search=None,
 ) -> list[dict[str, Any]]:
     if not reranked:
         return []
 
     profile = knowledge_store.get_profile(profile_id)
-    profile_text = _profile_snapshot(profile)
     selected = reranked[:top_fit]
 
     for item in selected:
-        prompt = _fit_prompt(item["job"], profile_text)
-        messages = [
-            {"role": "user", "content": prompt},
-        ]
-        raw = call_llm(messages=messages, temperature=0.2, prefer=llm_prefer)
+        job = item.get("job") or {}
+        boost = int(item.get("search_boost") or 0)
+        if not boost and search_boost:
+            tags = job.get("matched_searches") or []
+            if tags:
+                boost = int(search_boost)
         try:
-            fit_obj = json.loads(clean_json(raw))
-            if not isinstance(fit_obj, dict):
-                fit_obj = _fallback_fit()
-        except Exception:  # noqa: BLE001
-            fit_obj = _fallback_fit()
+            fit_obj = scoring.score_job(
+                job.get("description_text") or "",
+                profile,
+                title=str(job.get("title") or ""),
+                company=str(job.get("company") or ""),
+                llm=llm_prefer,
+                search_boost=boost,
+            )
+        except Exception:  # noqa: BLE001 — one bad job never kills the run
+            fit_obj = scoring.fallback_fit("Fit stage exception")
+
+        # Legitimacy is additive — never mutates match_pct, never drops.
+        try:
+            fit_obj["legitimacy"] = assess_legitimacy(
+                job,
+                match_pct=int(fit_obj.get("match_pct") or 0),
+                strong_threshold=strong_threshold,
+                enable_web=enable_legitimacy_web,
+                web_search=web_search,
+            )
+        except Exception as exc:  # noqa: BLE001
+            fit_obj["legitimacy"] = {
+                "tier": "caution",
+                "signals": [
+                    {"code": "legitimacy_error", "detail": type(exc).__name__, "severity": "info"}
+                ],
+                "note": "Legitimacy check failed soft — treat as caution.",
+            }
+
         item["fit"] = fit_obj
-        item["match_pct"] = int(float(fit_obj.get("match_pct", 0) or 0))
+        item["match_pct"] = int(fit_obj.get("match_pct", 0) or 0)
 
     print(f"[stage3] fit_scored={len(selected)}")
     return selected
-

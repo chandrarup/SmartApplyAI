@@ -1,0 +1,35 @@
+# User-defined search strings — editable without code changes.
+# Each entry: name, query (plain terms or /regex/), fields (title|description|both), boost (int).
+# At normalize time jobs get matched_searches[]; matcher uses them for internship
+# prefilter bypass (explicit user intent) and a small career_alignment boost.
+
+searches:
+  - name: spatial proteomics
+    query: spatial proteomics
+    fields: both
+    boost: 5
+
+  - name: computational biology intern
+    query: computational biology
+    fields: both
+    boost: 5
+
+  - name: LLM research intern
+    query: "(LLM|large language model).{0,60}(intern|research)|(intern|research).{0,60}(LLM|large language model)"
+    fields: both
+    boost: 5
+
+  - name: machine learning intern
+    query: machine learning
+    fields: both
+    boost: 5
+
+  - name: computer vision co-op
+    query: "computer vision|cv intern|vision co-?op"
+    fields: both
+    boost: 5
+
+  - name: biomedical AI
+    query: "biomedical AI|biomedical artificial intelligence|AI for biomedicine"
+    fields: both
+    boost: 5

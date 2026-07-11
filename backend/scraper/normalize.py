@@ -158,10 +158,21 @@ def normalize_ashby(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
 def normalize_job(ats: str, token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
     ats_lower = ats.lower().strip()
     if ats_lower == "greenhouse":
-        return normalize_greenhouse(token, raw_job)
-    if ats_lower == "lever":
-        return normalize_lever(token, raw_job)
-    if ats_lower == "ashby":
-        return normalize_ashby(token, raw_job)
-    raise ValueError(f"Unsupported ATS for normalization: {ats}")
+        job = normalize_greenhouse(token, raw_job)
+    elif ats_lower == "lever":
+        job = normalize_lever(token, raw_job)
+    elif ats_lower == "ashby":
+        job = normalize_ashby(token, raw_job)
+    else:
+        raise ValueError(f"Unsupported ATS for normalization: {ats}")
+    # Tag user search strings (searches.yaml) — flows to matcher/queue.
+    try:
+        from .searches import match_searches
+    except ImportError:  # pragma: no cover
+        from scraper.searches import match_searches  # type: ignore
+    job["matched_searches"] = match_searches(
+        str(job.get("title") or ""),
+        str(job.get("description_text") or ""),
+    )
+    return job
 

@@ -12,4 +12,8 @@ recall_evidence_k: 8
 filters_path: backend/scraper/filters.yaml
 jobs_db_path: backend/scraper/jobs.db
 matches_db_path: backend/matcher/matches.db
+# matching-v2 search-string integration
+search_alignment_boost: 5
+search_bypass_internship: true
+enable_legitimacy_web: true
 

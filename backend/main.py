@@ -1735,6 +1735,7 @@ def _queue_item_view(item: dict) -> dict:
     """Shape a matches.db row for the review UI (fit rationale + tailored edits)."""
     fit = item.get("fit") or {}
     tailored = item.get("tailored")
+    legitimacy = fit.get("legitimacy") if isinstance(fit.get("legitimacy"), dict) else {}
     return {
         "id": item.get("id"),
         "company": item.get("company", ""),
@@ -1743,9 +1744,14 @@ def _queue_item_view(item: dict) -> dict:
         "match_pct": item.get("match_pct"),
         "band": item.get("band"),
         "rationale": fit.get("rationale", ""),
+        "dimensions": fit.get("dimensions"),
+        "knockouts": fit.get("knockouts"),
         "matched_skills": fit.get("matched_skills", []),
         "missing_skills": fit.get("missing_skills", []),
         "best_projects": fit.get("best_projects", []),
+        "legitimacy_tier": legitimacy.get("tier"),
+        "legitimacy": legitimacy,
+        "matched_searches": item.get("matched_searches") or fit.get("matched_searches") or [],
         "tailor_status": item.get("tailor_status"),
         "tailor_error": item.get("tailor_error"),
         "review_status": item.get("review_status"),
@@ -1761,13 +1767,50 @@ def _queue_item_view(item: dict) -> dict:
     }
 
 @app.get("/queue")
-def get_queue(request: Request, band: str = "", review_status: str = ""):
-    """Banded review queue, Strong first (rule 10)."""
+def get_queue(request: Request, band: str = "", review_status: str = "", search: str = ""):
+    """Banded review queue, Strong first (rule 10). Optional `search` filters by
+    matched_searches tag (My Searches view)."""
     pid = get_pid(request)
     items = matcher_store.list_queue(
         _matcher_db_path(), pid, band=band or None, review_status=review_status or None,
     )
-    return {"items": [_queue_item_view(i) for i in items], "source": _matcher_db_path()}
+    views = [_queue_item_view(i) for i in items]
+    if search.strip():
+        needle = search.strip().lower()
+        views = [
+            v for v in views
+            if any(needle == str(t).lower() or needle in str(t).lower()
+                   for t in (v.get("matched_searches") or []))
+        ]
+    return {"items": views, "source": _matcher_db_path(), "search": search or None}
+
+
+@app.get("/queue/searches")
+def get_queue_searches(request: Request):
+    """My Searches view: group queue items by matched search-string name."""
+    pid = get_pid(request)
+    items = matcher_store.list_queue(_matcher_db_path(), pid)
+    groups: dict[str, list[dict]] = {}
+    for item in items:
+        view = _queue_item_view(item)
+        tags = view.get("matched_searches") or []
+        if not tags:
+            continue
+        for tag in tags:
+            groups.setdefault(str(tag), []).append({
+                "id": view["id"],
+                "company": view["company"],
+                "title": view["title"],
+                "match_pct": view["match_pct"],
+                "band": view["band"],
+                "legitimacy_tier": view.get("legitimacy_tier"),
+            })
+    return {
+        "searches": [
+            {"name": name, "count": len(rows), "items": rows}
+            for name, rows in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        ]
+    }
 
 @app.get("/queue/{match_id}")
 def get_queue_item_detail(match_id: int, request: Request):
@@ -2080,9 +2123,14 @@ OUTPUT JSON ONLY: {{"tailored_summary": "..."}}"""
 
 
 def _analysis_deep_block(extracted: dict, judgments: list, nice_judgments: list,
-                         scored: dict, profile_haystack: str, jd_text: str) -> dict:
+                         scored: dict, profile_haystack: str, jd_text: str,
+                         fit: dict | None = None) -> dict:
     """Shape the shared analysis into the /analyze-deep response contract so the
-    dashboard can hand off Analyze → Tailor without a second LLM call."""
+    dashboard can hand off Analyze → Tailor without a second LLM call.
+
+    `scored` is the must/nice requirement rubric (skills lists). `fit` is the
+    five-dimension scorer — when present, match_score / dimensions come from it.
+    """
     verdict_ok = {"met", "equivalent", "partial"}
     by_req = {j["requirement"]: j for j in judgments + nice_judgments}
     def _flag(skills):
@@ -2090,6 +2138,7 @@ def _analysis_deep_block(extracted: dict, judgments: list, nice_judgments: list,
                  "matched": by_req.get(s["skill"], {}).get("verdict") in verdict_ok}
                 for s in skills]
     keywords = extracted.get("keywords") or []
+    overall = fit.get("match_pct") if isinstance(fit, dict) and fit.get("match_pct") is not None else scored.get("score")
     return {
         "role": extracted.get("role", ""),
         "company": extracted.get("company", ""),
@@ -2101,10 +2150,13 @@ def _analysis_deep_block(extracted: dict, judgments: list, nice_judgments: list,
         "keywords": keywords,
         "keywords_covered": [k for k in keywords if scoring.lexical_match(k, profile_haystack)],
         "keywords_missing": [k for k in keywords if not scoring.lexical_match(k, profile_haystack)],
-        "match_score": scored.get("score"),
+        "match_score": overall,
         "gaps": scored.get("gaps", []),
         "recommendations": [],
         "jd_extracted": jd_text[:4000],
+        "dimensions": (fit or {}).get("dimensions"),
+        "knockouts": (fit or {}).get("knockouts"),
+        "fit": fit,
         "_judgments": judgments,
         "_nice_judgments": nice_judgments,
     }
@@ -2143,7 +2195,7 @@ async def analyze_job(req: JobRequest, request: Request):
         log.error(f"POST /analyze failed — pid={pid}: {extracted}", exc_info=extracted)
         raise HTTPException(status_code=500, detail=f"JD analysis failed: {extracted}")
 
-    # Deterministic judgment + rubric score over the FULL profile corpus.
+    # Deterministic judgment + must/nice rubric (skills lists) over the FULL corpus.
     must = [s["skill"] for s in extracted.get("must_have_skills") or []]
     nice = [s["skill"] for s in extracted.get("nice_to_have_skills") or []]
     async with llm_semaphore:  # borderline adjudication may make one LLM call
@@ -2153,6 +2205,17 @@ async def analyze_job(req: JobRequest, request: Request):
     nice_judgments = await asyncio.to_thread(
         scoring.judge_requirements, pid, nice, user_data, knowledge_semantic.search)
     scored = scoring.compute_match_score(judgments, nice_judgments)
+
+    # Canonical overall score: five-dimension scorer (same as Tailor + matcher).
+    async with llm_semaphore:
+        fit = await asyncio.to_thread(
+            scoring.score_job,
+            req.jd_text,
+            user_data,
+            title=extracted.get("role") or "",
+            company=extracted.get("company") or "",
+            llm=req.llm,
+        )
 
     # Summary is best-effort: fall back to the master summary, never fail the request.
     summary_fallback = False
@@ -2169,11 +2232,12 @@ async def analyze_job(req: JobRequest, request: Request):
         user_data.get("projects", []), req.jd_text, n=3)
     profile_haystack = scoring.build_profile_haystack(user_data)
     gaps = scored.get("gaps", [])
+    overall = fit.get("match_pct")
 
     result = {
         # Legacy contract (renderAnalysis in dashboard.html + any older clients)
         "role": extracted.get("role", ""),
-        "score": f"{scored['score']}%" if scored.get("score") is not None else "N/A",
+        "score": f"{overall}%" if overall is not None else "N/A",
         "skills_matched": scored.get("met", []) + scored.get("equivalent", []),
         "missing_skill": gaps[0] if gaps else "",
         "tailored_summary": tailored_summary,
@@ -2184,11 +2248,15 @@ async def analyze_job(req: JobRequest, request: Request):
             [dict(j, tier="must") for j in judgments]
             + [dict(j, tier="nice") for j in nice_judgments]
         ),
-        "score_detail": {"band": scored.get("band"), "met": scored.get("met", []),
+        "score_detail": {"band": fit.get("band") or scored.get("band"),
+                         "met": scored.get("met", []),
                          "equivalent": scored.get("equivalent", []), "gaps": gaps},
+        "dimensions": fit.get("dimensions"),
+        "knockouts": fit.get("knockouts"),
+        "fit": fit,
         "summary_fallback": summary_fallback,
         "deep": _analysis_deep_block(extracted, judgments, nice_judgments,
-                                     scored, profile_haystack, req.jd_text),
+                                     scored, profile_haystack, req.jd_text, fit=fit),
     }
     log_event(log, "INFO", "analyze_ok", pid=pid, score=result.get("score"),
               role=result.get("role", "")[:40], gaps=len(gaps),
@@ -2486,7 +2554,7 @@ async def analyze_deep(req: DeepAnalyzeRequest, request: Request):
         log.error(f"POST /analyze-deep failed — pid={pid}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Same deterministic judgment + rubric as /analyze — one scorer everywhere.
+    # Same deterministic judgment + five-dim scorer as /analyze — one scorer everywhere.
     must = [s["skill"] for s in extracted.get("must_have_skills") or []]
     nice = [s["skill"] for s in extracted.get("nice_to_have_skills") or []]
     judgments = await asyncio.to_thread(
@@ -2495,9 +2563,18 @@ async def analyze_deep(req: DeepAnalyzeRequest, request: Request):
         scoring.judge_requirements, pid, nice, user_data, knowledge_semantic.search)
     scored = scoring.compute_match_score(judgments, nice_judgments)
     profile_haystack = scoring.build_profile_haystack(user_data)
+    async with llm_semaphore:
+        fit = await asyncio.to_thread(
+            scoring.score_job,
+            req.jd_text,
+            user_data,
+            title=extracted.get("role") or req.role or "",
+            company=extracted.get("company") or req.company or "",
+            llm=req.llm,
+        )
 
     result = _analysis_deep_block(extracted, judgments, nice_judgments,
-                                  scored, profile_haystack, req.jd_text)
+                                  scored, profile_haystack, req.jd_text, fit=fit)
     log_event(log, "INFO", "analyze_deep_ok", pid=pid, score=result.get("match_score"),
               musts=len(must), gaps=len(result.get("gaps") or []))
     return result
@@ -3160,9 +3237,9 @@ OUTPUT JSON ONLY:
             master=user_data,
             tailored=result,
         )
-        # ── STEP 6: score estimate on the shared rubric (no extra LLM calls) ──
-        # Uses the analysis judgments when the caller supplies them; otherwise
-        # re-judges the analysis' must-have skills. No analysis → no estimate.
+        # ── STEP 6: score estimate on the shared five-dim scorer (no extra LLM
+        # when analysis already carries a fit; else bump technical_skills from
+        # tailored coverage on the must/nice judgments).
         base_judgments = (analysis or {}).get("_judgments") or []
         nice_judgments = (analysis or {}).get("_nice_judgments") or []
         if not base_judgments:
@@ -3172,6 +3249,7 @@ OUTPUT JSON ONLY:
                 base_judgments = await asyncio.to_thread(
                     scoring.judge_requirements, pid, must, user_data,
                     knowledge_semantic.search)
+        prior_fit = (analysis or {}).get("fit") or (analysis or {}).get("deep", {}).get("fit")
         if base_judgments:
             tailored_texts = [result.get("tailored_summary", "")]
             for e in result.get("experience", []):
@@ -3179,8 +3257,19 @@ OUTPUT JSON ONLY:
             for lst in (result.get("tailored_skills") or {}).values():
                 if isinstance(lst, list):
                     tailored_texts.extend(str(s) for s in lst)
-            result["score_estimate"] = scoring.score_after_tailoring(
-                base_judgments, tailored_texts, nice_judgments or None)["score"]
+            if isinstance(prior_fit, dict) and prior_fit.get("dimensions"):
+                updated = scoring.apply_tailoring_to_fit(
+                    prior_fit, base_judgments, tailored_texts, nice_judgments or None)
+                result["fit"] = updated
+                result["dimensions"] = updated.get("dimensions")
+                result["score_estimate"] = updated.get("match_pct")
+            else:
+                result["score_estimate"] = scoring.score_after_tailoring(
+                    base_judgments, tailored_texts, nice_judgments or None)["score"]
+        elif isinstance(prior_fit, dict) and prior_fit.get("match_pct") is not None:
+            result["fit"] = prior_fit
+            result["dimensions"] = prior_fit.get("dimensions")
+            result["score_estimate"] = prior_fit.get("match_pct")
 
         result["_meta"] = {
             "model_used": active_model,

@@ -27,6 +27,10 @@ class MatcherConfig:
     filters_path: str = "backend/scraper/filters.yaml"
     jobs_db_path: str = "backend/scraper/jobs.db"
     matches_db_path: str = "backend/matcher/matches.db"
+    # Search-string integration (matching-v2)
+    search_alignment_boost: int = 5
+    search_bypass_internship: bool = True
+    enable_legitimacy_web: bool = True
 
 
 def _merge(base: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
@@ -64,5 +68,8 @@ def load_config(config_path: str | Path | None = None) -> MatcherConfig:
         filters_path=str(merged.get("filters_path", base.filters_path)),
         jobs_db_path=str(merged.get("jobs_db_path", base.jobs_db_path)),
         matches_db_path=str(merged.get("matches_db_path", base.matches_db_path)),
+        search_alignment_boost=int(merged.get("search_alignment_boost", base.search_alignment_boost)),
+        search_bypass_internship=bool(merged.get("search_bypass_internship", base.search_bypass_internship)),
+        enable_legitimacy_web=bool(merged.get("enable_legitimacy_web", base.enable_legitimacy_web)),
     )
 

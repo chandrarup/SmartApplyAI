@@ -2175,6 +2175,36 @@ function renderAnalysis(a, questions) {
   ring.className = 'score-ring ' + (scoreNum >= 80 ? 'sh' : scoreNum >= 60 ? 'sm' : 'sl2');
   document.getElementById('jd-roleLbl').textContent = a.role || '';
 
+  // Five-dimension sub-score table (matching-v2) — optional until fit is present
+  let dimHost = document.getElementById('jd-dimensions');
+  if (!dimHost) {
+    dimHost = document.createElement('div');
+    dimHost.id = 'jd-dimensions';
+    dimHost.style.cssText = 'margin:12px 0 4px;';
+    const matchedParent = document.getElementById('jd-matched')?.parentElement;
+    if (matchedParent) matchedParent.parentElement?.insertBefore(dimHost, matchedParent);
+    else document.getElementById('jd-results')?.prepend(dimHost);
+  }
+  const dims = a.dimensions || (a.fit && a.fit.dimensions) || null;
+  if (dims) {
+    const order = ['technical_skills','experience_match','education_fit','career_alignment'];
+    const labels = {technical_skills:'Technical', experience_match:'Experience',
+                    education_fit:'Education', career_alignment:'Career path'};
+    dimHost.innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--t3);margin-bottom:6px">Fit dimensions</div>` +
+      order.map(k => {
+        const cell = dims[k] || {};
+        const sc = cell.score ?? '—';
+        const note = cell.note || '';
+        return `<div style="display:flex;gap:10px;align-items:baseline;font-size:12.5px;margin:3px 0">
+          <span style="width:88px;color:var(--t3)">${labels[k]||k}</span>
+          <strong style="width:36px">${sc}</strong>
+          <span style="color:var(--t4);flex:1">${note}</span>
+        </div>`;
+      }).join('');
+  } else {
+    dimHost.innerHTML = '';
+  }
+
   // Matched skills
   const ms = document.getElementById('jd-matched');
   const matched = Array.isArray(a.skills_matched) ? a.skills_matched : [];
