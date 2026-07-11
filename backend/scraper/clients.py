@@ -1,4 +1,8 @@
-"""HTTP clients for public ATS job board endpoints."""
+"""HTTP clients for public ATS job board endpoints.
+
+Thin compatibility shim over the provider registry. Prefer
+`providers.resolve_provider` + `provider.fetch` for new code.
+"""
 
 from __future__ import annotations
 
@@ -7,11 +11,26 @@ from dataclasses import dataclass
 import time
 from typing import Any
 
-import requests
+from .providers.base import (
+    DEFAULT_TIMEOUT_SECONDS,
+    MAX_CONCURRENCY,
+    SLEEP_BETWEEN_CALLS_SECONDS,
+    CompanyEntry,
+)
+from .providers.registry import load_providers, resolve_provider
 
-DEFAULT_TIMEOUT_SECONDS = 20
-MAX_CONCURRENCY = 4
-SLEEP_BETWEEN_CALLS_SECONDS = 0.35
+# Re-exports for existing imports
+__all__ = [
+    "CompanyTarget",
+    "DEFAULT_TIMEOUT_SECONDS",
+    "MAX_CONCURRENCY",
+    "SLEEP_BETWEEN_CALLS_SECONDS",
+    "fetch_board",
+    "fetch_greenhouse",
+    "fetch_lever",
+    "fetch_ashby",
+    "fetch_many",
+]
 
 
 @dataclass(frozen=True)
@@ -22,49 +41,26 @@ class CompanyTarget:
     token: str
 
 
-def _get_json(url: str) -> Any:
-    response = requests.get(url, timeout=DEFAULT_TIMEOUT_SECONDS)
-    response.raise_for_status()
-    return response.json()
+def fetch_board(ats: str, token: str) -> list[dict[str, Any]]:
+    """Fetch jobs for one ATS target via the provider registry."""
+    entry = CompanyEntry(ats=ats.lower().strip(), token=token)
+    providers = load_providers()
+    provider = resolve_provider(entry, providers)
+    if not provider:
+        raise ValueError(f"Unsupported ATS: {ats}")
+    return provider.fetch(entry)
 
 
 def fetch_greenhouse(token: str) -> list[dict[str, Any]]:
-    """Fetch Greenhouse board jobs for a token."""
-    url = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs?content=true"
-    payload = _get_json(url)
-    return payload.get("jobs", [])
+    return fetch_board("greenhouse", token)
 
 
 def fetch_lever(token: str) -> list[dict[str, Any]]:
-    """Fetch Lever board jobs for a token."""
-    url = f"https://api.lever.co/v0/postings/{token}?mode=json"
-    payload = _get_json(url)
-    if not isinstance(payload, list):
-        raise ValueError(f"Expected list payload for lever token={token}")
-    return payload
+    return fetch_board("lever", token)
 
 
 def fetch_ashby(token: str) -> list[dict[str, Any]]:
-    """Fetch Ashby board jobs for a token."""
-    url = f"https://api.ashbyhq.com/posting-api/job-board/{token}"
-    payload = _get_json(url)
-    if isinstance(payload, dict) and "jobs" in payload:
-        return payload["jobs"]
-    if isinstance(payload, list):
-        return payload
-    raise ValueError(f"Unexpected Ashby payload shape for token={token}")
-
-
-def fetch_board(ats: str, token: str) -> list[dict[str, Any]]:
-    """Fetch jobs for one ATS target."""
-    ats_lower = ats.lower().strip()
-    if ats_lower == "greenhouse":
-        return fetch_greenhouse(token)
-    if ats_lower == "lever":
-        return fetch_lever(token)
-    if ats_lower == "ashby":
-        return fetch_ashby(token)
-    raise ValueError(f"Unsupported ATS: {ats}")
+    return fetch_board("ashby", token)
 
 
 def fetch_many(targets: list[CompanyTarget]) -> dict[CompanyTarget, list[dict[str, Any]]]:

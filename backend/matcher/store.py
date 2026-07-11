@@ -94,11 +94,38 @@ def gate_and_store(
     if not survivors:
         return counts
 
+    # Liveness on queue entry (plain HTTP) — never blocks storage.
+    try:
+        from scraper.liveness import check_url
+    except ImportError:
+        try:
+            from backend.scraper.liveness import check_url  # type: ignore
+        except ImportError:
+            check_url = None  # type: ignore
+
     with _connect(matches_db_path) as conn:
         for row in survivors:
             job = row["job"]
             band = band_for(row.get("match_pct", 0), strong_threshold)
             counts[band] += 1
+            fit_obj = dict(row.get("fit") or {})
+            if check_url:
+                try:
+                    live = check_url(job.get("apply_url") or "")
+                    fit_obj["liveness"] = live
+                    # Also persist onto jobs row when identity is known
+                    try:
+                        from scraper.liveness import persist_job_liveness
+                    except ImportError:
+                        from backend.scraper.liveness import persist_job_liveness  # type: ignore
+                    if job.get("source_ats") and job.get("external_id"):
+                        persist_job_liveness(job["source_ats"], job["external_id"], live)
+                except Exception as exc:  # noqa: BLE001
+                    fit_obj["liveness"] = {
+                        "result": "uncertain",
+                        "code": "liveness_error",
+                        "reason": type(exc).__name__,
+                    }
             conn.execute(
                 """
                 INSERT INTO matches (
@@ -117,9 +144,6 @@ def gate_and_store(
                     fit_json = excluded.fit_json,
                     created_at = excluded.created_at
                 """,
-                # Re-matching updates the JD/score but deliberately preserves
-                # tailor_status / tailored_json / review_status so a night's review
-                # progress is never wiped by the next matcher run (rule 7).
                 (
                     profile_id,
                     job.get("source_ats", ""),
@@ -132,7 +156,7 @@ def gate_and_store(
                     int(row.get("match_pct", 0) or 0),
                     band,
                     job.get("description_text", "") or "",
-                    json.dumps(row.get("fit", {}), ensure_ascii=False),
+                    json.dumps(fit_obj, ensure_ascii=False),
                     _utc_now(),
                 ),
             )
