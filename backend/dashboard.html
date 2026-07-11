@@ -1725,8 +1725,9 @@ function renderQueueCard(it, opts={}){
   const missing=(it.missing_skills||[]).map(s=>chip(s.skill||s,'warn')).join('');
   const tailorWarn=it.tailor_status!=='tailored'?`<div style="font-size:11.5px;color:#b45309;margin-top:4px">Tailoring ${tlrEsc(it.tailor_status||'pending')}${it.tailor_error?': '+tlrEsc(it.tailor_error):''}${mode==='tailor'?' — click Tailor this job below.':' — run "Tailor pending".'}</div>`:'';
   const pf=it.page_fit||{};
-  const overflowBadge=pf.wont_fit_one_page?`<span class="pc" style="margin-left:6px;background:#fee2e2;color:#b91c1c;border-color:#fca5a5" title="${tlrEsc((pf.reasons||[]).join(' · '))}">⚠ won't fit one page</span>`:'';
-  const overflowDetail=pf.wont_fit_one_page?`<div style="font-size:11.5px;color:#b91c1c;margin-top:4px"><strong>Won't fit one page:</strong> ${tlrEsc((pf.reasons||[]).join(' · '))} — shorten before approving.</div>`:'';
+  const overflowLabel=pf.badge||(pf.wont_fit_one_page?'overflow — fix before download':'');
+  const overflowBadge=pf.wont_fit_one_page||pf.blocked?`<span class="pc" style="margin-left:6px;background:#fee2e2;color:#b91c1c;border-color:#fca5a5" title="${tlrEsc((pf.reasons||[]).join(' · '))}">⚠ ${tlrEsc(overflowLabel)}</span>`:'';
+  const overflowDetail=pf.wont_fit_one_page||pf.blocked?`<div style="font-size:11.5px;color:#b91c1c;margin-top:4px"><strong>Overflow — fix before download:</strong> ${tlrEsc((pf.reasons||[]).join(' · '))}</div>`:'';
   const editsHtml=edits.length?edits.map((e,idx)=>{
     const st=e.status||'proposed', before=tlrEsc(e.before||''), after=tlrEsc(e.after||'');
     const ev=e.evidence_ref?`<div class="tlr-edit-meta">Evidence: <code>${tlrEsc(e.evidence_ref)}</code></div>`:'<div class="tlr-edit-meta" style="color:#b45309">No evidence found — needs your call</div>';
@@ -2469,45 +2470,71 @@ function tlrAcceptCountLabel(edits){
 function tlrRenderEditControls(res){
   const wrap = document.getElementById('tlr-editControls');
   if (!wrap) return;
-  const edits = Array.isArray(res?._edits) ? res._edits : [];
+  const edits = Array.isArray(res?._edits) ? res._edits.filter(e => e.stretch_level !== 'fabrication') : [];
   tlrAcceptCountLabel(edits);
+  const fab = res?._fabrication_count || 0;
   if (!edits.length) {
-    wrap.innerHTML = '<span style="font-size:12px;color:var(--t4)">No structured edits returned.</span>';
+    wrap.innerHTML = `<span style="font-size:12px;color:var(--t4)">No structured edits returned.${fab?` (${fab} fabrication(s) auto-rejected.)`:''}</span>`;
     return;
   }
   const rowHtml = (e, idx) => {
     const status = e.status || 'proposed';
+    const stretch = e.stretch_level || 'grounded';
     const before = tlrEsc(e.before || '');
     const after = tlrEsc(e.after || '');
     const unbacked = (e.ungrounded_terms||[]).length
       ? ` — unbacked terms: ${e.ungrounded_terms.map(tlrEsc).join(', ')}` : '';
     const evidence = e.evidence_ref
       ? `<div class="tlr-edit-meta">Evidence: <code>${tlrEsc(e.evidence_ref)}</code></div>`
-      : `<div class="tlr-edit-meta" style="color:#b45309">No evidence found — needs your call${unbacked}</div>`;
+      : `<div class="tlr-edit-meta" style="color:#b45309">No evidence found${unbacked}</div>`;
+    const stretchBanner = stretch === 'stretch'
+      ? `<div style="margin:6px 0;padding:6px 8px;background:#fff7ed;border-left:3px solid #ea580c;border-radius:4px;font-size:11.5px;color:#9a3412">
+           This is a stretch because ${tlrEsc(e.stretch_reason || 'adjacent framing of similar work')}.
+         </div>`
+      : (stretch === 'grounded'
+        ? `<div class="tlr-edit-meta" style="color:#166534">Grounded rewrite</div>` : '');
+    const lintBits = (e.lint_flags||[]).length
+      ? `<div style="margin-top:4px;font-size:11px;color:#b91c1c">Style lint: ${(e.lint_flags||[]).map(f=>tlrEsc(f.label||f.match||'flag')).join(', ')}</div>`
+      : '';
+    const stretchActions = stretch === 'stretch'
+      ? `<div class="tlr-edit-actions" style="margin-top:4px">
+           <button data-stretch-act="keep" class="${status==='accepted'?'on':''}">Keep</button>
+           <button data-stretch-act="soften">Soften</button>
+           <button data-stretch-act="drop" class="${status==='rejected'?'on':''}">Drop</button>
+         </div>`
+      : `<div class="tlr-edit-actions">
+           <button data-status="accepted" class="${status==='accepted'?'on':''}">Accept</button>
+           <button data-status="rejected" class="${status==='rejected'?'on':''}">Reject</button>
+           <button data-status="needs_your_call" class="${status==='needs_your_call'?'on':''}">Needs Call</button>
+         </div>`;
     return `<div class="tlr-edit-row" data-edit-idx="${idx}">
       <div style="font-size:11.5px;color:var(--t3)">${tlrEsc(e.reason || '')}</div>
+      ${stretchBanner}
       ${evidence}
+      ${lintBits}
       <div style="margin-top:6px;font-size:11px;color:#6b7280">Before</div>
       <div style="font-size:12px;color:#6b7280;text-decoration:line-through">${before || '—'}</div>
       <div style="margin-top:6px;font-size:11px;color:#166534">After</div>
       <div contenteditable="true" data-edit-after="${idx}" style="font-size:12.5px;border:1px solid var(--border);border-radius:6px;padding:6px">${after || ''}</div>
-      <div class="tlr-edit-actions">
-        <button data-status="accepted" class="${status==='accepted'?'on':''}">Accept</button>
-        <button data-status="rejected" class="${status==='rejected'?'on':''}">Reject</button>
-        <button data-status="needs_your_call" class="${status==='needs_your_call'?'on':''}">Needs Call</button>
-      </div>
+      ${stretchActions}
     </div>`;
   };
   // Group by section into collapsible accordions; data-edit-idx stays the flat
   // index into res._edits so the listeners below are section-agnostic.
   const sections = [...new Set(edits.map(e => e.section || 'other'))];
-  wrap.innerHTML = sections.map(sec => {
+  const fabNote = fab ? `<div style="font-size:11px;color:#6b7280;margin-bottom:6px">${fab} fabrication(s) auto-rejected (hidden).</div>` : '';
+  wrap.innerHTML = fabNote + sections.map(sec => {
     const pairs = edits.map((e,i)=>[e,i]).filter(([e]) => (e.section||'other') === sec);
-    const acc = pairs.filter(([e])=>e.status==='accepted').length;
+    // Map display index back to real index in res._edits
+    const realPairs = pairs.map(([e]) => {
+      const realIdx = (res._edits || []).indexOf(e);
+      return [e, realIdx >= 0 ? realIdx : 0];
+    });
+    const acc = realPairs.filter(([e])=>e.status==='accepted').length;
     const label = sec.charAt(0).toUpperCase()+sec.slice(1);
     return `<details open>
-      <summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--t2);padding:4px 0">${tlrEsc(label)} (${pairs.length}) · ${acc} accepted</summary>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">${pairs.map(([e,i])=>rowHtml(e,i)).join('')}</div>
+      <summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--t2);padding:4px 0">${tlrEsc(label)} (${realPairs.length}) · ${acc} accepted</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">${realPairs.map(([e,i])=>rowHtml(e,i)).join('')}</div>
     </details>`;
   }).join('');
 
@@ -2520,15 +2547,62 @@ function tlrRenderEditControls(res){
       tlrRenderPreview(window.tlrLastResult);
     });
   });
-  wrap.querySelectorAll('.tlr-edit-actions button').forEach(btn => {
+  wrap.querySelectorAll('.tlr-edit-actions button[data-status]').forEach(btn => {
     btn.addEventListener('click', () => {
       const row = btn.closest('[data-edit-idx]');
       const idx = parseInt(row.dataset.editIdx, 10);
       if (!window.tlrLastResult?._edits?.[idx]) return;
       window.tlrLastResult._edits[idx].status = btn.dataset.status;
       tlrRenderEditControls(window.tlrLastResult);
-      // Accept/Reject drives the resume preview, not just the pill.
       tlrRenderPreview(window.tlrLastResult);
+    });
+  });
+  wrap.querySelectorAll('.tlr-edit-actions button[data-stretch-act]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('[data-edit-idx]');
+      const idx = parseInt(row.dataset.editIdx, 10);
+      const edit = window.tlrLastResult?._edits?.[idx];
+      if (!edit) return;
+      const act = btn.dataset.stretchAct;
+      if (act === 'keep') {
+        edit.status = 'accepted';
+        tlrApplyEditField(window.tlrLastResult, edit);
+        tlrRenderEditControls(window.tlrLastResult);
+        tlrRenderPreview(window.tlrLastResult);
+        return;
+      }
+      if (act === 'drop') {
+        edit.status = 'rejected';
+        tlrRenderEditControls(window.tlrLastResult);
+        tlrRenderPreview(window.tlrLastResult);
+        return;
+      }
+      if (act === 'soften') {
+        btn.disabled = true; btn.textContent = 'Softening…';
+        try {
+          const jd = document.getElementById('tlr-jd')?.value || '';
+          const r = await fetch((localStorage.getItem('lh_api')||DEF_API)+'/tailor/soften-edit', {
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-Profile-ID':getActivePid()},
+            body: JSON.stringify({edit, jd_text: jd, llm: localStorage.getItem('lh_llm')||'ollama'}),
+          });
+          if (!r.ok) throw new Error(await r.text());
+          const data = await r.json();
+          if (data.edit) {
+            window.tlrLastResult._edits[idx] = data.edit;
+            if (data.edit.status === 'accepted') {
+              tlrApplyEditField(window.tlrLastResult, data.edit);
+            }
+          }
+          tlrRenderEditControls(window.tlrLastResult);
+          tlrRenderPreview(window.tlrLastResult);
+          tlrLog('✓ Softened stretch edit', 'ok');
+        } catch (e) {
+          tlrLog('✗ Soften failed: ' + e.message, 'err');
+          toast('Soften failed', 'err');
+          btn.disabled = false; btn.textContent = 'Soften';
+        }
+      }
     });
   });
 }
@@ -2786,10 +2860,16 @@ function tlrRenderPreview(res) {
   const acceptedEdits = edits.filter(e => e.status === 'accepted').length;
   const needsCallEdits = edits.filter(e => e.status === 'needs_your_call').length;
 
-  const overflowBanner = overflowRisk > 15
-    ? `<div style="margin-top:8px;padding:8px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;font-size:11.5px;color:#92400e">
-        ⚠ <b>Page overflow risk: +${overflowRisk} words</b> over original.
-        <div style="margin-top:4px;color:#78350f;font-size:11px">May spill to page 2. Compile loop will auto-trim if needed.</div>
+  const overflowBanner = (res._page_fit?.blocked || overflowRisk > 15)
+    ? `<div style="margin-top:8px;padding:8px;background:#fee2e2;border-left:3px solid #dc2626;border-radius:4px;font-size:11.5px;color:#991b1b">
+        ⚠ <b>overflow — fix before download</b>${overflowRisk > 15 ? ` (+${overflowRisk} words over original)` : ''}
+        <div style="margin-top:4px;font-size:11px">${tlrEsc((res._page_fit?.reasons||[]).join(' · ') || 'Shorten content so the PDF fits one page.')}</div>
+      </div>` : '';
+
+  const lintFlags = res.lint_flags || [];
+  const lintBanner = lintFlags.length
+    ? `<div style="margin-top:6px;padding:6px 8px;background:#fef2f2;border-left:3px solid #ef4444;border-radius:4px;font-size:11px;color:#991b1b">
+        Style lint still flagged: ${lintFlags.slice(0,4).map(f=>tlrEsc(f.label||f.match||'')).join(', ')}
       </div>` : '';
 
   const warnBanner = warnings.length
@@ -2797,15 +2877,19 @@ function tlrRenderPreview(res) {
         ⚠ ${warnings.length} content warning${warnings.length>1?'s':''}: ${warnings.slice(0,2).map(w=>w.kind).join(', ')}
       </div>` : '';
 
+  const stretchCount = edits.filter(e => e.stretch_level === 'stretch').length;
   ch.innerHTML = [
     sd.tailored ? `<div>• Summary rewritten for this role</div>` : '',
     editCount   ? `<div>• ${editCount} bullet(s) edited with JD language</div>` : '',
     addCount    ? `<div>• ${addCount} bullet(s) added</div>` : '',
     (res.skills_added||[]).length ? `<div>• ${res.skills_added.length} skill keyword(s) added</div>` : '',
     edits.length ? `<div>• ${acceptedEdits}/${edits.length} edits accepted</div>` : '',
-    needsCallEdits ? `<div style="color:#b45309">• ${needsCallEdits} edit(s) need your call (no evidence)</div>` : '',
+    stretchCount ? `<div style="color:#c2410c">• ${stretchCount} stretch edit(s) — Keep / Soften / Drop</div>` : '',
+    needsCallEdits ? `<div style="color:#b45309">• ${needsCallEdits} edit(s) need your call</div>` : '',
+    (res._fabrication_count) ? `<div style="color:#6b7280">• ${res._fabrication_count} fabrication(s) auto-rejected</div>` : '',
     res.score_estimate ? `<div style="margin-top:8px;font-weight:700;color:var(--orange)">Estimated fit: ${res.score_estimate}%</div>` : '',
     overflowBanner,
+    lintBanner,
     warnBanner,
     (() => {
       const pf = res._preflight || {};
@@ -3242,7 +3326,12 @@ document.getElementById('tlr-pdfBtn').addEventListener('click', async () => {
       let errMsg = 'PDF failed';
       try {
         const d = JSON.parse(errText).detail;
-        if (d && typeof d === 'object' && d.preflight) {
+        if (d && typeof d === 'object' && d.page_fit) {
+          window.tlrLastResult._page_fit = d.page_fit;
+          tlrRenderPreview(window.tlrLastResult);
+          errMsg = d.error || d.page_fit.badge || 'overflow — fix before download';
+          tlrLog('✗ Page-count gate: ' + errMsg, 'err');
+        } else if (d && typeof d === 'object' && d.preflight) {
           const fatal = (d.preflight.issues || []).filter(i => i.severity === 'fatal');
           errMsg = fatal.map(i => i.message).join('; ') || d.error || errMsg;
           tlrLog('✗ Pre-PDF check: ' + errMsg, 'err');
