@@ -126,6 +126,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ text: null, jobContext: null });
     }
     return true;
+
+  } else if (message.action === "fetch_json") {
+    const url = message.url;
+    if (!url || typeof url !== "string") {
+      sendResponse({ ok: false, error: "missing url" });
+      return true;
+    }
+    fetch(url, { method: message.method || "GET", headers: message.headers || {} })
+      .then(async (r) => {
+        const text = await r.text();
+        sendResponse({ ok: r.ok, status: r.status, text });
+      })
+      .catch((e) => sendResponse({ ok: false, error: e.message || String(e) }));
+    return true;
   }
 
   return true;

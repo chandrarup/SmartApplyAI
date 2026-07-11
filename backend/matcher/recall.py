@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.knowledge import search as knowledge_search
+try:
+    from backend.knowledge import search as knowledge_search
+except ImportError:
+    from knowledge import search as knowledge_search  # type: ignore
 
 
 def recall_candidates(

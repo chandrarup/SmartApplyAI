@@ -18,7 +18,11 @@ from . import store
 from .embeddings import embed
 
 EMBEDDING_DIM = int(os.getenv("SMARTAPPLY_EMBED_DIM", "384"))
-ALLOWED_KINDS = {"skill", "project", "experience_bullet", "summary"}
+ALLOWED_KINDS = {
+    "skill", "project", "experience_bullet", "summary",
+    "education", "publication", "certification", "award",
+    "leadership", "research_interest",
+}
 SQLITE_VEC_AVAILABLE = sqlite_vec is not None
 
 
@@ -30,13 +34,49 @@ def _load_vec_extension(conn: sqlite3.Connection) -> None:
     conn.enable_load_extension(False)
 
 
+def _migrate_evidence_schema(conn: sqlite3.Connection) -> None:
+    """Rebuild the evidence table if it carries the legacy kind CHECK constraint.
+
+    Kinds are validated in Python against ALLOWED_KINDS; a baked-in CHECK cannot
+    be altered in SQLite and would reject the expanded kinds. Row ids are copied
+    verbatim so vec_evidence rowids remain valid (no re-embedding needed).
+    """
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'evidence'"
+    ).fetchone()
+    if row is None or "CHECK" not in (row["sql"] or ""):
+        return
+    conn.execute("ALTER TABLE evidence RENAME TO evidence_legacy")
+    conn.execute(
+        """
+        CREATE TABLE evidence (
+            id INTEGER PRIMARY KEY,
+            profile_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            ref_id TEXT NOT NULL,
+            text TEXT NOT NULL,
+            hash TEXT NOT NULL,
+            UNIQUE(profile_id, kind, ref_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO evidence(id, profile_id, kind, ref_id, text, hash)
+        SELECT id, profile_id, kind, ref_id, text, hash FROM evidence_legacy
+        """
+    )
+    conn.execute("DROP TABLE evidence_legacy")
+
+
 def ensure_semantic_schema(conn: sqlite3.Connection) -> None:
+    _migrate_evidence_schema(conn)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS evidence (
             id INTEGER PRIMARY KEY,
             profile_id TEXT NOT NULL,
-            kind TEXT NOT NULL CHECK(kind IN ('skill','project','experience_bullet','summary')),
+            kind TEXT NOT NULL,
             ref_id TEXT NOT NULL,
             text TEXT NOT NULL,
             hash TEXT NOT NULL,
@@ -158,6 +198,39 @@ def _build_corpus(conn: sqlite3.Connection, pid: str) -> list[tuple[str, str, st
         if summary_text:
             corpus.append(("summary", "summary", summary_text))
 
+    def _joined(entry: dict[str, Any], keys: list[str]) -> str:
+        return _normalize_text(
+            ". ".join(str(entry.get(key) or "") for key in keys if entry.get(key))
+        )
+
+    section_specs: list[tuple[str, str, list[str]]] = [
+        ("education", "education",
+         ["degree", "field", "university", "school", "graduation_date", "graduation", "details"]),
+        ("publication", "publications",
+         ["title", "conference", "venue", "date", "description"]),
+        ("certification", "certifications", ["name", "issuer", "date"]),
+        ("award", "awards", ["title", "organization", "description"]),
+        ("leadership", "leadership", ["role", "organization", "university", "activities"]),
+    ]
+    for kind, section_key, keys in section_specs:
+        entries = profile.get(section_key, [])
+        if not isinstance(entries, list):
+            continue
+        for idx, entry in enumerate(entries):
+            if isinstance(entry, dict):
+                text = _joined(entry, keys)
+            else:
+                text = _normalize_text(entry)
+            if text:
+                corpus.append((kind, str(idx), text))
+
+    interests = profile.get("research_interests", [])
+    if isinstance(interests, list):
+        for idx, interest in enumerate(interests):
+            text = _normalize_text(interest)
+            if text:
+                corpus.append(("research_interest", str(idx), f"Research interest: {text}"))
+
     return corpus
 
 
@@ -254,7 +327,8 @@ def _fallback_search(pid: str, query_text: str, k: int, kind_filter: str | None)
             "kind": corpus[int(i)][0],
             "ref_id": corpus[int(i)][1],
             "text": corpus[int(i)][2],
-            "score": float(scores[int(i)]),
+            # Raw cosine of unit-norm vectors, clamped to match the vec path.
+            "score": max(0.0, min(1.0, float(scores[int(i)]))),
             "evidence_ref": f"{corpus[int(i)][0]}:{corpus[int(i)][1]}",
         }
         for i in top_indices
@@ -301,7 +375,9 @@ def search(pid: str, query_text: str, k: int = 10, kind_filter: str | None = Non
                 "kind": row["kind"],
                 "ref_id": row["ref_id"],
                 "text": row["text"],
-                "score": float(1.0 / (1.0 + float(row["score"]))),
+                # vec0 returns L2 distance; embeddings are unit-norm, so
+                # cosine = 1 - d^2/2 — same scale as the numpy fallback path.
+                "score": max(0.0, min(1.0, 1.0 - (float(row["score"]) ** 2) / 2.0)),
                 "evidence_ref": f'{row["kind"]}:{row["ref_id"]}',
             }
             for row in rows

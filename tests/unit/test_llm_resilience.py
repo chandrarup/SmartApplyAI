@@ -17,6 +17,8 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
 import main  # noqa: E402
+import llm_provider  # noqa: E402
+import scoring  # noqa: E402
 
 
 @pytest.fixture
@@ -24,15 +26,26 @@ def client():
     return TestClient(main.app)
 
 
-def _analyze_json(score="82", projects=None):
+def _extraction_json():
+    """scoring.extract_jd_requirements response for a 'Python ML' JD."""
     return json.dumps({
-        "role": "ML Engineer",
-        "skills_matched": ["Python", "ML"],
-        "missing_skill": "Kubernetes",
-        "score": score,
-        "tailored_summary": "Experienced ML engineer.",
-        "selected_projects": projects or ["GPT-2 Style Small Language Model --- Built from Scratch"],
+        "role": "ML Engineer", "company": "", "level": "Mid", "summary": "ML role.",
+        "responsibilities": [],
+        "must_have_skills": [{"skill": "Python"}, {"skill": "ML"}],
+        "nice_to_have_skills": [], "keywords": ["Python"],
     })
+
+
+def _summary_json():
+    return json.dumps({
+        "tailored_summary": "Experienced ML engineer shipping Python systems in production environments.",
+    })
+
+
+def _mock_analyze_pipeline(monkeypatch):
+    monkeypatch.setattr(scoring, "call_llm", lambda *a, **kw: _extraction_json())
+    monkeypatch.setattr(main, "call_llm", lambda *a, **kw: _summary_json())
+    monkeypatch.setattr(main.knowledge_semantic, "search", lambda *a, **kw: [])
 
 
 # ── call_llm unit tests ───────────────────────────────────────────────────────
@@ -48,8 +61,8 @@ def test_ollama_unreachable_falls_back_to_claude(monkeypatch):
         calls.append("claude")
         return "claude-response"
 
-    monkeypatch.setattr(main, "call_ollama", fail_ollama)
-    monkeypatch.setattr(main, "call_claude", ok_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", fail_ollama)
+    monkeypatch.setattr(llm_provider, "call_claude", ok_claude)
 
     out = main.call_llm([{"role": "user", "content": "hi"}], prefer="ollama")
     assert out == "claude-response"
@@ -60,8 +73,8 @@ def test_both_providers_down_raises_runtime_error(monkeypatch):
     def fail(*args, **kwargs):
         raise RuntimeError("provider down")
 
-    monkeypatch.setattr(main, "call_ollama", fail)
-    monkeypatch.setattr(main, "call_claude", fail)
+    monkeypatch.setattr(llm_provider, "call_ollama", fail)
+    monkeypatch.setattr(llm_provider, "call_claude", fail)
 
     with pytest.raises(RuntimeError, match="All LLM providers failed"):
         main.call_llm([{"role": "user", "content": "hi"}], prefer="ollama")
@@ -79,8 +92,8 @@ def test_ollama_timeout_passes_ceiling_and_falls_back(monkeypatch):
         seen["providers"].append("claude")
         return "fallback-ok"
 
-    monkeypatch.setattr(main, "call_ollama", timeout_ollama)
-    monkeypatch.setattr(main, "call_claude", ok_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", timeout_ollama)
+    monkeypatch.setattr(llm_provider, "call_claude", ok_claude)
 
     out = main.call_llm([{"role": "user", "content": "hi"}], prefer="ollama", timeout=600)
     assert out == "fallback-ok"
@@ -99,9 +112,9 @@ def test_prefer_claude_missing_api_key_falls_back_to_ollama(monkeypatch):
         calls.append("ollama")
         return "ollama-wins"
 
-    monkeypatch.setattr(main, "get_anthropic_key", lambda: "")
-    monkeypatch.setattr(main, "call_claude", no_key_claude)
-    monkeypatch.setattr(main, "call_ollama", ok_ollama)
+    monkeypatch.setattr(llm_provider, "get_anthropic_key", lambda: "")
+    monkeypatch.setattr(llm_provider, "call_claude", no_key_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", ok_ollama)
 
     out = main.call_llm([{"role": "user", "content": "hi"}], prefer="claude")
     assert out == "ollama-wins"
@@ -109,7 +122,7 @@ def test_prefer_claude_missing_api_key_falls_back_to_ollama(monkeypatch):
 
 
 def test_prefer_claude_missing_key_and_ollama_down_raises(monkeypatch):
-    monkeypatch.setattr(main, "get_anthropic_key", lambda: "")
+    monkeypatch.setattr(llm_provider, "get_anthropic_key", lambda: "")
 
     def fail_claude(*args, **kwargs):
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
@@ -117,8 +130,8 @@ def test_prefer_claude_missing_key_and_ollama_down_raises(monkeypatch):
     def fail_ollama(*args, **kwargs):
         raise ConnectionError("ollama down")
 
-    monkeypatch.setattr(main, "call_claude", fail_claude)
-    monkeypatch.setattr(main, "call_ollama", fail_ollama)
+    monkeypatch.setattr(llm_provider, "call_claude", fail_claude)
+    monkeypatch.setattr(llm_provider, "call_ollama", fail_ollama)
 
     with pytest.raises(RuntimeError, match="All LLM providers failed"):
         main.call_llm([{"role": "user", "content": "hi"}], prefer="claude")
@@ -157,8 +170,11 @@ def test_empty_llm_response_autofill_returns_rule_based_only(client, monkeypatch
     )
     assert r.status_code == 200
     data = r.json()
-    assert "First Name" in data
-    assert "Obscure custom question XYZ?" not in data or data.get("Obscure custom question XYZ?") in ("", None)
+    # New contract: {answers, unanswered}. Rules ground First Name; the obscure
+    # question the empty LLM can't answer must come back as the user's call.
+    assert data["answers"].get("First Name")
+    assert any(u["label"] == "Obscure custom question XYZ?" for u in data["unanswered"])
+    assert "Obscure custom question XYZ?" not in data["answers"]
 
 
 def test_analyze_both_providers_down_graceful_message(client, monkeypatch):
@@ -178,13 +194,9 @@ def test_analyze_both_providers_down_graceful_message(client, monkeypatch):
 
 
 def test_analyze_ollama_down_uses_claude_fallback(client, monkeypatch):
-    def smart_llm(messages, temperature=0.3, system="", prefer="ollama", timeout=600, model=None):
-        if prefer == "ollama":
-            # simulate internal fallback already happened at call_llm level
-            pass
-        return _analyze_json()
-
-    monkeypatch.setattr(main, "call_llm", smart_llm)
+    # call_llm's internal provider fallback is opaque to /analyze — as long as
+    # the provider layer returns content, the endpoint succeeds.
+    _mock_analyze_pipeline(monkeypatch)
     r = client.post(
         "/analyze",
         json={"jd_text": "Python ML", "llm": "ollama"},
@@ -291,25 +303,19 @@ def test_autofill_truncation_essential_contact_in_first_5500(client, monkeypatch
 
 # ── Determinism (informational) ───────────────────────────────────────────────
 
-def test_analyze_twice_reports_score_drift(client, monkeypatch):
-    responses = [_analyze_json("75"), _analyze_json("88", projects=["Other Project"])]
-
-    def drifting_llm(*args, **kwargs):
-        return responses.pop(0)
-
-    monkeypatch.setattr(main, "call_llm", drifting_llm)
+def test_analyze_twice_is_deterministic(client, monkeypatch):
+    # The score comes from the deterministic rubric, not LLM free text — the
+    # same JD + profile must score identically run to run (the old test here
+    # documented the drift this fixed).
+    _mock_analyze_pipeline(monkeypatch)
 
     jd = "Machine learning engineer with Python."
     r1 = client.post("/analyze", json={"jd_text": jd, "llm": "ollama"}, headers={"X-Profile-ID": "default"})
     r2 = client.post("/analyze", json={"jd_text": jd, "llm": "ollama"}, headers={"X-Profile-ID": "default"})
     assert r1.status_code == 200 and r2.status_code == 200
-    s1, s2 = r1.json()["score"], r2.json()["score"]
-    p1 = r1.json()["selected_projects"]
-    p2 = r2.json()["selected_projects"]
-    # Informational assertions — documents drift when LLM non-deterministic
-    assert s1 != s2
-    assert p1 != p2
-    pytest.drift_report = {"score_delta": abs(int(s1) - int(s2)), "projects_changed": p1 != p2}
+    assert r1.json()["score"] == r2.json()["score"]
+    assert r1.json()["selected_projects"] == r2.json()["selected_projects"]
+    assert r1.json()["missing_skills"] == r2.json()["missing_skills"]
 
 
 def test_call_ollama_forwards_timeout_to_http_post(monkeypatch):
@@ -321,7 +327,9 @@ def test_call_ollama_forwards_timeout_to_http_post(monkeypatch):
         mock.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
         return mock
 
-    monkeypatch.setattr(main.http_requests, "post", fake_post)
+    import requests
+    monkeypatch.setattr(requests, "post", fake_post)
     out = main.call_ollama([{"role": "user", "content": "x"}], timeout=600)
     assert out == "ok"
-    assert seen["timeout"] == 600
+    # call_ollama sends (connect_timeout, read_timeout) so a dead host fails fast
+    assert seen["timeout"] == (llm_provider.OLLAMA_CONNECT_TIMEOUT, 600)

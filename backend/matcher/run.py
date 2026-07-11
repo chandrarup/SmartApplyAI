@@ -19,13 +19,9 @@ def _resolve(root: Path, maybe_relative: str) -> Path:
     return path if path.is_absolute() else (root / path)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Matcher pipeline")
-    parser.add_argument("--profile-id", default="default")
-    parser.add_argument("--config", default="")
-    args = parser.parse_args()
-
-    cfg = load_config(args.config or None)
+def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
+    """Full recall → rerank → fit → gate run. Callable from CLI, nightly, or the API."""
+    cfg = load_config(config or None)
     root = Path(__file__).resolve().parents[2]
 
     jobs_db = _resolve(root, cfg.jobs_db_path)
@@ -36,23 +32,24 @@ def main() -> int:
         jobs_db_path=jobs_db,
         role_mode=cfg.role_mode,
         filters_path=filters_path,
+        search_bypass_internship=cfg.search_bypass_internship,
     )
     if not survivors:
         print("[done] no survivors after prefilter")
-        return 0
+        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "prefilter"}
 
     recalled = recall_candidates(
-        profile_id=args.profile_id,
+        profile_id=profile_id,
         jobs=survivors,
         top_recall=cfg.top_recall,
         evidence_k=cfg.recall_evidence_k,
     )
     if not recalled:
         print("[done] no candidates after stage1 recall")
-        return 0
+        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "recall"}
 
     reranked = rerank_candidates(
-        profile_id=args.profile_id,
+        profile_id=profile_id,
         recalled=recalled,
         rerank_model=cfg.rerank_model,
     )
@@ -64,6 +61,19 @@ def main() -> int:
             f"{job.get('title', '')} @ {job.get('company', '')}"
         )
 
+    # Per-job search boost from matched_searches (config default, capped in scorer).
+    try:
+        from scraper.searches import max_boost_for_names
+    except ImportError:
+        from backend.scraper.searches import max_boost_for_names  # type: ignore
+    for item in reranked:
+        job = item.get("job") or {}
+        tags = job.get("matched_searches") or []
+        if tags:
+            # Config default (+5) is the cap; per-search boost from yaml can be lower.
+            configured = max_boost_for_names(tags)
+            item["search_boost"] = min(int(cfg.search_alignment_boost), configured or int(cfg.search_alignment_boost))
+
     fitted: list[dict] = []
     fallback_fit = {
         "match_pct": 0,
@@ -74,10 +84,13 @@ def main() -> int:
     }
     try:
         fitted = fit_candidates(
-            profile_id=args.profile_id,
+            profile_id=profile_id,
             reranked=reranked,
             top_fit=cfg.top_fit,
             llm_prefer=cfg.llm_prefer,
+            search_boost=cfg.search_alignment_boost,
+            strong_threshold=cfg.strong_threshold,
+            enable_legitimacy_web=cfg.enable_legitimacy_web,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[stage3] blocked: {exc}")
@@ -87,9 +100,14 @@ def main() -> int:
     if fitted:
         print("[stage3] sample fit object:")
         print(json.dumps(fitted[0].get("fit", {}), indent=2, ensure_ascii=False))
+        # Persist matched_searches onto fit for My Searches view
+        for item in fitted:
+            tags = (item.get("job") or {}).get("matched_searches") or []
+            fit = item.setdefault("fit", {})
+            fit["matched_searches"] = tags
         stored = gate_and_store(
             matches_db_path=matches_db,
-            profile_id=args.profile_id,
+            profile_id=profile_id,
             fitted=fitted,
             match_threshold=cfg.match_threshold,
             strong_threshold=cfg.strong_threshold,
@@ -102,9 +120,17 @@ def main() -> int:
         f"strong={stored['strong']} stretch={stored['stretch']} "
         f"(MATCH_THRESHOLD={cfg.match_threshold}, STRONG={cfg.strong_threshold})"
     )
+    return {**stored, "stage": "done"}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Matcher pipeline")
+    parser.add_argument("--profile-id", default="default")
+    parser.add_argument("--config", default="")
+    args = parser.parse_args()
+    run_pipeline(profile_id=args.profile_id, config=args.config)
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

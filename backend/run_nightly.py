@@ -19,20 +19,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
 
 
 def _run_matcher(profile_id: str) -> int:
     try:
-        from backend.matcher.run import main as matcher_main
+        from backend.matcher.run import run_pipeline
     except ImportError:
-        from matcher.run import main as matcher_main
-    argv_backup = sys.argv
-    sys.argv = ["matcher", "--profile-id", profile_id]
-    try:
-        return matcher_main()
-    finally:
-        sys.argv = argv_backup
+        from matcher.run import run_pipeline  # type: ignore
+    run_pipeline(profile_id=profile_id)
+    return 0
 
 
 def run_nightly(

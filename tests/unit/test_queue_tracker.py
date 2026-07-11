@@ -150,45 +150,66 @@ def test_end_to_end_walk(client, dbs, monkeypatch):
     assert client.post("/queue/tailor", headers={"X-Profile-ID": PID}).json()["tailored"] == 1
     assert matcher_store.get_queue_item(dbs["matches"], PID, match_id)["tailor_status"] == "tailored"
 
-    # approve → real versioned PDF + tracker row
+    # approve → real versioned PDF, stays in queue as customized (no tracker row yet)
     r = client.post(f"/queue/{match_id}/approve", headers={"X-Profile-ID": PID}, json={})
     assert r.status_code == 200, r.text
     body = r.json()
     variant_id = body["variant_id"]
     assert variant_id
-    app_row = body["application"]
-    assert app_row["status"] == "approved"
-    assert app_row["resume_variant_id"] == variant_id
-    assert app_row["band"] == "strong"
+    assert body["review_status"] == "customized"
+    assert "application" not in body
 
-    # the exact PDF artifact exists on disk (interview-defensibility)
     import resume_versions
     pdf_path = resume_versions.get_variant_path(main._profile_dir(PID), variant_id, "tailored.pdf")
     assert pdf_path and os.path.exists(pdf_path)
-    # don't leave the test artifact behind in the real profile dir
     import shutil
     shutil.rmtree(os.path.dirname(pdf_path), ignore_errors=True)
 
-    # queue item marked reviewed
-    assert matcher_store.get_queue_item(dbs["matches"], PID, match_id)["review_status"] == "approved"
+    item = matcher_store.get_queue_item(dbs["matches"], PID, match_id)
+    assert item["review_status"] == "customized"
+    assert item["resume_variant_id"] == variant_id
 
-    # pacing release: approved → ready_to_apply
-    rel = client.post("/tracker/release", headers={"X-Profile-ID": PID}).json()
-    assert rel["released"] == [app_row["id"]]
-    assert tracker_store.get_application(PID, app_row["id"])["status"] == "ready_to_apply"
+    # tracker/match resolves customized queue item
+    tm = client.get("/tracker/match", params={"host": "x", "url": "https://x/northwind", "company": "Northwind"},
+                    headers={"X-Profile-ID": PID}).json()
+    assert tm["match"] is not None
+    assert tm["match"]["queue_match_id"] == match_id
 
-    # human applies → status pipeline advances, date_applied stamped, history recorded
-    r = client.patch(f"/applications/{app_row['id']}", headers={"X-Profile-ID": PID},
-                     json={"status": "applied"})
-    assert r.status_code == 200
-    applied = r.json()
-    assert applied["status"] == "applied"
-    assert applied["date_applied"]
+    # mark-applied → tracker row with applied status
+    r = client.post(f"/queue/{match_id}/mark-applied", headers={"X-Profile-ID": PID}, json={})
+    assert r.status_code == 200, r.text
+    app_row = r.json()["application"]
+    assert app_row["status"] == "applied"
+    assert app_row["resume_variant_id"] == variant_id
+    assert app_row["band"] == "strong"
+    assert matcher_store.get_queue_item(dbs["matches"], PID, match_id)["review_status"] == "applied"
+
     hist = tracker_store.status_history(PID, app_row["id"])
     transitions = [(h["from_status"], h["to_status"]) for h in hist]
-    assert (None, "approved") in transitions
-    assert ("approved", "ready_to_apply") in transitions
-    assert ("ready_to_apply", "applied") in transitions
+    assert (None, "applied") in transitions
+
+
+def test_single_item_tailor_only(client, dbs, monkeypatch):
+    matcher_store.gate_and_store(
+        dbs["matches"], PID,
+        [_match("a", "Alpha", "SWE", 80), _match("b", "Beta", "ML", 82)],
+        70, 85,
+    )
+    items = matcher_store.list_queue(dbs["matches"], PID)
+    mid_a = next(i["id"] for i in items if i["company"] == "Alpha")
+    calls = []
+
+    async def fake_tailoring(pid, jd_text, role="", company="", **kw):
+        calls.append(company)
+        return {"tailored_summary": f"tailored for {company}", "_edits": []}
+
+    monkeypatch.setattr(main, "run_tailoring", fake_tailoring)
+    r = client.post(f"/queue/{mid_a}/tailor", headers={"X-Profile-ID": PID})
+    assert r.status_code == 200
+    assert calls == ["Alpha"]
+    by_co = {i["company"]: i for i in matcher_store.list_queue(dbs["matches"], PID)}
+    assert by_co["Alpha"]["tailor_status"] == "tailored"
+    assert by_co["Beta"]["tailor_status"] == "pending"
 
 
 # ── 4. dedupe / rejection-history block ───────────────────────────────────────
@@ -220,11 +241,15 @@ def test_approve_blocked_by_dedupe_then_force(client, dbs, monkeypatch):
     assert r.status_code == 409
     assert r.json()["detail"]["error"] == "dedupe_block"
 
-    # force with a pre-supplied variant id (bypass PDF gen) → succeeds
+    # force with a pre-supplied variant id (bypass PDF gen) → customized in queue
     r2 = client.post(f"/queue/{mid}/approve", headers={"X-Profile-ID": PID},
                      json={"force": True, "variant_id": "manual-variant-1"})
     assert r2.status_code == 200
-    assert r2.json()["application"]["resume_variant_id"] == "manual-variant-1"
+    assert r2.json()["variant_id"] == "manual-variant-1"
+    assert r2.json()["review_status"] == "customized"
+    item = matcher_store.get_queue_item(dbs["matches"], PID, mid)
+    assert item["resume_variant_id"] == "manual-variant-1"
+    assert len(tracker_store.list_applications(PID)) == 1  # only the pre-existing Hooli row
 
 
 # ── 5. pacing caps (rule 11) ──────────────────────────────────────────────────

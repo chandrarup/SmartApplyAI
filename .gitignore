@@ -80,3 +80,15 @@ backend/t_*.log
 backend/t_*.tex
 backend/test_latex_inj.*
 .claude/
+
+# LaTeX injection test artifacts
+backend/inj_*.*
+
+# Tracker runtime store
+backend/tracker/tracker.db
+
+# Scratch
+.tmp/
+
+# LLM provider config (holds API keys — never commit)
+backend/llm_config.json

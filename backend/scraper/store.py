@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+import json
 import sqlite3
 from typing import Any, Iterator
 
@@ -73,6 +74,12 @@ def _ensure_jobs_columns(conn: sqlite3.Connection) -> None:
         conn.execute(
             f"ALTER TABLE jobs ADD COLUMN {column_name} INTEGER NOT NULL DEFAULT {default_value}"
         )
+    # JSON list of search names from searches.yaml (matching-v2 / sourcing-v2).
+    if "matched_searches" not in existing_columns:
+        conn.execute("ALTER TABLE jobs ADD COLUMN matched_searches TEXT NOT NULL DEFAULT '[]'")
+    for col in ("liveness", "liveness_checked_at"):
+        if col not in existing_columns:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} TEXT")
 
 
 def _existing_row(conn: sqlite3.Connection, source_ats: str, external_id: str) -> sqlite3.Row | None:
@@ -97,8 +104,15 @@ def _is_changed(existing: sqlite3.Row, normalized_job: dict[str, Any]) -> bool:
         "posted_at",
         "updated_at",
         "raw_json",
+        "matched_searches",
     )
     for field in compare_fields:
+        if field == "matched_searches":
+            existing_value = existing["matched_searches"] if "matched_searches" in existing.keys() else "[]"
+            incoming_value = json.dumps(normalized_job.get("matched_searches") or [], ensure_ascii=True)
+            if existing_value != incoming_value:
+                return True
+            continue
         existing_value = existing[field]
         incoming_value = normalized_job[field]
         if field in {"remote_flag", "is_internship", "location_match", "sponsorship_knockout"}:
@@ -121,6 +135,7 @@ def upsert_company_jobs(
         external_id = job["external_id"]
         seen_ids.add(external_id)
         existing = _existing_row(conn, source_ats, external_id)
+        matched_json = json.dumps(job.get("matched_searches") or [], ensure_ascii=True)
         if not existing:
             conn.execute(
                 """
@@ -128,8 +143,8 @@ def upsert_company_jobs(
                     source_ats, company, external_id, title, location, remote_flag, is_internship,
                     location_match, sponsorship_knockout, department,
                     description_text, apply_url, posted_at, updated_at, raw_json,
-                    first_seen, last_seen, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                    first_seen, last_seen, status, matched_searches
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
                 """,
                 (
                     source_ats,
@@ -149,6 +164,7 @@ def upsert_company_jobs(
                     job["raw_json"],
                     now,
                     now,
+                    matched_json,
                 ),
             )
             inserted += 1
@@ -161,7 +177,7 @@ def upsert_company_jobs(
             SET company = ?, title = ?, location = ?, remote_flag = ?, is_internship = ?,
                 location_match = ?, sponsorship_knockout = ?, department = ?,
                 description_text = ?, apply_url = ?, posted_at = ?, updated_at = ?, raw_json = ?,
-                last_seen = ?, status = 'active'
+                last_seen = ?, status = 'active', matched_searches = ?
             WHERE source_ats = ? AND external_id = ?
             """,
             (
@@ -179,6 +195,7 @@ def upsert_company_jobs(
                 job["updated_at"],
                 job["raw_json"],
                 now,
+                matched_json,
                 source_ats,
                 external_id,
             ),
@@ -218,3 +235,30 @@ def count_all_rows(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT COUNT(*) AS c FROM jobs").fetchone()
     return int(row["c"]) if row else 0
 
+
+
+def stats(db_path: Path | str = DB_PATH) -> dict[str, Any]:
+    """Read-only jobs.db summary for the dashboard sourcing page."""
+    with get_conn(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
+                SUM(CASE WHEN status = 'active' AND is_internship = 1 THEN 1 ELSE 0 END) AS internships,
+                SUM(CASE WHEN status = 'active' AND location_match = 1 THEN 1 ELSE 0 END) AS location_matches,
+                SUM(CASE WHEN first_seen >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS new_24h,
+                COUNT(DISTINCT company) AS companies,
+                MAX(last_seen) AS last_seen
+            FROM jobs
+            """
+        ).fetchone()
+    return {
+        "total": row["total"] or 0,
+        "active": row["active"] or 0,
+        "internships": row["internships"] or 0,
+        "location_matches": row["location_matches"] or 0,
+        "new_24h": row["new_24h"] or 0,
+        "companies": row["companies"] or 0,
+        "last_seen": row["last_seen"],
+    }

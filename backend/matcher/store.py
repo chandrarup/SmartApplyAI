@@ -21,8 +21,9 @@ _QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("tailor_status", "TEXT NOT NULL DEFAULT 'pending'"),  # pending | tailored | failed
     ("tailored_json", "TEXT"),
     ("tailor_error", "TEXT"),
-    ("review_status", "TEXT NOT NULL DEFAULT 'new'"),  # new | approved | skipped
+    ("review_status", "TEXT NOT NULL DEFAULT 'new'"),  # new | customized | skipped | applied
     ("tailored_at", "TEXT"),
+    ("resume_variant_id", "TEXT"),
 )
 
 
@@ -65,6 +66,14 @@ def _connect(path: str | Path) -> sqlite3.Connection:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_matches_profile_match ON matches(profile_id, match_pct DESC)"
     )
+    # Migrate legacy review_status vocabulary.
+    try:
+        conn.execute(
+            "UPDATE matches SET review_status = 'customized' WHERE review_status = 'approved'"
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     return conn
 
 
@@ -156,10 +165,14 @@ def list_queue(
     profile_id: str,
     band: str | None = None,
     review_status: str | None = None,
+    *,
+    active_only: bool = True,
 ) -> list[dict[str, Any]]:
     """Return queue items (matches) for a profile, Strong band first then by match_pct."""
     sql = "SELECT * FROM matches WHERE profile_id = ?"
     params: list[Any] = [profile_id]
+    if active_only:
+        sql += " AND review_status NOT IN ('applied', 'skipped')"
     if band:
         sql += " AND band = ?"
         params.append(band)
@@ -238,4 +251,43 @@ def set_review_status(
             (review_status, int(match_id)),
         )
         conn.commit()
+
+
+def set_customized(
+    matches_db_path: str | Path,
+    match_id: int,
+    *,
+    resume_variant_id: str,
+) -> None:
+    """Mark a queue item reviewed: PDF ready, stays in queue until form submit."""
+    with _connect(matches_db_path) as conn:
+        conn.execute(
+            """
+            UPDATE matches
+               SET review_status = 'customized',
+                   resume_variant_id = ?
+             WHERE id = ?
+            """,
+            (resume_variant_id, int(match_id)),
+        )
+        conn.commit()
+
+
+def list_customized(
+    matches_db_path: str | Path, profile_id: str
+) -> list[dict[str, Any]]:
+    """Queue items ready for extension autofill (customized + variant PDF)."""
+    with _connect(matches_db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM matches
+             WHERE profile_id = ?
+               AND review_status = 'customized'
+               AND resume_variant_id IS NOT NULL
+               AND resume_variant_id != ''
+             ORDER BY CASE band WHEN 'strong' THEN 0 ELSE 1 END, match_pct DESC, id DESC
+            """,
+            (profile_id,),
+        ).fetchall()
+    return [_row_to_queue_item(r) for r in rows]
 

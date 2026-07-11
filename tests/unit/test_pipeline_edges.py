@@ -20,6 +20,7 @@ from starlette.requests import Request
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
 import main  # noqa: E402
+import scoring  # noqa: E402
 from knowledge import rating as knowledge_rating  # noqa: E402
 from knowledge import store as knowledge_store  # noqa: E402
 from matcher import fit as matcher_fit  # noqa: E402
@@ -244,23 +245,35 @@ def test_skill_rating_lost_on_save_profile_remigrate(temp_knowledge_env):
 def test_matcher_malformed_llm_json_one_job_gets_fallback_batch_continues(monkeypatch):
     calls = {"n": 0}
 
-    def fake_llm(messages, temperature=0.2, prefer="ollama", system=""):
+    def fake_llm(messages, temperature=0.2, prefer="ollama", **kw):
         calls["n"] += 1
         if calls["n"] == 1:
             return "not json at all"
         return json.dumps({
-            "match_pct": 90,
+            "dimensions": {
+                "technical_skills": {"score": 90, "note": "ok"},
+                "experience_match": {"score": 90, "note": "ok"},
+                "education_fit": {"score": 90, "note": "ok"},
+                "career_alignment": {"score": 90, "note": "ok"},
+            },
             "matched_skills": [],
             "missing_skills": [],
             "best_projects": [],
             "rationale": "good",
         })
 
-    monkeypatch.setattr(matcher_fit, "call_llm", fake_llm)
+    # fit.py may bind backend.scoring or scoring depending on import path
+    monkeypatch.setattr(scoring, "call_llm", fake_llm)
+    try:
+        import backend.scoring as backend_scoring  # noqa: WPS440
+        monkeypatch.setattr(backend_scoring, "call_llm", fake_llm)
+    except ImportError:
+        pass
     monkeypatch.setattr(
         matcher_fit.knowledge_store,
         "get_profile",
-        lambda pid: {"summary": "ML", "experience": [], "projects": []},
+        lambda pid: {"summary": "ML", "experience": [], "projects": [], "education": [],
+                     "contact_info": {}, "autofill": {}},
     )
 
     reranked = [
@@ -269,9 +282,10 @@ def test_matcher_malformed_llm_json_one_job_gets_fallback_batch_continues(monkey
     ]
     fitted = matcher_fit.fit_candidates("default", reranked, top_fit=2)
     assert len(fitted) == 2
-    assert fitted[0]["fit"]["rationale"] == "Fit parsing failed"
     assert fitted[0]["match_pct"] == 0
+    assert "failed" in fitted[0]["fit"]["rationale"].lower()
     assert fitted[1]["match_pct"] == 90
+    assert "dimensions" in fitted[1]["fit"]
 
 
 def test_matcher_empty_prefilter_returns_empty_gracefully(temp_jobs_db):

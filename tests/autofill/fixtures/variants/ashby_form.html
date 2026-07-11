@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Ashby Application Form (fixture)</title>
+<!-- HOSTILE host-page CSS: mimics a real site whose global rules would otherwise
+     crush the injected panel. The panel must resist this via its shadow root. -->
+<style>
+  * { box-sizing: content-box !important; margin: 0 !important; font-size: 40px !important; padding: 30px !important; }
+  body { font-family: "Comic Sans MS", cursive; }
+</style>
+<style>
+  /* Minimal Radix-like combobox styling for the fixture itself. */
+  ._listbox { display: none; border: 1px solid #ccc; position: absolute; background: #fff; z-index: 10; }
+  ._listbox._open { display: block; }
+  ._option { cursor: pointer; }
+</style>
+</head>
+<body>
+<form class="ashby-application-form">
+  <div class="_formEntries">
+    <div class="_fieldEntry" aria-required="true">
+      <label id="lbl-name" for="f-name">Full name *</label>
+      <input id="f-name" type="text" aria-labelledby="lbl-name" required />
+    </div>
+    <div class="_fieldEntry" aria-required="true">
+      <label id="lbl-email" for="f-email">Email *</label>
+      <input id="f-email" type="email" aria-labelledby="lbl-email" required />
+    </div>
+    <div class="_fieldEntry">
+      <label id="lbl-links" for="f-links">LinkedIn URL</label>
+      <input id="f-links" type="text" aria-labelledby="lbl-links" />
+    </div>
+
+    <!-- Custom combobox: work authorization (required) -->
+    <div class="_fieldEntry" aria-required="true">
+      <span id="lbl-auth" class="_label">Are you authorized to work in the US? *</span>
+      <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false"
+              aria-controls="lb-auth" aria-labelledby="lbl-auth" data-value="">Select…</button>
+      <div id="lb-auth" class="_listbox" role="listbox">
+        <div class="_option" role="option" data-val="Yes">Yes</div>
+        <div class="_option" role="option" data-val="No">No</div>
+      </div>
+    </div>
+
+    <!-- Custom combobox: veteran status (the field the user reported broken) -->
+    <div class="_fieldEntry">
+      <span id="lbl-vet" class="_label">Veteran status</span>
+      <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false"
+              aria-controls="lb-vet" aria-labelledby="lbl-vet" data-value="">Select…</button>
+      <div id="lb-vet" class="_listbox" role="listbox">
+        <div class="_option" role="option" data-val="I am a protected veteran">I am a protected veteran</div>
+        <div class="_option" role="option" data-val="I am not a protected veteran">I am not a protected veteran</div>
+        <div class="_option" role="option" data-val="I don't wish to answer">I don't wish to answer</div>
+      </div>
+    </div>
+
+    <div class="_fieldEntry">
+      <label id="lbl-why" for="f-why">Why do you want to work here?</label>
+      <textarea id="f-why" aria-labelledby="lbl-why"></textarea>
+    </div>
+  </div>
+</form>
+
+<script>
+// Radix-like combobox behaviour: open on trigger click, select on option click.
+document.querySelectorAll('[role="combobox"]').forEach((trigger) => {
+  const box = document.getElementById(trigger.getAttribute('aria-controls'));
+  trigger.addEventListener('click', () => {
+    const open = box.classList.toggle('_open');
+    trigger.setAttribute('aria-expanded', String(open));
+  });
+  box.querySelectorAll('[role="option"]').forEach((opt) => {
+    opt.addEventListener('click', () => {
+      const val = opt.getAttribute('data-val');
+      trigger.textContent = val;
+      trigger.setAttribute('data-value', val);
+      box.classList.remove('_open');
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+  });
+});
+</script>
+</body>
+</html>

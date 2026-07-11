@@ -7,7 +7,10 @@ from typing import Any
 
 from sentence_transformers import CrossEncoder
 
-from backend.knowledge import store as knowledge_store
+try:
+    from backend.knowledge import store as knowledge_store
+except ImportError:
+    from knowledge import store as knowledge_store  # type: ignore
 
 
 def _profile_to_text(profile: dict[str, Any]) -> str:

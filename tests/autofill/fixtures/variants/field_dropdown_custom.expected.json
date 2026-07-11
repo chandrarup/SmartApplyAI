@@ -1,8 +1,11 @@
 {
   "platform": "generic",
-  "must_map_labels": [],
-  "expect_no_native_select_in_scan": false,
-  "custom_dropdown_unsupported": true,
-  "fill": {},
-  "note": "Custom div dropdown has no input/select — not scanned by getFormFields"
+  "must_map_labels": ["Work Authorization"],
+  "fill": {
+    "Work Authorization": "Yes"
+  },
+  "expect_values": {
+    "Work Authorization": "Yes"
+  },
+  "note": "div[role=button][aria-labelledby] trigger detected as combobox; filled via click-open + text-matched item click"
 }

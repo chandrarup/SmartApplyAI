@@ -42,7 +42,10 @@
     "*://*.paycom.com/*",
     "*://*.workable.com/*",
     "*://*.recruitee.com/*",
-    "*://*.greenhouse.io/*"
+    "*://*.greenhouse.io/*",
+    "*://api.ashbyhq.com/*",
+    "*://boards-api.greenhouse.io/*",
+    "*://api.lever.co/*"
   ],
   "content_scripts": [
     {
@@ -73,14 +76,18 @@
         "*://*.workable.com/*",
         "*://*.recruitee.com/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["injected.js"],
+      "resources": [
+        "injected.js"
+      ],
       "matches": [
         "http://localhost/*",
         "http://127.0.0.1/*",

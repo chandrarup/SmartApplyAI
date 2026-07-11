@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"
 
 import compile_loop  # noqa: E402
 import main  # noqa: E402
+import scoring  # noqa: E402
 import tailor_edits  # noqa: E402
 
 
@@ -410,18 +411,22 @@ GARBAGE_JDS = {
 def analyze_recorder(monkeypatch):
     rec = []
 
-    def _fake(messages, temperature=0.3, system="", prefer="ollama", timeout=600, model=None):
+    def _extraction(messages, temperature=0.1, prefer="ollama", **kw):
+        # scoring.extract_jd_requirements — garbage JD yields no requirements
         rec.append(messages[-1]["content"])
         return json.dumps({
-            "role": "Unknown",
-            "skills_matched": [],
-            "missing_skill": "n/a",
-            "score": "0",
-            "tailored_summary": "Fallback summary.",
-            "selected_projects": [],
+            "role": "Unknown", "company": "", "level": "", "summary": "",
+            "responsibilities": [], "must_have_skills": [],
+            "nice_to_have_skills": [], "keywords": [],
         })
 
-    monkeypatch.setattr(main, "call_llm", _fake)
+    def _summary(messages, temperature=0.3, system="", prefer="ollama", timeout=600, model=None):
+        rec.append(messages[-1]["content"])
+        return json.dumps({"tailored_summary": "Fallback summary long enough to pass placeholder checks."})
+
+    monkeypatch.setattr(scoring, "call_llm", _extraction)
+    monkeypatch.setattr(main, "call_llm", _summary)
+    monkeypatch.setattr(main.knowledge_semantic, "search", lambda *a, **kw: [])
     return rec
 
 
