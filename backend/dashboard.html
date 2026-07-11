@@ -375,6 +375,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 <!-- TAILOR RESUME -->
 <div id="pg-tailor" class="pg">
   <div class="ph"><h2>Tailor Resume for a Job</h2><p>Paste a JD, choose what to emphasize, then generate and download a tailored PDF resume.</p></div>
+  <div id="tlr-jobCtx" class="tlr-job-ctx" aria-live="polite">
+    <div class="tlr-job-ctx-inner">
+      <span class="tlr-job-ctx-label">Tailoring for</span>
+      <span class="tlr-job-ctx-main" id="tlr-jobCtxMain">—</span>
+      <span class="tlr-job-ctx-sub" id="tlr-jobCtxSub"></span>
+    </div>
+  </div>
   <style>
   .tlr-stepper{display:flex;align-items:center;gap:0;margin-bottom:24px}
   .tlr-step{display:flex;align-items:center;gap:8px;padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;color:var(--t4);background:#f3f4f6}
@@ -411,9 +418,28 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   [contenteditable]:focus{outline:2px solid var(--orange);border-radius:3px;padding:1px 3px}
   .tlr-edit-row{border:1px solid var(--border);border-radius:8px;padding:8px;background:#fff}
   .tlr-edit-meta{font-size:11px;color:var(--t4);margin-top:4px}
-  .tlr-edit-actions{display:flex;gap:6px;margin-top:6px}
+  .tlr-edit-actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
   .tlr-edit-actions button{font-size:11px;padding:4px 8px;border-radius:10px;border:1px solid var(--border);cursor:pointer;background:#f9fafb}
   .tlr-edit-actions button.on{background:#fff7ed;border-color:#fdba74;color:#9a3412}
+  .tlr-job-ctx{position:sticky;top:var(--hh);z-index:45;background:linear-gradient(180deg,#fff7ed,#fff);border-bottom:1px solid #fed7aa;padding:8px 0;margin:0 0 12px;display:none}
+  .tlr-job-ctx.on{display:block}
+  .tlr-job-ctx-inner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px}
+  .tlr-job-ctx-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#9a3412}
+  .tlr-job-ctx-main{font-weight:700;color:#9a3412;font-size:15px}
+  .tlr-job-ctx-sub{color:var(--t3);font-size:12.5px}
+  .tlr-sk-add{color:#166534;background:#dcfce7;border-radius:6px;padding:0 5px;margin:0 3px 2px 0;display:inline-block;font-weight:600}
+  .tlr-sk-del{color:#991b1b;background:#fee2e2;border-radius:6px;padding:0 5px;margin:0 3px 2px 0;display:inline-block;text-decoration:line-through;font-weight:600}
+  .tlr-edits-mo{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
+  .tlr-edits-mo.open{display:flex}
+  .tlr-edits-md{background:#fff;border-radius:12px;width:min(920px,96vw);max-height:min(88vh,820px);display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.2);overflow:hidden}
+  .tlr-edits-mh{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);background:#fafafa}
+  .tlr-edits-mb{padding:12px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px}
+  .tlr-edits-mf{padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;align-items:center;background:#fafafa}
+  .tlr-edits-sec{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .tlr-edits-sec > summary{cursor:pointer;list-style:none;padding:10px 12px;font-size:13px;font-weight:700;background:#f8fafc;display:flex;justify-content:space-between;align-items:center}
+  .tlr-edits-sec > summary::-webkit-details-marker{display:none}
+  .tlr-edits-sec[open] > summary{border-bottom:1px solid var(--border)}
+  .tlr-edits-sec-body{padding:10px;display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow-y:auto}
   </style>
 
   <!-- Stepper (always visible) -->
@@ -575,14 +601,15 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 
   <!-- ═══ STEP 3: REVIEW ═══ -->
   <div id="tlr-s3" style="display:none">
-    <!-- Sticky action bar: Download PDF + AI Rewrite are never below the fold -->
+    <!-- Sticky action bar: Download PDF + AI Rewrite stay here; edits open in a modal -->
     <div id="tlr-stickyBar" style="position:sticky;top:calc(var(--hh) + 8px);z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+      <button class="btn bo" id="tlr-openEditsBtn" type="button">✎ Review Edits</button>
       <span id="tlr-acceptCount" style="font-size:12.5px;font-weight:600;color:var(--t3);white-space:nowrap"></span>
       <input id="tlr-aiAsk" type="text" placeholder="Tell me how you'd like to tweak your resume…" style="flex:1;min-width:220px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px">
       <button class="btn bo" id="tlr-aiRewrite">✦ Edit With AI</button>
       <button class="btn bp" id="tlr-pdfBtn">⬇ Download PDF Resume</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start">
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start">
       <!-- Left: rendered resume with highlights -->
       <div class="card">
         <div class="ch">
@@ -594,18 +621,12 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
         </div>
         <div class="cb tlr-resume-col" id="tlr-resumePreview" style="max-height:70vh;overflow-y:auto;padding:16px 20px"></div>
       </div>
-      <!-- Right: sidebar -->
+      <!-- Right: compact sidebar (edits live in the modal) -->
       <div style="display:flex;flex-direction:column;gap:12px">
-        <!-- What changed -->
         <div class="card">
           <div class="ch"><h3>See What's Changed</h3></div>
           <div class="cb" id="tlr-changes" style="font-size:13px;display:flex;flex-direction:column;gap:6px"></div>
         </div>
-        <div class="card">
-          <div class="ch"><h3>Approve Edits</h3></div>
-          <div class="cb" id="tlr-editControls" style="display:flex;flex-direction:column;gap:8px"></div>
-        </div>
-        <!-- Skills diff -->
         <div class="card">
           <div class="ch"><h3>Skills</h3></div>
           <div class="cb">
@@ -615,12 +636,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
             <div id="tlr-skRemoved" style="display:flex;flex-wrap:wrap;gap:4px"></div>
           </div>
         </div>
-        <!-- Download PDF + AI Rewrite moved to the sticky top bar -->
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="btn bo" id="tlr-htmlBtn" style="width:100%;font-size:12px" title="Plain HTML view — not the final format. Use Download Resume for the real PDF.">Quick Browser Preview</button>
           <button class="btn bo" id="tlr-clear" style="width:100%">Start Over</button>
         </div>
-        <!-- Log -->
         <details>
           <summary style="font-size:12px;color:var(--t4);cursor:pointer;padding:4px">Request Log <button class="btn bo bsm" id="tlr-clearLog" style="margin-left:8px">Clear</button></summary>
           <div id="tlr-log" style="font-family:Menlo,Monaco,monospace;font-size:10.5px;background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px;max-height:180px;overflow-y:auto;line-height:1.5;margin-top:6px">No activity yet.</div>
@@ -633,6 +652,28 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
     <div id="tlr-kw" style="display:none"></div>
     <div id="tlr-expDiff" style="display:none"></div>
     <div id="tlr-projects" style="display:none"></div>
+    <div id="tlr-editControls" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Edits review modal (C1) — one-screen bundle, grouped by section -->
+<div class="tlr-edits-mo" id="tlr-editsModal" role="dialog" aria-modal="true" aria-labelledby="tlr-editsTitle">
+  <div class="tlr-edits-md">
+    <div class="tlr-edits-mh">
+      <div>
+        <div id="tlr-editsTitle" style="font-weight:800;font-size:16px">Review edits</div>
+        <div id="tlr-editsModalSub" style="font-size:12.5px;color:var(--t3);margin-top:2px"></div>
+      </div>
+      <button type="button" class="btn bo bsm" id="tlr-editsClose" aria-label="Close">✕ Close</button>
+    </div>
+    <div class="tlr-edits-mb" id="tlr-editsModalBody"></div>
+    <div class="tlr-edits-mf">
+      <span id="tlr-editsModalCount" style="font-size:12.5px;color:var(--t3)"></span>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn bo" id="tlr-editsAcceptAll">Accept all grounded</button>
+        <button type="button" class="btn bp" id="tlr-editsDone">Done</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -784,6 +825,13 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 <!-- REVIEW QUEUE (M6) -->
 <div id="pg-review" class="pg">
   <div class="ph"><h2>Review Queue</h2><p>Matched &amp; tailored overnight — review edits, then approve. Strong matches first. Nothing is submitted until you say so.</p></div>
+  <div id="rev-jobCtx" class="tlr-job-ctx" aria-live="polite">
+    <div class="tlr-job-ctx-inner">
+      <span class="tlr-job-ctx-label">Reviewing</span>
+      <span class="tlr-job-ctx-main" id="rev-jobCtxMain">—</span>
+      <span class="tlr-job-ctx-sub" id="rev-jobCtxSub"></span>
+    </div>
+  </div>
   <div class="tb">
     <div style="font-size:12.5px;color:var(--g500)" id="queueSummary">Loading…</div>
     <div class="mla" style="display:flex;gap:8px">
@@ -1668,6 +1716,7 @@ function renderQueue(){
   const readyFill=queueItems.filter(i=>i.review_status==='customized');
   const open=needsTailor.length+reviewEdits.length+readyFill.length;
   summary.textContent=`${open} in queue · ${needsTailor.length} to tailor · ${reviewEdits.length} to review · ${readyFill.length} ready to fill`;
+  revUpdateJobCtx(reviewEdits[0] || needsTailor[0] || readyFill[0] || null);
   if(!open){
     list.innerHTML='<p style="color:var(--g400);font-size:13px;padding:20px">Nothing in the queue. Run matching + tailoring, or check back after tonight\'s run.</p>';
     return;
@@ -1680,6 +1729,8 @@ function renderQueue(){
   list.querySelectorAll('[data-qexpand]').forEach(h=>h.addEventListener('click',()=>{
     const body=document.getElementById('qbody-'+h.dataset.qexpand);
     if(body) body.style.display=body.style.display==='none'?'block':'none';
+    const it=queueItems.find(x=>String(x.id)===String(h.dataset.qexpand));
+    if(it) revUpdateJobCtx(it);
   }));
   list.querySelectorAll('[data-edit-after]').forEach(el=>el.addEventListener('input',()=>{
     const {mid,idx}=el.dataset; const arr=queueEdits[mid]; if(arr&&arr[idx]) arr[idx].after=(el.innerText||'').trim();
@@ -2342,6 +2393,7 @@ function tlrSetStep(n) {
   document.getElementById('tlr-s1').style.display = n===1?'block':'none';
   document.getElementById('tlr-s2').style.display = n===2?'block':'none';
   document.getElementById('tlr-s3').style.display = n===3?'block':'none';
+  tlrUpdateJobCtx();
 }
 
 // Populate step 2 keyword chips from analysis
@@ -2465,10 +2517,76 @@ function tlrAcceptCountLabel(edits){
   if (!el) return;
   const acc = edits.filter(e=>e.status==='accepted').length;
   el.textContent = edits.length ? `${acc} of ${edits.length} edits accepted` : '';
+  const modalCount = document.getElementById('tlr-editsModalCount');
+  if (modalCount) modalCount.textContent = edits.length ? `${acc} of ${edits.length} accepted` : 'No edits';
+  const openBtn = document.getElementById('tlr-openEditsBtn');
+  if (openBtn) openBtn.textContent = edits.length ? `✎ Review Edits (${acc}/${edits.length})` : '✎ Review Edits';
+}
+
+function tlrUpdateJobCtx(){
+  const co = (document.getElementById('tlr-co')?.value || '').trim();
+  const role = (document.getElementById('tlr-role')?.value || '').trim();
+  const bar = document.getElementById('tlr-jobCtx');
+  const main = document.getElementById('tlr-jobCtxMain');
+  const sub = document.getElementById('tlr-jobCtxSub');
+  if (!bar || !main) return;
+  if (!co && !role) {
+    bar.classList.remove('on');
+    main.textContent = '—';
+    if (sub) sub.textContent = '';
+    return;
+  }
+  bar.classList.add('on');
+  main.textContent = [co, role].filter(Boolean).join(' · ') || '—';
+  if (sub) {
+    const step = document.getElementById('tlr-s3')?.style.display !== 'none' ? 'Review'
+      : document.getElementById('tlr-s2')?.style.display !== 'none' ? 'Align' : 'Match';
+    sub.textContent = step;
+  }
+  const modalSub = document.getElementById('tlr-editsModalSub');
+  if (modalSub) modalSub.textContent = [co, role].filter(Boolean).join(' · ');
+}
+
+function revUpdateJobCtx(it){
+  const bar = document.getElementById('rev-jobCtx');
+  const main = document.getElementById('rev-jobCtxMain');
+  const sub = document.getElementById('rev-jobCtxSub');
+  if (!bar || !main) return;
+  if (!it) {
+    // Fall back to first open queue item so multi-tab users still see context
+    const open = (typeof queueItems !== 'undefined' ? queueItems : []).find(i =>
+      i.review_status === 'new' || i.review_status === 'customized');
+    it = open || null;
+  }
+  if (!it) { bar.classList.remove('on'); main.textContent = '—'; if (sub) sub.textContent = ''; return; }
+  bar.classList.add('on');
+  main.textContent = [it.company, it.role || it.title].filter(Boolean).join(' · ') || '—';
+  if (sub) {
+    const band = it.band || (it.match_pct != null ? `${it.match_pct}%` : '');
+    sub.textContent = [band, it.tailor_status, it.review_status].filter(Boolean).join(' · ');
+  }
+}
+
+function tlrOpenEditsModal(){
+  const mo = document.getElementById('tlr-editsModal');
+  if (!mo) return;
+  tlrUpdateJobCtx();
+  tlrRenderEditControls(window.tlrLastResult);
+  mo.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function tlrCloseEditsModal(){
+  const mo = document.getElementById('tlr-editsModal');
+  if (!mo) return;
+  mo.classList.remove('open');
+  document.body.style.overflow = '';
+  if (window.tlrLastResult) tlrRenderPreview(window.tlrLastResult);
 }
 
 function tlrRenderEditControls(res){
-  const wrap = document.getElementById('tlr-editControls');
+  // Prefer modal body; fall back to hidden #tlr-editControls for compat.
+  const wrap = document.getElementById('tlr-editsModalBody') || document.getElementById('tlr-editControls');
   if (!wrap) return;
   const edits = Array.isArray(res?._edits) ? res._edits.filter(e => e.stretch_level !== 'fabrication') : [];
   tlrAcceptCountLabel(edits);
@@ -2513,28 +2631,28 @@ function tlrRenderEditControls(res){
       ${evidence}
       ${lintBits}
       <div style="margin-top:6px;font-size:11px;color:#6b7280">Before</div>
-      <div style="font-size:12px;color:#6b7280;text-decoration:line-through">${before || '—'}</div>
+      <div style="font-size:12px;color:#991b1b;background:#fee2e2;border-radius:4px;padding:4px 6px;text-decoration:line-through">${before || '—'}</div>
       <div style="margin-top:6px;font-size:11px;color:#166534">After</div>
-      <div contenteditable="true" data-edit-after="${idx}" style="font-size:12.5px;border:1px solid var(--border);border-radius:6px;padding:6px">${after || ''}</div>
+      <div contenteditable="true" data-edit-after="${idx}" style="font-size:12.5px;border:1px solid #86efac;background:#dcfce7;border-radius:6px;padding:6px">${after || ''}</div>
       ${stretchActions}
     </div>`;
   };
-  // Group by section into collapsible accordions; data-edit-idx stays the flat
-  // index into res._edits so the listeners below are section-agnostic.
-  const sections = [...new Set(edits.map(e => e.section || 'other'))];
-  const fabNote = fab ? `<div style="font-size:11px;color:#6b7280;margin-bottom:6px">${fab} fabrication(s) auto-rejected (hidden).</div>` : '';
+  const SECTION_ORDER = ['summary', 'experience', 'skills', 'projects', 'other'];
+  const sectionSet = [...new Set(edits.map(e => e.section || 'other'))];
+  const sections = SECTION_ORDER.filter(s => sectionSet.includes(s))
+    .concat(sectionSet.filter(s => !SECTION_ORDER.includes(s)));
+  const fabNote = fab ? `<div style="font-size:11px;color:#6b7280">${fab} fabrication(s) auto-rejected (hidden).</div>` : '';
   wrap.innerHTML = fabNote + sections.map(sec => {
     const pairs = edits.map((e,i)=>[e,i]).filter(([e]) => (e.section||'other') === sec);
-    // Map display index back to real index in res._edits
     const realPairs = pairs.map(([e]) => {
       const realIdx = (res._edits || []).indexOf(e);
       return [e, realIdx >= 0 ? realIdx : 0];
     });
     const acc = realPairs.filter(([e])=>e.status==='accepted').length;
     const label = sec.charAt(0).toUpperCase()+sec.slice(1);
-    return `<details open>
-      <summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--t2);padding:4px 0">${tlrEsc(label)} (${realPairs.length}) · ${acc} accepted</summary>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">${realPairs.map(([e,i])=>rowHtml(e,i)).join('')}</div>
+    return `<details class="tlr-edits-sec" open>
+      <summary><span>${tlrEsc(label)} · ${realPairs.length}</span><span style="font-weight:600;color:var(--t3);font-size:12px">${acc} accepted</span></summary>
+      <div class="tlr-edits-sec-body">${realPairs.map(([e,i])=>rowHtml(e,i)).join('')}</div>
     </details>`;
   }).join('');
 
@@ -2664,7 +2782,7 @@ function tlrRenderPreview(res) {
     } else if (summaryEdit && summaryEdit.status !== 'accepted') {
       // Pending / needs-your-call: original stands until a decision is made.
       html += `<div style="background:#fef9c3;border-left:3px solid #f59e0b;padding:5px 10px;border-radius:0 4px 4px 0">
-        <span style="font-size:9pt;font-weight:700;color:#92400e">? PENDING — decide in Approve Edits</span>
+        <span style="font-size:9pt;font-weight:700;color:#92400e">? PENDING — decide in Review Edits</span>
         <div style="font-size:11pt;margin-top:2px">${esc(tailoredSummary)}</div>
         <div style="font-size:10pt;color:#78350f;margin-top:2px">Proposed: ${esc(summaryEdit.after||'')}</div>
       </div>`;
@@ -2788,39 +2906,52 @@ function tlrRenderPreview(res) {
     }
   }
 
-  // ── SKILLS (dynamic — effective result; diff line mirrors the edits panel) ─
+  // ── SKILLS (dynamic — green added / red removed, consistent with edits panel) ─
   const tailoredSkills = eff.tailored_skills || sk;
+  const addedGlobal = new Set((res.skills_added || []).map(s => String(s).trim()).filter(Boolean));
+  const removedGlobal = new Set((res.skills_removed || []).map(s => String(s).trim()).filter(Boolean));
   html += sec('Skills');
   const skillCats = [
-    ['LLMs & Agentic AI', 'domains', (tailoredSkills.domains||[]).join(', ')],
-    ['ML / DL', 'frameworks',           (tailoredSkills.frameworks||[]).join(', ')],
-    ['Databases & Vector Stores', 'databases', (tailoredSkills.databases||[]).join(', ')],
-    ['Infrastructure & APIs', 'tools', (tailoredSkills.tools||[]).join(', ')],
-    ['Languages', 'languages',         (tailoredSkills.languages||[]).join(', ')],
+    ['LLMs & Agentic AI', 'domains', (tailoredSkills.domains||[])],
+    ['ML / DL', 'frameworks',           (tailoredSkills.frameworks||[])],
+    ['Databases & Vector Stores', 'databases', (tailoredSkills.databases||[])],
+    ['Infrastructure & APIs', 'tools', (tailoredSkills.tools||[])],
+    ['Languages', 'languages',         (tailoredSkills.languages||[])],
   ];
-  for (const [label, key, items] of skillCats) {
-    if (!items) continue;
+  for (const [label, key, list] of skillCats) {
+    const items = Array.isArray(list) ? list : String(list||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if (!items.length && !removedGlobal.size) continue;
     const skEdit = editByField[`tailored_skills.${key}`];
-    let diffLine = '';
-    if (skEdit && skEdit.status === 'accepted') {
-      const beforeSet = new Set((skEdit.before||'').split(',').map(s=>s.trim()).filter(Boolean));
-      const afterSet  = new Set((skEdit.after||'').split(',').map(s=>s.trim()).filter(Boolean));
-      const added   = [...afterSet].filter(s=>!beforeSet.has(s));
-      const removed = [...beforeSet].filter(s=>!afterSet.has(s));
-      if (added.length || removed.length) {
-        diffLine = `<div style="font-size:9.5pt;margin:1px 0 3px 12px">
-          ${added.map(s=>`<span style="color:#166534;background:#dcfce7;border-radius:6px;padding:0 5px;margin-right:4px">+ ${esc(s)}</span>`).join('')}
-          ${removed.map(s=>`<span style="color:#991b1b;background:#fee2e2;border-radius:6px;padding:0 5px;margin-right:4px;text-decoration:line-through">${esc(s)}</span>`).join('')}
-        </div>`;
-      }
-    } else if (skEdit && skEdit.status === 'rejected') {
-      diffLine = `<div style="font-size:9.5pt;margin:1px 0 3px 12px;color:#991b1b">✗ rejected — <span style="text-decoration:line-through">${esc(skEdit.after||'')}</span></div>`;
-    } else if (skEdit) {
-      diffLine = `<div style="font-size:9.5pt;margin:1px 0 3px 12px;color:#92400e">? pending — proposed: ${esc(skEdit.after||'')}</div>`;
+    const beforeSet = new Set((skEdit?.before||'').split(',').map(s=>s.trim()).filter(Boolean));
+    const afterSet  = new Set((skEdit?.after||items.join(',')).split(',').map(s=>s.trim()).filter(Boolean));
+    const added = skEdit && skEdit.status === 'accepted'
+      ? [...afterSet].filter(s=>!beforeSet.has(s))
+      : items.filter(s => addedGlobal.has(s));
+    const removed = skEdit && skEdit.status === 'accepted'
+      ? [...beforeSet].filter(s=>!afterSet.has(s))
+      : [...removedGlobal].filter(s => {
+          // show removals once under the category they left
+          const masterList = (sk[key] || []);
+          return masterList.map(x=>String(x).trim()).includes(s);
+        });
+    const addedSet = new Set(added);
+    const chips = items.map(s => addedSet.has(s)
+      ? `<span class="tlr-sk-add">+ ${esc(s)}</span>`
+      : `<span>${esc(s)}</span>`).join(' ');
+    const removedChips = removed.map(s => `<span class="tlr-sk-del">${esc(s)}</span>`).join(' ');
+    let statusNote = '';
+    if (skEdit && skEdit.status === 'rejected') {
+      statusNote = `<div style="font-size:9.5pt;margin:1px 0 3px 12px;color:#991b1b">✗ rejected skill change</div>`;
+    } else if (skEdit && skEdit.status !== 'accepted') {
+      statusNote = `<div style="font-size:9.5pt;margin:1px 0 3px 12px;color:#92400e">? pending skill change</div>`;
     }
-    const editable = (!skEdit || skEdit.status === 'accepted')
+    const showDiff = added.length || removed.length;
+    const editable = (!skEdit || skEdit.status === 'accepted') && !showDiff
       ? ` contenteditable="true" data-edit-path="tailored_skills.${key}"` : '';
-    html += `<div style="font-size:10.5pt;margin:2px 0"><strong>${esc(label)}:</strong> <span${editable}>${esc(items)}</span></div>${diffLine}`;
+    const body = showDiff
+      ? `${chips || '—'}${removedChips ? `<div style="margin:2px 0 0 12px">${removedChips}</div>` : ''}`
+      : `<span${editable}>${esc(items.join(', '))}</span>`;
+    html += `<div style="font-size:10.5pt;margin:2px 0"><strong>${esc(label)}:</strong> ${body}${statusNote}</div>`;
   }
 
   html += '</div>';
@@ -3086,10 +3217,11 @@ function tlrRenderAnalysis(res, jd) {
     const gapEl = document.getElementById('tlr-gaps');
     gapEl.innerHTML = (res.gaps||[]).map(g=>`<span style="padding:4px 10px;background:#fee2e2;color:#991b1b;border-radius:10px;font-size:12px">⚠ ${g}</span>`).join('')
       || '<span style="font-size:12px;color:#166534">No gaps — great match!</span>';
-    if(res.role && !document.getElementById('tlr-role').value) document.getElementById('tlr-role').value = res.role;
     if(res.company && !document.getElementById('tlr-co').value) document.getElementById('tlr-co').value = res.company;
+    if(res.role && !document.getElementById('tlr-role').value) document.getElementById('tlr-role').value = res.role;
     document.getElementById('tlr-results').style.display = 'block';
     tlrBuildStep2();
+    tlrUpdateJobCtx();
 }
 
 document.getElementById('tlr-analyzeBtn').addEventListener('click', async () => {
@@ -3140,6 +3272,35 @@ document.getElementById('tlr-addCustom').addEventListener('click', () => {
 
 // Step 3 back + AI rewrite
 document.getElementById('tlr-s3-back')?.addEventListener('click', () => tlrSetStep(2));
+document.getElementById('tlr-openEditsBtn')?.addEventListener('click', () => tlrOpenEditsModal());
+document.getElementById('tlr-editsClose')?.addEventListener('click', () => tlrCloseEditsModal());
+document.getElementById('tlr-editsDone')?.addEventListener('click', () => tlrCloseEditsModal());
+document.getElementById('tlr-editsModal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) tlrCloseEditsModal();
+});
+document.getElementById('tlr-editsAcceptAll')?.addEventListener('click', () => {
+  const edits = window.tlrLastResult?._edits || [];
+  let n = 0;
+  for (const e of edits) {
+    if (e.stretch_level === 'fabrication') continue;
+    if (e.stretch_level === 'stretch') continue; // keep human Keep/Soften/Drop
+    if (e.status !== 'accepted') { e.status = 'accepted'; n++; }
+    tlrApplyEditField(window.tlrLastResult, e);
+  }
+  tlrRenderEditControls(window.tlrLastResult);
+  tlrRenderPreview(window.tlrLastResult);
+  toast(n ? `Accepted ${n} grounded edit(s)` : 'No grounded edits to accept');
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('tlr-editsModal')?.classList.contains('open')) {
+    tlrCloseEditsModal();
+  }
+});
+['tlr-co','tlr-role'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', tlrUpdateJobCtx);
+  document.getElementById(id)?.addEventListener('change', tlrUpdateJobCtx);
+});
+
 document.getElementById('tlr-aiRewrite')?.addEventListener('click', async () => {
   const q = document.getElementById('tlr-aiAsk').value.trim();
   if(!q || !window.tlrLastResult) return;
@@ -3149,6 +3310,7 @@ document.getElementById('tlr-aiRewrite')?.addEventListener('click', async () => 
     const jd = document.getElementById('tlr-jd').value;
     const llm = document.getElementById('tlr-llm').value;
     tlrLog('→ AI rewrite: ' + q.slice(0,80));
+    const prev = window.tlrLastResult;
     const res = await tlrFetch('/tailor-resume', {method:'POST', body: JSON.stringify({
       jd_text: jd, role: document.getElementById('tlr-role').value,
       company: document.getElementById('tlr-co').value,
@@ -3159,7 +3321,17 @@ document.getElementById('tlr-aiRewrite')?.addEventListener('click', async () => 
     })});
     renderTlrOut(res); tlrRenderPreview(res);
     document.getElementById('tlr-aiAsk').value='';
-    toast('Resume updated!');
+    const bits = [];
+    const sumChanged = (res.tailored_summary || '') !== (prev.tailored_summary || '');
+    if (sumChanged) bits.push('summary rewritten');
+    const editN = (res._edits || []).filter(e => e.stretch_level !== 'fabrication').length;
+    if (editN) bits.push(`${editN} edit(s)`);
+    const addN = (res.skills_added || []).length;
+    const remN = (res.skills_removed || []).length;
+    if (addN) bits.push(`+${addN} skill(s)`);
+    if (remN) bits.push(`−${remN} skill(s)`);
+    toast(bits.length ? `AI rewrite: ${bits.join(' · ')}` : 'AI rewrite applied — see green/red diffs in preview');
+    tlrOpenEditsModal();
   } catch(e) { toast('Rewrite failed: '+e.message,'err'); }
   finally { btn.disabled=false; btn.textContent='✦ Edit With AI'; }
 });
@@ -3185,7 +3357,8 @@ document.getElementById('tlr-genBtn').addEventListener('click', async () => {
     tlrRenderPreview(res);
     tlrSetStep(3);
     window.scrollTo({top:0,behavior:'smooth'});
-    toast('Tailored resume ready!');
+    toast('Tailored resume ready — review edits');
+    tlrOpenEditsModal();
   } catch (e) {
     toast('Tailor failed: ' + e.message, 'err');
   } finally {
@@ -3207,6 +3380,7 @@ function renderTlrOut(res){
       status: e.status || (e.evidence_ref ? 'accepted' : 'needs_your_call')
     }));
   }
+  tlrUpdateJobCtx();
   tlrRenderEditControls(window.tlrLastResult);
   document.getElementById('tlr-est').textContent = res.score_estimate ? `Estimated fit: ${res.score_estimate}%` : '';
   // Show which model was used
