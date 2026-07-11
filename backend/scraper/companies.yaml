@@ -32,3 +32,6 @@ companies:
   - { ats: ashby, token: scale }
   - { ats: ashby, token: notion }
   - { ats: lever, token: netflix }
+  # careers_url auto-detect examples (sourcing-v2)
+  - { name: NVIDIA, careers_url: "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", max_pages: 3 }
+  - { ats: tracker, token: trackers, name: internship-trackers }

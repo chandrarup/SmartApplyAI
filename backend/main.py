@@ -1929,6 +1929,20 @@ async def approve_queue_item(match_id: int, request: Request, payload: dict = No
     company = item.get("company", "")
     title = item.get("title", "")
 
+    # Re-run liveness on approval (sourcing-v2) — observations only, never blocks.
+    try:
+        from scraper.liveness import check_url, persist_job_liveness
+    except ImportError:
+        from backend.scraper.liveness import check_url, persist_job_liveness  # type: ignore
+    try:
+        live = check_url(item.get("apply_url") or "")
+        fit = dict(item.get("fit") or {})
+        fit["liveness"] = live
+        if item.get("source_ats") and item.get("external_id"):
+            persist_job_liveness(item["source_ats"], item["external_id"], live)
+    except Exception as e:  # noqa: BLE001
+        log.warning(f"[queue] liveness re-check failed for match {match_id}: {e}")
+
     # Dedupe / rejection-history guard (block unless force).
     verdict = tracker_dedupe.check(pid, company, title)
     if verdict["blocked"] and not payload.get("force"):

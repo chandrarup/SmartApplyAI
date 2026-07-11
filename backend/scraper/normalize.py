@@ -103,6 +103,26 @@ def normalize_greenhouse(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def lever_created_at_to_iso(created_at: Any) -> str | None:
+    """Lever createdAt is epoch MILLISECONDS — divide by 1000 before ISO.
+
+    Regression guard: values > 1e12 are treated as ms; seconds pass through.
+    """
+    if created_at is None or created_at == "":
+        return None
+    if isinstance(created_at, str) and not created_at.strip().isdigit():
+        # Already an ISO-ish string
+        return created_at
+    try:
+        ts = float(created_at)
+    except (TypeError, ValueError):
+        return str(created_at)
+    if ts > 1e12:  # milliseconds
+        ts = ts / 1000.0
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
 def normalize_lever(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
     categories = raw_job.get("categories") or {}
     location = categories.get("location", "")
@@ -123,7 +143,7 @@ def normalize_lever(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
         "department": department,
         "description_text": description_text,
         "apply_url": raw_job.get("applyUrl") or raw_job.get("hostedUrl", ""),
-        "posted_at": raw_job.get("createdAt"),
+        "posted_at": lever_created_at_to_iso(raw_job.get("createdAt")),
         "updated_at": None,
         "raw_json": _serialize_raw(raw_job),
     }
@@ -155,17 +175,195 @@ def normalize_ashby(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def normalize_workday(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
+    title = raw_job.get("title", "")
+    location = raw_job.get("locationsText") or ""
+    path = raw_job.get("externalPath") or ""
+    base = raw_job.get("_job_base") or ""
+    apply_url = (base + path) if path else ""
+    description_text = " ".join(str(x) for x in (raw_job.get("bulletFields") or []) if x)
+    company = raw_job.get("_tenant") or (token.split("/")[0] if token else token)
+    flags = compute_targeting_flags(title=title, location=location, description_text=description_text)
+    return {
+        "source_ats": "workday",
+        "company": company,
+        "external_id": str(raw_job.get("id") or path or title),
+        "title": title,
+        "location": location,
+        "remote_flag": detect_remote_flag(title, location, description_text),
+        "is_internship": flags["is_internship"],
+        "location_match": flags["location_match"],
+        "sponsorship_knockout": flags["sponsorship_knockout"],
+        "department": "",
+        "description_text": description_text,
+        "apply_url": apply_url,
+        "posted_at": raw_job.get("postedOn"),
+        "updated_at": None,
+        "raw_json": _serialize_raw(raw_job),
+    }
+
+
+def normalize_smartrecruiters(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
+    title = raw_job.get("name") or raw_job.get("title") or ""
+    loc = raw_job.get("location") or {}
+    location = ""
+    if isinstance(loc, dict):
+        location = loc.get("city") or loc.get("region") or loc.get("country") or ""
+    description_text = html_to_text(raw_job.get("jobAd", {}).get("sections", {}).get("jobDescription", {}).get("text") if isinstance(raw_job.get("jobAd"), dict) else "") or str(raw_job.get("description") or "")
+    apply_url = raw_job.get("applyUrl") or raw_job.get("ref") or ""
+    if apply_url and not str(apply_url).startswith("http"):
+        apply_url = f"https://jobs.smartrecruiters.com/{token}/{raw_job.get('id', '')}"
+    flags = compute_targeting_flags(title=title, location=str(location), description_text=description_text)
+    return {
+        "source_ats": "smartrecruiters",
+        "company": token,
+        "external_id": str(raw_job.get("id") or title),
+        "title": title,
+        "location": str(location),
+        "remote_flag": detect_remote_flag(title, str(location), description_text),
+        "is_internship": flags["is_internship"],
+        "location_match": flags["location_match"],
+        "sponsorship_knockout": flags["sponsorship_knockout"],
+        "department": str((raw_job.get("department") or {}).get("label") if isinstance(raw_job.get("department"), dict) else raw_job.get("department") or ""),
+        "description_text": description_text,
+        "apply_url": apply_url,
+        "posted_at": raw_job.get("releasedDate") or raw_job.get("createdOn"),
+        "updated_at": None,
+        "raw_json": _serialize_raw(raw_job),
+    }
+
+
+def normalize_workable(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
+    title = raw_job.get("title") or ""
+    location = raw_job.get("city") or raw_job.get("location") or ""
+    if isinstance(location, dict):
+        location = location.get("city") or location.get("country") or ""
+    description_text = html_to_text(raw_job.get("description")) or str(raw_job.get("shortcode") or "")
+    apply_url = raw_job.get("url") or raw_job.get("application_url") or ""
+    flags = compute_targeting_flags(title=title, location=str(location), description_text=description_text)
+    return {
+        "source_ats": "workable",
+        "company": token,
+        "external_id": str(raw_job.get("shortcode") or raw_job.get("id") or title),
+        "title": title,
+        "location": str(location),
+        "remote_flag": detect_remote_flag(title, str(location), description_text) or bool(raw_job.get("remote")),
+        "is_internship": flags["is_internship"],
+        "location_match": flags["location_match"],
+        "sponsorship_knockout": flags["sponsorship_knockout"],
+        "department": str(raw_job.get("department") or ""),
+        "description_text": description_text,
+        "apply_url": apply_url,
+        "posted_at": raw_job.get("created_at") or raw_job.get("published_on"),
+        "updated_at": None,
+        "raw_json": _serialize_raw(raw_job),
+    }
+
+
+def normalize_teamtailor(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
+    # Teamtailor jobs.json often nests under attributes
+    node = raw_job.get("attributes") if isinstance(raw_job.get("attributes"), dict) else raw_job
+    title = node.get("title") or raw_job.get("title") or ""
+    location = node.get("human_status") or node.get("locations") or ""
+    if isinstance(location, list):
+        location = ", ".join(str(x) for x in location)
+    description_text = html_to_text(node.get("body") or node.get("pitch") or "")
+    apply_url = node.get("url") or raw_job.get("links", {}).get("careersite-job-url") if isinstance(raw_job.get("links"), dict) else node.get("url") or ""
+    flags = compute_targeting_flags(title=title, location=str(location), description_text=description_text)
+    return {
+        "source_ats": "teamtailor",
+        "company": token.split(".")[0] if token else token,
+        "external_id": str(raw_job.get("id") or node.get("id") or title),
+        "title": title,
+        "location": str(location),
+        "remote_flag": detect_remote_flag(title, str(location), description_text),
+        "is_internship": flags["is_internship"],
+        "location_match": flags["location_match"],
+        "sponsorship_knockout": flags["sponsorship_knockout"],
+        "department": str(node.get("department") or ""),
+        "description_text": description_text,
+        "apply_url": apply_url or "",
+        "posted_at": node.get("start-date") or node.get("created-at"),
+        "updated_at": None,
+        "raw_json": _serialize_raw(raw_job),
+    }
+
+
+def normalize_personio(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
+    title = raw_job.get("name") or raw_job.get("title") or ""
+    location = raw_job.get("office") or ""
+    desc_parts = [
+        f"{d.get('name', '')}: {d.get('value', '')}"
+        for d in (raw_job.get("jobDescriptions") or [])
+        if isinstance(d, dict)
+    ]
+    description_text = html_to_text("\n".join(desc_parts))
+    apply_url = f"https://{token}.jobs.personio.de/job/{raw_job.get('id', '')}" if token else ""
+    flags = compute_targeting_flags(title=title, location=str(location), description_text=description_text)
+    return {
+        "source_ats": "personio",
+        "company": token,
+        "external_id": str(raw_job.get("id") or title),
+        "title": title,
+        "location": str(location),
+        "remote_flag": detect_remote_flag(title, str(location), description_text),
+        "is_internship": flags["is_internship"],
+        "location_match": flags["location_match"],
+        "sponsorship_knockout": flags["sponsorship_knockout"],
+        "department": str(raw_job.get("department") or ""),
+        "description_text": description_text,
+        "apply_url": apply_url,
+        "posted_at": None,
+        "updated_at": None,
+        "raw_json": _serialize_raw(raw_job),
+    }
+
+
+def normalize_tracker(token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
+    title = raw_job.get("title") or ""
+    company = raw_job.get("company") or token or "tracker"
+    location = raw_job.get("location") or ""
+    description_text = raw_job.get("description") or f"{title} at {company}"
+    flags = compute_targeting_flags(title=title, location=str(location), description_text=description_text)
+    # Tracker rows are overwhelmingly internships
+    if not flags["is_internship"]:
+        flags["is_internship"] = True
+    return {
+        "source_ats": "tracker",
+        "company": company,
+        "external_id": str(raw_job.get("id") or f"{company}:{title}"),
+        "title": title,
+        "location": str(location),
+        "remote_flag": detect_remote_flag(title, str(location), description_text),
+        "is_internship": flags["is_internship"],
+        "location_match": flags["location_match"],
+        "sponsorship_knockout": flags["sponsorship_knockout"],
+        "department": "",
+        "description_text": description_text,
+        "apply_url": raw_job.get("apply_url") or "",
+        "posted_at": None,
+        "updated_at": None,
+        "raw_json": _serialize_raw(raw_job),
+    }
+
+
 def normalize_job(ats: str, token: str, raw_job: dict[str, Any]) -> dict[str, Any]:
     ats_lower = ats.lower().strip()
-    if ats_lower == "greenhouse":
-        job = normalize_greenhouse(token, raw_job)
-    elif ats_lower == "lever":
-        job = normalize_lever(token, raw_job)
-    elif ats_lower == "ashby":
-        job = normalize_ashby(token, raw_job)
-    else:
+    dispatch = {
+        "greenhouse": normalize_greenhouse,
+        "lever": normalize_lever,
+        "ashby": normalize_ashby,
+        "workday": normalize_workday,
+        "smartrecruiters": normalize_smartrecruiters,
+        "workable": normalize_workable,
+        "teamtailor": normalize_teamtailor,
+        "personio": normalize_personio,
+        "tracker": normalize_tracker,
+    }
+    fn = dispatch.get(ats_lower)
+    if not fn:
         raise ValueError(f"Unsupported ATS for normalization: {ats}")
-    # Tag user search strings (searches.yaml) — flows to matcher/queue.
+    job = fn(token, raw_job)
     try:
         from .searches import match_searches
     except ImportError:  # pragma: no cover
