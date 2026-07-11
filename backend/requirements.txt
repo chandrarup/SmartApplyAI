@@ -2,6 +2,7 @@ fastapi
 uvicorn
 requests
 jinja2
+pylatexenc
 sqlite-vec
 sentence-transformers
 pylatexenc

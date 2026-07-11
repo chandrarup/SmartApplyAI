@@ -25,6 +25,7 @@ How it works:
 """
 
 import os
+import shutil
 import time
 import pytest
 
@@ -36,7 +37,7 @@ BrowserContext = playwright.BrowserContext
 
 BACKEND_URL   = os.environ.get("BACKEND_URL",   "http://127.0.0.1:5001")
 EXTENSION_PATH = os.environ.get("EXTENSION_PATH", "./extension")
-HEADLESS      = os.environ.get("HEADLESS", "1") != "0"
+HEADLESS      = os.environ.get("HEADLESS", "0") != "0"
 USER_DATA_DIR = "/tmp/smartapply_test_profile"
 
 
@@ -54,6 +55,7 @@ def browser_ctx():
     headless=False is better for debugging; set HEADLESS=1 in CI.
     """
     with sync_playwright() as p:
+        shutil.rmtree(USER_DATA_DIR, ignore_errors=True)
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=USER_DATA_DIR,
             headless=HEADLESS,
@@ -90,17 +92,34 @@ def wait_for_fill_done(page: Page, timeout_ms: int = 20000):
     Wait for the fill to complete.
     The panel log shows "Done!" or "✓ X field(s) filled" when complete.
     """
-    page.wait_for_function(
-        """() => {
-            const panel = document.getElementById('localhire-floating-panel');
-            if (!panel) return false;
-            const log = panel.querySelector('.lh-log, [class*="log"]');
-            if (!log) return false;
-            const text = log.innerText || log.textContent;
-            return text.includes('Done!') || text.includes('filled') || text.includes('field');
-        }""",
-        timeout=timeout_ms,
-    )
+    deadline = time.time() + (timeout_ms / 1000)
+    last_count = -1
+    stable_since = None
+    while time.time() < deadline:
+        state = page.evaluate(
+            """() => {
+                const panel = document.getElementById('localhire-floating-panel');
+                if (!panel) return { count: 0, done: false };
+                const log = panel.querySelector('.lh-log, [class*="log"]');
+                const text = log ? (log.innerText || log.textContent || '') : '';
+                return {
+                    count: panel.querySelectorAll('.lh-fill-item').length,
+                    done: text.includes('Done!') || text.includes('filled') || text.includes('field')
+                };
+            }"""
+        )
+        if state["done"]:
+            return
+        count = state["count"]
+        if count > 0 and count == last_count:
+            stable_since = stable_since or time.time()
+            if time.time() - stable_since >= 1.5:
+                return
+        else:
+            stable_since = None
+            last_count = count
+        time.sleep(0.25)
+    raise TimeoutError(f"Fill did not complete within {timeout_ms}ms. Panel log:\n{get_panel_log(page)}")
 
 
 def click_fill_button(page: Page):
@@ -117,6 +136,11 @@ def click_fill_button(page: Page):
     if pill.count() > 0:
         pill.click()
         time.sleep(0.3)
+
+    clear_btn = page.locator("#lh-clear").first
+    if clear_btn.count() > 0:
+        clear_btn.click()
+        time.sleep(0.1)
 
     # Click the Fill button
     fill_btn = page.locator("#lh-fill, button:text('Fill'), [class*='fill-btn']").first
@@ -137,11 +161,12 @@ def get_input_value(page: Page, selector: str) -> str:
 def get_select_value(page: Page, selector: str) -> str:
     """Get the selected text of a <select> element."""
     return page.evaluate(
-        f"""() => {{
-            const el = document.querySelector('{selector}');
+        """selector => {
+            const el = document.querySelector(selector);
             if (!el) return '';
             return el.options[el.selectedIndex]?.text || el.value || '';
-        }}"""
+        }""",
+        selector,
     )
 
 
@@ -406,6 +431,140 @@ class TestICIMS:
         # Should not contain an uncaught error about state
         assert "Uncaught" not in log, f"Uncaught error in log:\n{log}"
 
+    def test_same_origin_iframe_fields_filled(self, page):
+        """iCIMS embeds often place the form in a same-origin iframe."""
+        page.goto(f"{BACKEND_URL}/test/icims")
+        wait_for_panel(page)
+        page.evaluate("""
+            () => {
+                document.querySelector('#icims-form')?.remove();
+                const frame = document.createElement('iframe');
+                frame.id = 'icims_content_iframe';
+                frame.srcdoc = `
+                  <form>
+                    <table class="iCIMS_TableFields">
+                      <tr>
+                        <td class="iCIMS_Label"><label for="iframe_first">First Name</label></td>
+                        <td><input class="iCIMS_Input" id="iframe_first" name="applicant.name.given" type="text"></td>
+                      </tr>
+                      <tr>
+                        <td class="iCIMS_Label"><label for="iframe_email">Email Address</label></td>
+                        <td><input class="iCIMS_Input" id="iframe_email" name="applicant.communications.email" type="email"></td>
+                      </tr>
+                    </table>
+                  </form>`;
+                document.body.appendChild(frame);
+            }
+        """)
+        page.wait_for_selector("#icims_content_iframe")
+        click_fill_button(page)
+        wait_for_fill_done(page)
+
+        values = page.evaluate("""
+            () => {
+                const doc = document.querySelector('#icims_content_iframe').contentDocument;
+                return {
+                    first: doc.querySelector('#iframe_first').value,
+                    email: doc.querySelector('#iframe_email').value,
+                };
+            }
+        """)
+        assert values["first"] != "", f"iCIMS iframe first name empty. Log:\n{get_panel_log(page)}"
+        assert "@" in values["email"], f"iCIMS iframe email empty. Log:\n{get_panel_log(page)}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADDITIONAL ATS PLATFORM TESTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestLever:
+    """Lever live-like fixture: name/email/phone plus common dropdowns."""
+
+    def test_contact_fields_filled(self, page):
+        page.goto(f"{BACKEND_URL}/test/lever")
+        wait_for_panel(page)
+        click_fill_button(page)
+        wait_for_fill_done(page)
+
+        assert get_input_value(page, "#lv_name") != "", f"Lever name empty. Log:\n{get_panel_log(page)}"
+        assert "@" in get_input_value(page, "#lv_email"), f"Lever email empty. Log:\n{get_panel_log(page)}"
+        assert get_input_value(page, "#lv_phone") != "", f"Lever phone empty. Log:\n{get_panel_log(page)}"
+
+    def test_work_authorization_dropdown_filled(self, page):
+        page.goto(f"{BACKEND_URL}/test/lever")
+        wait_for_panel(page)
+        click_fill_button(page)
+        wait_for_fill_done(page)
+
+        val = get_select_value(page, "#lv_q1")
+        assert val != "", f"Lever work authorization should be selected. Log:\n{get_panel_log(page)}"
+
+
+class TestBambooHR:
+    """BambooHR camelCase fields and ordinary contact inputs."""
+
+    def test_contact_fields_filled(self, page):
+        page.goto(f"{BACKEND_URL}/test/bamboohr")
+        wait_for_panel(page)
+        click_fill_button(page)
+        wait_for_fill_done(page)
+
+        assert get_input_value(page, "#firstName") != "", f"BambooHR first name empty. Log:\n{get_panel_log(page)}"
+        assert get_input_value(page, "#lastName") != "", f"BambooHR last name empty. Log:\n{get_panel_log(page)}"
+        assert "@" in get_input_value(page, "#email"), f"BambooHR email empty. Log:\n{get_panel_log(page)}"
+        assert get_input_value(page, "#phoneNumber") != "", f"BambooHR phone empty. Log:\n{get_panel_log(page)}"
+
+
+class TestSmartRecruiters:
+    """SmartRecruiters data-test-id fields and custom select questions."""
+
+    def test_contact_fields_filled(self, page):
+        page.goto(f"{BACKEND_URL}/test/smartrecruiters")
+        wait_for_panel(page)
+        click_fill_button(page)
+        wait_for_fill_done(page)
+
+        assert get_input_value(page, "#sr_first") != "", f"SmartRecruiters first name empty. Log:\n{get_panel_log(page)}"
+        assert get_input_value(page, "#sr_last") != "", f"SmartRecruiters last name empty. Log:\n{get_panel_log(page)}"
+        assert "@" in get_input_value(page, "#sr_email"), f"SmartRecruiters email empty. Log:\n{get_panel_log(page)}"
+        assert get_input_value(page, "#sr_phone") != "", f"SmartRecruiters phone empty. Log:\n{get_panel_log(page)}"
+
+    def test_authorization_dropdown_filled(self, page):
+        page.goto(f"{BACKEND_URL}/test/smartrecruiters")
+        wait_for_panel(page)
+        click_fill_button(page)
+        wait_for_fill_done(page)
+
+        assert get_select_value(page, "#sr_wa") != "", f"SmartRecruiters work auth empty. Log:\n{get_panel_log(page)}"
+
+
+class TestTaleo:
+    """Taleo ftl-prefixed field ids and table-based layout."""
+
+    def test_contact_fields_filled(self, page):
+        page.goto(f"{BACKEND_URL}/test/taleo")
+        wait_for_panel(page)
+        click_fill_button(page)
+        wait_for_fill_done(page)
+
+        assert get_input_value(page, "#ftlFirstName") != "", f"Taleo first name empty. Log:\n{get_panel_log(page)}"
+        assert get_input_value(page, "#ftlLastName") != "", f"Taleo last name empty. Log:\n{get_panel_log(page)}"
+        assert "@" in get_input_value(page, "#ftlEmail"), f"Taleo email empty. Log:\n{get_panel_log(page)}"
+        assert get_input_value(page, "#ftlPhone") != "", f"Taleo phone empty. Log:\n{get_panel_log(page)}"
+
+
+class TestAshby:
+    """Ashby fixture exercises manifest match + content-script gating."""
+
+    def test_panel_injects_on_ashby_fixture(self, page):
+        page.goto(f"{BACKEND_URL}/test/ashby")
+        wait_for_panel(page)
+        pill = page.locator("#localhire-floating-panel .lh-pill").first
+        if pill.count() > 0:
+            pill.click()
+        text = page.locator("#localhire-floating-panel").inner_text(timeout=5000)
+        assert "LocalHire Agent" in text, f"LocalHire panel did not render on Ashby fixture:\n{text}"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONTENTEDITABLE TESTS
@@ -431,7 +590,7 @@ class TestContenteditable:
         """)
 
         # Simulate the Bug 4 fix: setNativeValue() with contenteditable detection
-        page.evaluate("""
+        page.evaluate("""() => {
             function setNativeValue(element, value) {
                 if (element.contentEditable === 'true' || element.getAttribute('role') === 'textbox') {
                     element.focus();
@@ -451,7 +610,7 @@ class TestContenteditable:
 
             const el = document.getElementById('app');
             setNativeValue(el, 'BioGPT-based RAG pipeline for clinical NLP');
-        """)
+        }""")
 
         content = page.locator("#app").inner_text()
         assert "BioGPT" in content or content == "BioGPT-based RAG pipeline for clinical NLP", \
@@ -465,7 +624,7 @@ class TestContenteditable:
             </body></html>
         """)
 
-        page.evaluate("""
+        page.evaluate("""() => {
             function setNativeValue(element, value) {
                 if (element.contentEditable === 'true' || element.getAttribute('role') === 'textbox') {
                     element.focus();
@@ -487,7 +646,7 @@ class TestContenteditable:
 
             const el = document.getElementById('normal');
             setNativeValue(el, 'Houston, TX');
-        """)
+        }""")
 
         val = page.locator("#normal").input_value()
         assert val == "Houston, TX", f"Normal input should be filled, got: '{val}'"

@@ -397,6 +397,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def private_network_access_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
 # --- DATA MODELS ---
 class JobRequest(BaseModel):
     jd_text: str
@@ -1728,6 +1734,19 @@ def tracker_match_page(request: Request, host: str = "", url: str = "", company:
         "source": "tracker",
     }}
 
+@app.post("/queue/{match_id}/mark-applied")
+def queue_mark_applied(match_id: str, request: Request):
+    """Human-confirmed tracker transition after the user submits the ATS form."""
+    pid = get_pid(request)
+    _ensure_tracker_migrated(pid)
+    try:
+        updated = tracker_store.update_status(pid, match_id, tracker_store.STATUS_APPLIED)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not updated:
+        raise HTTPException(status_code=404, detail="Ready queue item not found")
+    return {"ok": True, "application": updated}
+
 # ─────────────────────────────────────────────────────────────────
 # REVIEW QUEUE (M6) — banded matches, tailored overnight, approved by human
 # ─────────────────────────────────────────────────────────────────
@@ -2069,6 +2088,11 @@ def test_linkedin():
 @app.get("/test/taleo", response_class=HTMLResponse)
 def test_taleo():
     with open(os.path.join(os.path.dirname(__file__), "test_taleo.html"), "r") as f:
+        return f.read()
+
+@app.get("/test/ashby", response_class=HTMLResponse)
+def test_ashby():
+    with open(os.path.join(os.path.dirname(__file__), "test_pages", "test_ashby.html"), "r") as f:
         return f.read()
 
 # ─────────────────────────────────────────────────────────────────

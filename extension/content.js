@@ -1,6 +1,7 @@
 // LocalHire Agent — Content Script v3.0
 // Architecture: MAIN-world interception → schema → adapters → section parser
 // Legacy autofill flow preserved (extraction is additive, not replacement).
+const LH_INITIAL_PATH = typeof location !== "undefined" ? location.pathname : "";
 
 // ════════════════════════════════════════════════════════════════════════════
 // TELEMETRY — buffered event bus, console + (optional) backend sink
@@ -175,9 +176,40 @@ const CaptureBus = (() => {
   };
 })();
 
+// Keep the manifest narrow, then gate the heavy content-script behavior further
+// so ATS marketing/home pages do not get a panel or background scraping.
+function isLhActivePage() {
+  try {
+    const h = location.hostname.toLowerCase();
+    const p = location.pathname.toLowerCase();
+    const q = location.search.toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1") {
+      return p === "/test" || /^\/test\//.test(p) || /approved|multi_ats_demo|ats/.test(p);
+    }
+    if (/linkedin\.com$/.test(h)) {
+      return /^\/jobs\//.test(p) || !!document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]');
+    }
+    if (/greenhouse\.io$/.test(h)) {
+      return /\/jobs?\//.test(p) || /embed\/job_app|job_app|application|apply/.test(p) || h === "apply.greenhouse.io";
+    }
+    if (/lever\.co$/.test(h)) return /\/apply\b|\/[0-9a-f-]{24,}/i.test(p);
+    if (/ashbyhq\.com$/.test(h)) return /\/application\b|\/[0-9a-f-]{24,}|\/[^/]+\/[^/]+/.test(p);
+    if (/myworkdayjobs\.com$/.test(h)) return /\/job\/|\/apply\b|\/candidate-home/.test(p);
+    if (/icims\.com$/.test(h)) return /\/jobs\//.test(p) || q.includes("mode=apply");
+    if (/bamboohr\.com$/.test(h)) return /\/careers\/|\/jobs\//.test(p);
+    if (/smartrecruiters\.com$/.test(h)) return /\/application\b|\/jobs?\//.test(p) || p.split("/").filter(Boolean).length >= 2;
+    if (/taleo\.net$/.test(h)) return /jobdetail\.ftl|jobapplication\.ftl/.test(p);
+    if (/successfactors\.com$|jobvite\.com$|rippling\.com$|paycom\.com$|workable\.com$|recruitee\.com$|paylocity\.com$/.test(h)) {
+      return /job|apply|application|career|position|requisition/.test(p + " " + q);
+    }
+  } catch (e) {}
+  return false;
+}
+
 // Inject the MAIN-world interceptor (must run at document_start)
 (function injectInterceptor() {
   if (window.top !== window) return;
+  if (!isLhActivePage()) return;
   try {
     if (typeof chrome === "undefined" || !chrome.runtime?.getURL) return;
     const url = chrome.runtime.getURL("injected.js");
@@ -722,140 +754,29 @@ function setRadioGroup(container, value) {
   return false;
 }
 
-// Text-match a value against a list of option strings — shared by native <select>
-// and custom combobox fills. Exact → partial → yes/no → US-state abbreviation.
-function matchOptionText(optionTexts, value) {
-  if (!value) return null;
-  const valLower = value.toString().toLowerCase().trim();
-  let partial = null;
-  for (const raw of optionTexts) {
-    const t = (raw || "").toLowerCase().trim();
-    if (!t) continue;
-    if (t === valLower) return raw;
-    if (!partial && (t.includes(valLower) || valLower.includes(t))) partial = raw;
-  }
-  if (partial) return partial;
-  for (const raw of optionTexts) {
-    const t = (raw || "").toLowerCase().trim();
-    if (valLower.includes("yes") && /^yes\b/.test(t)) return raw;
-    if (valLower.includes("no") && /^no\b/.test(t)) return raw;
-  }
-  const abbrev = STATE_ABBREVIATIONS[valLower];
-  const fullName = Object.keys(STATE_ABBREVIATIONS).find(k => STATE_ABBREVIATIONS[k] === valLower.toUpperCase());
-  const tryVal = (abbrev || fullName || "").toLowerCase();
-  if (tryVal) {
-    for (const raw of optionTexts) {
-      const t = (raw || "").toLowerCase().trim();
-      if (t === tryVal || t.includes(tryVal)) return raw;
-    }
-  }
-  return null;
-}
-
-// A field is required if the control (or its field-group wrapper) says so, or the
-// visible label ends with an asterisk. Used to prioritise "must-answer" fields.
-function isFieldRequired(el) {
-  if (!el) return false;
-  if (el.required === true || el.getAttribute("aria-required") === "true") return true;
-  const grp = el.closest('[aria-required="true"]');
-  if (grp) return true;
-  const labelWrap = el.closest('[class*="_fieldEntry"], fieldset, [role="group"], .field, .form-group');
-  if (labelWrap) {
-    const txt = (labelWrap.querySelector("label, legend, .label, [class*='_label']")?.textContent || "").trim();
-    if (/[*✱]\s*$/.test(txt)) return true;
-  }
-  return false;
-}
-
-// Read the option labels of a custom (React) combobox. Options often aren't in the
-// DOM until the listbox opens, so this returns [] when nothing is pre-rendered and
-// the filler opens-reads-clicks live instead.
-function harvestComboboxOptions(triggerEl) {
-  const texts = [];
-  const seen = new Set();
-  const collect = (root) => {
-    root.querySelectorAll('[role="option"]').forEach(o => {
-      const t = (o.innerText || o.textContent || "").trim();
-      if (t && !seen.has(t)) { seen.add(t); texts.push(t); }
-    });
-  };
-  const controls = triggerEl.getAttribute("aria-controls");
-  if (controls) { const lb = document.getElementById(controls); if (lb) collect(lb); }
-  const container = triggerEl.closest('[class*="_fieldEntry"], fieldset, [role="group"]') || triggerEl.parentElement;
-  if (container) collect(container);
-  return texts;
-}
-
-// Fill a click-to-open React combobox (Ashby EEO/veteran, Radix, etc.) by mimicking
-// a real pointer sequence rather than setting .value (which React ignores).
-async function fillAshbyCombobox(triggerEl, value) {
-  if (!triggerEl || !value) return false;
-  try { triggerEl.scrollIntoView({ block: "center" }); } catch (e) {}
-  const firePointer = (elm) => {
-    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
-      const Ctor = (type.startsWith("pointer") && window.PointerEvent) ? PointerEvent : MouseEvent;
-      elm.dispatchEvent(new Ctor(type, { bubbles: true, cancelable: true, view: window }));
-    }
-  };
-  const closeBox = () => triggerEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  try { triggerEl.focus(); } catch (e) {}
-  firePointer(triggerEl);
-  await delay(280);
-
-  let listbox = null;
-  const controls = triggerEl.getAttribute("aria-controls");
-  if (controls) listbox = document.getElementById(controls);
-  if (!listbox) {
-    const boxes = Array.from(document.querySelectorAll('[role="listbox"]'));
-    listbox = boxes.find(b => b.offsetParent !== null) || boxes[boxes.length - 1] || null;
-  }
-  let options = listbox ? Array.from(listbox.querySelectorAll('[role="option"]')) : [];
-  if (!options.length) options = Array.from(document.querySelectorAll('[role="option"]'));
-
-  if (options.length) {
-    const texts = options.map(o => (o.innerText || o.textContent || "").trim());
-    const match = matchOptionText(texts, value);
-    if (match != null) {
-      const opt = options[texts.findIndex(t => t === match)];
-      if (opt) {
-        try { opt.scrollIntoView({ block: "nearest" }); } catch (e) {}
-        firePointer(opt);
-        await delay(150);
-        return true;
-      }
-    }
-    closeBox();   // no match — never leave a listbox open blocking the next field
-    return false;
-  }
-
-  // No ARIA options rendered. Plain div dropdowns (custom .item/.option menus)
-  // reveal clickable items near the trigger once opened — match on visible text.
-  const container = triggerEl.closest('[class*="_fieldEntry"], fieldset, [role="group"], .field, .form-group') || triggerEl.parentElement;
-  if (container) {
-    const items = Array.from(container.querySelectorAll('[data-value], [role="menuitem"], li, .item, .option'))
-      .filter(n => n !== triggerEl && n.offsetParent !== null && !n.querySelector("input, select, textarea"));
-    if (items.length) {
-      const texts = items.map(n => (n.innerText || n.textContent || "").trim());
-      const match = matchOptionText(texts, value);
-      if (match != null) {
-        firePointer(items[texts.indexOf(match)]);
-        await delay(120);
-        return true;
-      }
-    }
-  }
-
-  // Fallbacks: a hidden native <select> mirror, then a Workday-style typeahead.
-  closeBox();
-  const nativeSel = container && container.querySelector("select");
-  if (nativeSel) return setSelectValue(nativeSel, value);
-  return false;
-}
-
 // ─────────────────────────────────────────────
 // LABEL EXTRACTION — platform-aware
 // ─────────────────────────────────────────────
+function formDocuments(platform = detectPlatform()) {
+  const docs = [document];
+  if (platform !== "icims") return docs;
+  for (const frame of document.querySelectorAll("iframe")) {
+    try {
+      const doc = frame.contentDocument;
+      if (doc && doc.body) docs.push(doc);
+    } catch (e) {
+      // Cross-origin frames are intentionally ignored; the manifest keeps all_frames=false.
+    }
+  }
+  return docs;
+}
+
+function queryFormDocuments(selector, platform = detectPlatform()) {
+  return formDocuments(platform).flatMap(doc => Array.from(doc.querySelectorAll(selector)));
+}
+
 function getLabelForInput(input, platform) {
+  const doc = input.ownerDocument || document;
   // 1. aria-label
   const ariaLabel = input.getAttribute("aria-label");
   if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
@@ -865,7 +786,7 @@ function getLabelForInput(input, platform) {
   const labelledBy = input.getAttribute("aria-labelledby");
   if (labelledBy) {
     const texts = labelledBy.trim().split(/\s+/)
-      .map(id => { const el = byIdFrom(input, id); return el ? (el.innerText || el.textContent || "").replace(/[\s*✱]+$/, "").trim() : ""; })
+      .map(id => { const el = doc.getElementById(id); return el ? (el.innerText || el.textContent || "").replace(/[\s*✱]+$/, "").trim() : ""; })
       .filter(Boolean);
     if (texts.length) return texts.join(" ");
   }
@@ -902,11 +823,7 @@ function getLabelForInput(input, platform) {
   if (input.id) {
     try {
       const escaped = (typeof CSS !== "undefined" && CSS.escape) ? CSS.escape(input.id) : input.id.replace(/[^\w-]/g, "\\$&");
-      // Resolve against the input's own tree first — label[for] inside a shadow
-      // root is invisible to document.querySelector.
-      const root = input.getRootNode();
-      const scope = (root && root.querySelector) ? root : document;
-      const lbl = scope.querySelector(`label[for="${escaped}"]`);
+      const lbl = doc.querySelector(`label[for="${escaped}"]`);
       if (lbl) return (lbl.innerText || lbl.textContent || "").replace(/[\s*✱]+$/, "").trim();
     } catch (e) {}
   }
@@ -949,6 +866,7 @@ function getLabelForInput(input, platform) {
 function detectPlatform() {
   const h = location.hostname;
   const path = location.pathname;
+  const initialPath = LH_INITIAL_PATH || "";
   if (/myworkdayjobs\.com|workday\.com/.test(h)) return "workday";
   if (/greenhouse\.io/.test(h)) return "greenhouse";
   if (/lever\.co/.test(h) && /\/apply/.test(path)) return "lever";
@@ -971,6 +889,11 @@ function detectPlatform() {
   if (/test\/smartrecruiters/.test(path)) return "smartrecruiters";
   if (/test\/linkedin/.test(path)) return "linkedin";
   if (/test\/taleo/.test(path)) return "taleo";
+  if (/test\/ashby/.test(path) || /test\/ashby/.test(initialPath)) return "ashby";
+  if ((h === "localhost" || h === "127.0.0.1") && path === "/test") {
+    const localText = `${document.title || ""} ${document.body?.innerText || ""}`.slice(0, 2000);
+    if (/ashby/i.test(localText)) return "ashby";
+  }
   if (/test\/greenhouse/.test(path)) return "greenhouse";
   if (/test\/workday/.test(path)) return "workday";
   return "generic";
@@ -990,40 +913,12 @@ function getPlatformName(key) {
 // ─────────────────────────────────────────────
 // PLATFORM-SPECIFIC FIELD SCANNERS
 // ─────────────────────────────────────────────
-// querySelectorAll that also descends into open shadow roots. Workday and other
-// web-component ATSes render whole sections inside them, where
-// document.querySelectorAll cannot see. Closed shadow roots stay unreachable.
-function queryAllDeep(selector, root = document) {
-  const out = [];
-  const walk = (node) => {
-    out.push(...node.querySelectorAll(selector));
-    for (const el of node.querySelectorAll("*")) {
-      if (el.shadowRoot) walk(el.shadowRoot);
-    }
-  };
-  try { walk(root); } catch (e) {}
-  return [...new Set(out)];
-}
-
-// getElementById that works when el lives inside a shadow root: IDs are scoped to
-// their tree, so resolve against the element's own root first, then the document.
-function byIdFrom(el, id) {
-  try {
-    const root = el.getRootNode();
-    if (root && root.getElementById) {
-      const hit = root.getElementById(id);
-      if (hit) return hit;
-    }
-  } catch (e) {}
-  return document.getElementById(id);
-}
-
 function getFormFields(platform) {
   let rawInputs = [];
 
   if (platform === "workday") {
     // Workday: inputs inside [data-automation-id] wrappers OR inputs that themselves have the attribute
-    rawInputs = Array.from(queryAllDeep(
+    rawInputs = Array.from(document.querySelectorAll(
       '[data-automation-id] input:not([type="hidden"]):not([type="submit"]):not([type="file"]),' +
       '[data-automation-id] textarea,' +
       '[data-automation-id] select,' +
@@ -1035,37 +930,26 @@ function getFormFields(platform) {
     // LinkedIn: everything inside the Easy Apply modal
     const modal = document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]');
     if (modal) {
-      rawInputs = Array.from(queryAllDeep(
+      rawInputs = Array.from(modal.querySelectorAll(
         'input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]),' +
-        'textarea, select',
-        modal
+        'textarea, select'
       ));
     }
-  } else if (platform === "ashby") {
-    // Ashby is React: many fields are custom comboboxes / button-triggered listboxes,
-    // not native inputs. Scan the WHOLE document (the page often has several <form>s —
-    // e.g. the "autofill from resume" upload widget — so scoping to one form loses
-    // the real application fields) for BOTH natives and widget triggers.
-    rawInputs = Array.from(queryAllDeep(
-      'input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]),' +
-      'textarea, select,' +
-      '[role="combobox"], [aria-haspopup="listbox"], button[aria-expanded]'
-    ));
-    rawInputs = [...new Set(rawInputs)];
-  } else if (platform === "rippling" || platform === "paycom") {
+  } else if (platform === "ashby" || platform === "rippling" || platform === "paycom") {
     // Generic React form fields for newer ATS platforms
-    rawInputs = Array.from(queryAllDeep(
+    rawInputs = Array.from(document.querySelectorAll(
       'input:not([type="hidden"]):not([type="submit"]):not([type="file"]),' +
       'textarea, select'
     ));
   } else if (platform === "icims") {
     // iCIMS: elements with class iCIMS_Input
-    rawInputs = Array.from(queryAllDeep(
-      '.iCIMS_Input, input[name*="applicant"], select[name*="applicant"], textarea[name*="applicant"]'
-    ));
+    rawInputs = queryFormDocuments(
+      '.iCIMS_Input, input[name*="applicant"], select[name*="applicant"], textarea[name*="applicant"]',
+      platform
+    );
   } else if (platform === "smartrecruiters") {
     // SmartRecruiters: data-test-id attributes or generic
-    rawInputs = Array.from(queryAllDeep(
+    rawInputs = Array.from(document.querySelectorAll(
       'input[data-test-id]:not([type="hidden"]):not([type="file"]),' +
       'select[data-test-id], textarea[data-test-id],' +
       'input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]),' +
@@ -1075,7 +959,7 @@ function getFormFields(platform) {
     rawInputs = [...new Set(rawInputs)];
   } else if (platform === "taleo") {
     // Taleo: ftlField class or ftl-prefixed IDs
-    rawInputs = Array.from(queryAllDeep(
+    rawInputs = Array.from(document.querySelectorAll(
       'input.ftlField:not([type="hidden"]):not([type="submit"]),' +
       'select.ftlField, textarea.ftlField,' +
       'input[id^="ftl"]:not([type="hidden"]),' +
@@ -1084,22 +968,16 @@ function getFormFields(platform) {
     rawInputs = [...new Set(rawInputs)];
   } else if (platform === "greenhouse") {
     // Greenhouse: standard inputs, exclude resume/file uploads
-    rawInputs = Array.from(queryAllDeep(
+    rawInputs = Array.from(document.querySelectorAll(
       'input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]),' +
       'textarea, select'
     ));
   } else {
-    // Generic, Lever, BambooHR, and everything else. Also pick up custom widget
-    // triggers (React/ARIA comboboxes, div-based selects) — these carry the real
-    // dropdowns on many modern career pages. Non-field matches (nav menus etc.)
-    // are harmless: they get no answer and are never clicked.
-    rawInputs = Array.from(queryAllDeep(
+    // Generic, Lever, BambooHR, and everything else
+    rawInputs = Array.from(document.querySelectorAll(
       'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="image"]),' +
-      'textarea, select,' +
-      '[role="combobox"], [aria-haspopup="listbox"], button[aria-expanded],' +
-      '[role="button"][aria-labelledby]'
+      'textarea, select'
     ));
-    rawInputs = [...new Set(rawInputs)];
   }
 
   // Build field descriptor array
@@ -1107,37 +985,22 @@ function getFormFields(platform) {
   const seen = new Set();
   for (const el of rawInputs) {
     if (el.type === "radio" || el.type === "checkbox") continue;
-    // Skip hidden native mirrors that sit behind a visible custom widget.
-    if (el.getAttribute("aria-hidden") === "true") continue;
-    const comboAttrs = el.getAttribute("role") === "combobox"
-      || el.getAttribute("aria-haspopup") === "listbox"
-      || (el.tagName === "BUTTON" && el.hasAttribute("aria-expanded"))
-      // div/span styled as a select trigger: role=button + a label pointing at it
-      || (el.getAttribute("role") === "button" && el.hasAttribute("aria-labelledby")
-          && !["BUTTON", "INPUT", "SELECT", "TEXTAREA", "A"].includes(el.tagName));
-    // Writable text inputs marked combobox are typeaheads — typing works, keep them
-    // native. Buttons/divs/readonly inputs need the click-to-open filler. On Ashby
-    // every combobox is the click-to-open kind.
-    const isCombo = comboAttrs
-      && (platform === "ashby" || el.tagName !== "INPUT" || el.readOnly === true);
     const label = getLabelForInput(el, platform);
     // BUG 2: scoped identity — include nearest section container ID
     // so "Job Title" in Work Exp #1 ≠ "Job Title" in Work Exp #2
-    const scopeEl = el.closest('[data-automation-id], [data-field], fieldset, .application-field, .iCIMS_TableFields, .wd-field, [class*="_fieldEntry"], [role="group"], [aria-labelledby]');
-    const scopeId = scopeEl?.getAttribute("data-automation-id") || scopeEl?.id || scopeEl?.getAttribute("aria-labelledby") || "";
+    const scopeEl = el.closest('[data-automation-id], [data-field], fieldset, .application-field, .iCIMS_TableFields, .wd-field');
+    const scopeId = scopeEl?.getAttribute("data-automation-id") || scopeEl?.id || "";
     const identity = `${label || el.name || el.id}::${scopeId}`;
     if (!identity.replace(/::/g, "") || seen.has(identity)) continue;
     seen.add(identity);
     fields.push({
       element: el,
       label: label || el.name || el.id || "",
-      type: isCombo ? "combobox" : (el.type || el.tagName.toLowerCase()),
-      widget: isCombo ? "combobox" : undefined,
+      type: el.type || el.tagName.toLowerCase(),
       name: el.name || el.id || "",
-      required: isFieldRequired(el),
       options: el.tagName === "SELECT"
         ? Array.from(el.options).map(o => o.text.trim()).filter(t => t && t !== "--" && !t.startsWith("--"))
-        : (isCombo ? harvestComboboxOptions(el) : []),
+        : [],
     });
   }
   return fields;
@@ -1146,14 +1009,17 @@ function getFormFields(platform) {
 // Also scan radio button groups separately
 function getRadioGroups(platform) {
   const groups = {};
-  let scope = document;
+  let scopes = [document];
   if (platform === "linkedin") {
-    scope = document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]') || document;
+    scopes = [document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]') || document];
+  } else if (platform === "icims") {
+    scopes = formDocuments(platform);
   }
-  const radios = queryAllDeep('input[type="radio"]', scope);
+  const radios = scopes.flatMap(scope => Array.from(scope.querySelectorAll('input[type="radio"]')));
   for (const r of radios) {
     const name = r.name;
     if (!name) continue;
+    const doc = r.ownerDocument || document;
     if (!groups[name]) {
       const container = r.closest("fieldset, .field, .form-group, .application-field, .fab-field, .sr-field, .wd-field, tr, .li-field, [data-automation-id]");
       // BUG 7: Priority — legend > aria-labelledby on container > label without input child > name
@@ -1165,7 +1031,7 @@ function getRadioGroups(platform) {
         } else {
           const labelledBy = container.getAttribute("aria-labelledby");
           if (labelledBy) {
-            const el = byIdFrom(container, labelledBy);
+            const el = doc.getElementById(labelledBy);
             if (el) label = (el.innerText || el.textContent || "").replace(/[\s*✱]+$/, "").trim();
           }
           if (!label || label === name) {
@@ -1206,21 +1072,12 @@ function normalizeValue(label, value) {
   return value;
 }
 
-async function fillField(platform, field, value, opts = {}) {
+function fillField(platform, field, value) {
   if (!value || value === "SKIP" || !field.element) return false;
   const el = field.element;
-  // Never clobber a value already sitting in the field — the user may have typed
-  // it, or the ATS prefilled it from their account. Callers acting on an explicit
-  // user instruction (panel "Update on page", needs-your-call answers) pass force.
-  if (!opts.force && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")
-      && typeof el.value === "string" && el.value.trim()) return false;
   const finalVal = normalizeValue(field.label, value);
   if (!finalVal) return false;
   try {
-    // Only fields the detector flagged as a custom combobox widget use the
-    // click-to-open filler. Native inputs (incl. Workday typeahead handled
-    // elsewhere) keep the synchronous path so callers that don't await still work.
-    if (field.widget === "combobox") return await fillAshbyCombobox(el, String(finalVal));
     if (el.tagName === "SELECT") return setSelectValue(el, finalVal);
     el.focus();
     setNativeValue(el, String(finalVal));
@@ -1507,6 +1364,45 @@ function isExtensionAlive() {
 
 const DEFAULT_API_URL = "http://127.0.0.1:5001";
 
+function getSessionStore() {
+  try {
+    return chrome.storage?.session || chrome.storage?.local || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function hashString(str) {
+  let h = 2166136261;
+  const s = String(str || "");
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16);
+}
+
+function getStoreValue(store, key) {
+  return new Promise(resolve => {
+    if (!store) { resolve(undefined); return; }
+    try {
+      store.get([key], value => {
+        void chrome.runtime.lastError;
+        resolve(value ? value[key] : undefined);
+      });
+    } catch (e) {
+      resolve(undefined);
+    }
+  });
+}
+
+function setStoreValue(store, key, value) {
+  if (!store) return;
+  try {
+    store.set({ [key]: value }, () => { void chrome.runtime.lastError; });
+  } catch (e) {}
+}
+
 async function getSettings() {
   // If the runtime is invalidated, return safe defaults so callers still work.
   if (!isExtensionAlive()) {
@@ -1559,6 +1455,36 @@ async function fetchWithTimeout(url, options, timeoutMs = 45000) {
   }
 }
 
+async function bgFetchJson(url, options = {}, timeoutMs = 20000) {
+  if (!isExtensionAlive()) throw new Error("Extension runtime unavailable");
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Background fetch timed out after ${timeoutMs / 1000}s`)), timeoutMs);
+    try {
+      chrome.runtime.sendMessage({
+        action: "fetch_json",
+        url,
+        method: options.method || "GET",
+        headers: options.headers || undefined,
+        body: options.body || undefined,
+      }, res => {
+        clearTimeout(timer);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!res || !res.ok) {
+          reject(new Error(res?.error || `HTTP ${res?.status || 0}`));
+          return;
+        }
+        resolve(res.json !== null && res.json !== undefined ? res.json : res.text);
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      reject(e);
+    }
+  });
+}
+
 /**
  * BUG 12 FIX: Heuristic to detect whether the current page is a JD vs an application form.
  *
@@ -1591,40 +1517,6 @@ function isJobDescriptionPage() {
   const jdCount   = JD_SIGNALS.filter(s => text.includes(s)).length;
   const formCount = FORM_SIGNALS.filter(s => text.includes(s)).length;
   return jdCount >= formCount;
-}
-
-/** True on ATS job/apply pages where the extension should run network hooks. */
-function isLhActivePage() {
-  if (window.top !== window) return false;
-  const key = detectPlatform();
-  if (key && key !== "generic") return true;
-  if (isJobDescriptionPage()) return true;
-  try {
-    if (detectGreenhouseEmbed() || detectLeverApplyPage() || detectAshbyApplyPage()
-        || detectBambooHRApplyPage()) return true;
-  } catch (_) {}
-  return getFormFields(detectPlatform()).length > 0;
-}
-
-async function bgFetchJson(url) {
-  if (!isExtensionAlive()) throw new Error("extension context unavailable");
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action: "fetch_json", url }, (resp) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      if (!resp || !resp.ok) {
-        reject(new Error(resp?.error || `HTTP ${resp?.status || "?"}`));
-        return;
-      }
-      try {
-        resolve(JSON.parse(resp.text));
-      } catch (e) {
-        reject(new Error(`invalid JSON: ${e.message}`));
-      }
-    });
-  });
 }
 
 /**
@@ -1727,9 +1619,8 @@ async function getBestJD() {
 // ── content.js structured logger — writes to console + backend log file ──────
 function lhLog(level, module, msg, data) {
   const fn = level === "ERROR" ? console.error : level === "WARN" ? console.warn : console.log;
-  const detail = data && typeof data === "object" ? data : (data ?? "");
-  fn(`[LH][${level}][${module}] ${msg}`, detail);
-  if (level !== "ERROR" && !isLhActivePage()) return;
+  fn(`[LH][${level}][${module}] ${msg}`, data ?? "");
+  // Fire-and-forget to backend log sink (best-effort)
   try {
     fetch(`${DEFAULT_API_URL}/lh/ext-logs`, {
       method: "POST",
@@ -1882,8 +1773,19 @@ function detectAshbyApplyPage() {
 async function fetchAshbyJDContent(company, jobId) {
   try {
     const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(company)}`;
-    lhLog("INFO", "ashby-api", "Fetching job board", { url, company, jobId });
-    const data = await bgFetchJson(url);
+    lhLog("INFO", "ashby-api", "Fetching job board via background", { url, company, jobId });
+    let data = null;
+    try {
+      data = await bgFetchJson(url);
+    } catch (bgErr) {
+      lhLog("WARN", "ashby-api", "Background fetch failed; trying page fetch", { error: bgErr?.message || String(bgErr) });
+      const r = await fetch(url);
+      if (!r.ok) {
+        lhLog("WARN", "ashby-api", `API returned ${r.status}`, { company, jobId });
+        return null;
+      }
+      data = await r.json();
+    }
     const jobs = data.jobs || data.jobPostings || [];
     const job = jobs.find(j => j.id === jobId || j.jobId === jobId);
     if (!job) {
@@ -1892,13 +1794,13 @@ async function fetchAshbyJDContent(company, jobId) {
     }
     const title = job.title || "";
     const descHtml = job.descriptionHtml || job.description || job.descriptionPlain || "";
-    const bodyText = String(descHtml).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const bodyText = descHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     const jdText = (title ? title + "\n\n" : "") + bodyText;
     const loc = job.locationName || job.location || "";
     lhLog("INFO", "ashby-api", "JD fetched OK", { chars: jdText.length, title });
     return { title, company, location: loc, jdText, sourceAdapter: "ashby-api", confidence: { jd: 0.95 } };
   } catch (e) {
-    lhLog("ERROR", "ashby-api", "Fetch failed", { error: e.message, name: e.name });
+    lhLog("ERROR", "ashby-api", "Fetch failed", { error: e?.message || String(e) });
     return null;
   }
 }
@@ -2291,7 +2193,7 @@ const filledRegistry = []; // { id, label, value, ref (WeakRef to element), plat
 let isCurrentlyFilling = false; // BUG 8: re-entrancy guard
 
 function registerFilled(field, value, platform) {
-  if (!field || !field.element) return null;
+  if (!field || !field.element) return;
   const id = "lh_" + Math.random().toString(36).slice(2, 9);
   filledRegistry.push({
     id,
@@ -2300,9 +2202,7 @@ function registerFilled(field, value, platform) {
     ref: new WeakRef(field.element),
     platform,
     type: field.type,
-    widget: field.widget,
   });
-  return id;
 }
 
 function clearFilledRegistry() {
@@ -2551,7 +2451,7 @@ async function retryCascadingField(fieldKey, value, platform, waitMs = 1200) {
 
 async function fillResumeUpload(userData) {
   // Find file inputs labeled Resume/CV
-  const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
+  const inputs = queryFormDocuments('input[type="file"]', detectPlatform());
   const resumeInput = inputs.find(i => {
     const lbl = (getLabelForInput(i, "") || "").toLowerCase() +
                 " " + (i.name || "").toLowerCase() +
@@ -2675,8 +2575,6 @@ async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
   sendProgress({ status: "thinking", message: `AI (${activeLlm}) generating answers...` });
 
   let answers = {};
-  let unanswered = [];
-  panelState.needsCall = [];   // fresh run — drop stale "your call" items
   try {
     const res = await fetch(`${apiUrl}/autofill`, {
       method: "POST",
@@ -2691,10 +2589,7 @@ async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const resp = await res.json();
-    // New contract: {answers, unanswered}. Tolerate the old flat {label: value} shape.
-    answers = resp.answers || resp;
-    unanswered = Array.isArray(resp.unanswered) ? resp.unanswered : [];
+    answers = await res.json();
   } catch (err) {
     sendProgress({ status: "warning", message: `Backend unreachable. Using profile fallback.` });
     answers = await getLocalAnswers(fieldDescriptors);
@@ -2711,19 +2606,14 @@ async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
       try { field.element.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
       flashElement(field.element);
       await delay(120);
-      const ok = await fillField(platform, field, answer);
+      const ok = fillField(platform, field, answer);
       if (ok) {
         filled++;
-        const regId = registerFilled(field, answer, platform);
+        registerFilled(field, answer, platform);
         sendProgress({ status: "filling", message: `✓ ${field.label}`, filled, total: totalFields });
-        panelAddFilled(field.label, answer, undefined, regId);
+        panelAddFilled(field.label, answer);
       } else skipped++;
-    } else {
-      // No grounded answer (backend said so, backend is down, or local fallback
-      // had nothing) → ask the user instead of silently skipping (rule 2).
-      skipped++;
-      pushNeedsCall(field);
-    }
+    } else skipped++;
   }
 
   // Fill radio groups
@@ -2738,10 +2628,7 @@ async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
         sendProgress({ status: "filling", message: `✓ ${grp.label} (radio)`, filled, total: totalFields });
         panelAddFilled(grp.label, answer);
       } else skipped++;
-    } else {
-      skipped++;
-      if (grp.container) pushNeedsCall({ label: grp.label, name, type: "radio" });
-    }
+    } else skipped++;
   }
 
   // Cascading-dropdown retry (State after Country gets repopulated by AJAX)
@@ -2807,20 +2694,9 @@ async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
     }
   }
 
-  // Anything the backend couldn't ground → ask the user once, then remember it.
-  // (rule 2: never silently invent an answer.) The fill loop above already queued
-  // locally-unanswered fields; pushNeedsCall dedupes by label.
-  for (const u of unanswered) {
-    if (answers[u.label]) continue;   // filled via rules after all
-    pushNeedsCall(u);
-  }
-  const needCount = (panelState.needsCall || []).length;
-  if (needCount) { savePanelState(); renderPanel(); }
-
   sendProgress({
     status: "done",
-    message: `Done! Filled ${filled} of ${totalFields} on ${platformName}`
-      + (needCount ? ` · ${needCount} need your input` : ""),
+    message: `Done! Filled ${filled} of ${totalFields} fields on ${platformName}`,
     filled, skipped, total: totalFields,
   });
 }
@@ -2856,16 +2732,13 @@ const CONTACT_KEYS = new Set([
   "first_name", "last_name", "full_name", "email", "phone", "phone_country",
   "city", "state", "zip", "country", "linkedin", "github", "website", "address_line1",
 ]);
-const autoFilledUrls = new Set(); // guard: approved fill runs once per URL
+const autoFilledUrls = new Set(); // guard: approved fill runs once per detected form step
 
 async function resolveReadyApplication(force = false) {
-  // Cache the match per host so every page of a multi-step flow reuses it.
-  const key = "lh_ready_" + location.host;
-  if (!force && isExtensionAlive()) {
-    const cached = await new Promise(r => {
-      try { chrome.storage.session.get([key], v => { void chrome.runtime.lastError; r(v ? v[key] : undefined); }); }
-      catch (e) { r(undefined); }
-    });
+  const key = "lh_ready_" + location.host + "_" + hashString(location.origin + location.pathname + location.search);
+  const store = isExtensionAlive() ? getSessionStore() : null;
+  if (!force && store) {
+    const cached = await getStoreValue(store, key);
     if (cached !== undefined) return cached; // cached null = "no match here"
   }
   let match = null;
@@ -2873,11 +2746,48 @@ async function resolveReadyApplication(force = false) {
     const { apiUrl } = await getSettings();
     const company = extractCompanyFromPage() || "";
     const qs = new URLSearchParams({ host: location.host, url: location.href, company });
-    const res = await fetch(`${apiUrl}/tracker/match?${qs.toString()}`);
-    if (res.ok) match = (await res.json()).match || null;
-  } catch (e) { match = null; }
-  try { chrome.storage.session.set({ [key]: match }, () => { void chrome.runtime.lastError; }); } catch (e) {}
+    const res = await fetchWithTimeout(`${apiUrl}/tracker/match?${qs.toString()}`, {}, 8000);
+    if (res.ok) {
+      match = (await res.json()).match || null;
+      if (force && !match) panelLog("No queue match for this page.");
+    } else if (force) {
+      panelLog(`Tracker match failed: HTTP ${res.status}`);
+    }
+  } catch (e) {
+    match = null;
+    if (force) panelLog(`Backend offline: ${e?.message || String(e)}`);
+  }
+  setStoreValue(store, key, match);
   return match;
+}
+
+function currentFormSignature(platform = detectPlatform(), fields = null) {
+  try {
+    const formFields = fields || getFormFields(platform);
+    const radios = getRadioGroups(platform);
+    const fieldBits = formFields.slice(0, 80).map(f => [
+      f.type || "",
+      (f.label || "").trim().toLowerCase(),
+      f.name || "",
+      f.element?.id || "",
+      f.options ? f.options.join(",") : "",
+    ].join(":"));
+    const radioBits = Object.values(radios).slice(0, 40).map(g => [
+      "radio",
+      (g.label || "").trim().toLowerCase(),
+      (g.inputs || []).map(i => i.value || i.id || "").join(","),
+    ].join(":"));
+    const descriptor = fieldBits.concat(radioBits).join("|");
+    const page = location.origin + location.pathname + location.search;
+    return `${page}#${hashString(platform + "|" + descriptor)}`;
+  } catch (e) {
+    return location.href;
+  }
+}
+
+function approvedFillGuardKey(item, platform = detectPlatform(), fields = null) {
+  const id = item?.id || "matched";
+  return `${id}:${currentFormSignature(platform, fields)}`;
 }
 
 function pickAnswer(map, field) {
@@ -2937,7 +2847,7 @@ function resolveApprovedAnswer(field, ctx) {
 
 async function fillResumeUploadVersioned(variantId) {
   if (!variantId) return false;
-  const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
+  const inputs = queryFormDocuments('input[type="file"]', detectPlatform());
   const resumeInput = inputs.find(i => {
     const lbl = (getLabelForInput(i, "") || "").toLowerCase() + " " +
                 (i.name || "").toLowerCase() + " " + (i.id || "").toLowerCase();
@@ -2984,9 +2894,7 @@ async function _runApprovedFillInner(item) {
   // Track the active package so pause-and-ask can persist back to it.
   panelState.approvedItem = {
     id: item.id, company: item.company || "", role: item.role || "",
-    variantId: item.resume_variant_id || null,
-    queueMatchId: item.queue_match_id || null,
-    answers: { ...(item.answers || {}) },
+    variantId: item.resume_variant_id || null, answers: { ...(item.answers || {}) },
   };
   panelState.needsCall = [];
   panelState.collapsed = false;
@@ -3012,8 +2920,8 @@ async function _runApprovedFillInner(item) {
   try {
     const { apiUrl } = await getSettings();
     const [lr, pr] = await Promise.all([
-      fetch(`${apiUrl}/autofill/learned?host=${encodeURIComponent(location.host)}`).catch(() => null),
-      fetch(`${apiUrl}/profile`).catch(() => null),
+      fetchWithTimeout(`${apiUrl}/autofill/learned?host=${encodeURIComponent(location.host)}`, {}, 6000).catch(() => null),
+      fetchWithTimeout(`${apiUrl}/profile`, {}, 6000).catch(() => null),
     ]);
     if (lr && lr.ok) learned = await lr.json().catch(() => ({}));
     if (pr && pr.ok) profile = await pr.json().catch(() => null);
@@ -3030,10 +2938,10 @@ async function _runApprovedFillInner(item) {
       try { field.element.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {}
       flashElement(field.element);
       await delay(90);
-      if (await fillField(platform, field, value)) {
+      if (fillField(platform, field, value)) {
         counts[source] = (counts[source] || 0) + 1;
-        const regId = registerFilled(field, value, platform);
-        panelAddFilled(field.label, value, source, regId);
+        registerFilled(field, value, platform);
+        panelAddFilled(field.label, value, source);
         sendProgress({ status: "filling", message: `✓ ${field.label} (${source})` });
         continue;
       }
@@ -3073,43 +2981,22 @@ async function _runApprovedFillInner(item) {
   if (counts.unanswered > 0) panelLog(`⏸ ${counts.unanswered} field(s) need your call — see "Needs your call" below.`);
 }
 
-// Auto-fill from an approved package on load / each SPA step, once per URL.
+// Auto-fill from an approved package on load / each SPA step, once per form step.
 async function maybeApprovedAutoFill() {
   if (window.top !== window) return;
   if (!isLhActivePage()) return;
   if (isCurrentlyFilling) return;
-  if (autoFilledUrls.has(location.href)) return;
   const item = await resolveReadyApplication();
   if (!item) return;
-  if (getFormFields(detectPlatform()).length === 0) return;
-  autoFilledUrls.add(location.href);
-  panelLog(`↻ Customized package matched — auto-filling ${item.company || "this application"}…`);
+  const platform = detectPlatform();
+  const fields = getFormFields(platform);
+  const radioGroups = getRadioGroups(platform);
+  if (fields.length === 0 && Object.keys(radioGroups).length === 0) return;
+  const key = approvedFillGuardKey(item, platform, fields);
+  if (autoFilledUrls.has(key)) return;
+  autoFilledUrls.add(key);
+  panelLog(`↻ Approved item matched — auto-filling ${item.company || "this application"}…`);
   runApprovedFill(item).catch(e => panelLog("Approved auto-fill error: " + e.message));
-}
-
-async function markQueueItemAppliedFromExtension(queueMatchId) {
-  if (!queueMatchId) return false;
-  try {
-    const { apiUrl } = await getSettings();
-    const res = await fetch(`${apiUrl}/queue/${queueMatchId}/mark-applied`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: location.href, platform: detectPlatform() }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      panelLog("Mark applied failed: " + err.slice(0, 120));
-      return false;
-    }
-    panelLog("✓ Marked as applied in dashboard");
-    panelState.approvedItem = null;
-    savePanelState();
-    renderPanel();
-    return true;
-  } catch (e) {
-    panelLog("Mark applied error: " + e.message);
-    return false;
-  }
 }
 
 // ─────────────────────────────────────────────
@@ -3138,7 +3025,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.action === "start_approved_fill") {
     resolveReadyApplication(true).then(item => {
-      if (item) { autoFilledUrls.add(location.href); runApprovedFill(item); }
+      if (item) { autoFilledUrls.add(approvedFillGuardKey(item)); runApprovedFill(item); }
       else sendProgress({ status: "warning", message: "No ready-to-apply item matches this page." });
     });
     sendResponse({ started: true });
@@ -3209,7 +3096,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ═════════════════════════════════════════════════════════════════
 // IN-PAGE FLOATING PANEL — visible fill, edit, cover letter, Q&A
 // Injected into every page (top frame only). Persists across navigation
-// via chrome.storage.session keyed by tab origin.
+// via extension storage keyed by tab origin.
 // ═════════════════════════════════════════════════════════════════
 function flashElement(el) {
   if (!el) return;
@@ -3222,8 +3109,7 @@ function flashElement(el) {
 }
 
 const PANEL_ID = "localhire-floating-panel";
-let panelEl = null;      // content wrapper INSIDE the shadow root
-let panelRoot = null;    // the ShadowRoot itself
+let panelEl = null;
 let panelState = {
   collapsed: true, filled: [], log: [], cover: "", qa: [],
   approvedItem: null,       // active ready_to_apply package driving the fill
@@ -3239,26 +3125,17 @@ function panelKey() { return "lh_panel_" + location.host; }
 
 async function loadPanelState() {
   if (!isExtensionAlive()) return;
-  return new Promise(resolve => {
-    try {
-      chrome.storage.session.get([panelKey()], r => {
-        if (chrome.runtime.lastError) { resolve(); return; }
-        const s = r && r[panelKey()];
-        if (s) panelState = { ...panelState, ...s };
-        resolve();
-      });
-    } catch (e) { resolve(); }
-  });
+  const s = await getStoreValue(getSessionStore(), panelKey());
+  if (s) panelState = { ...panelState, ...s };
 }
 
 function savePanelState() {
   if (!isExtensionAlive()) return;
-  try { chrome.storage.session.set({ [panelKey()]: panelState }, () => { void chrome.runtime.lastError; }); }
-  catch (e) {}
+  setStoreValue(getSessionStore(), panelKey(), panelState);
 }
 
-function panelAddFilled(label, value, source, regId) {
-  panelState.filled.push({ label, value: String(value), source: source || "auto", regId: regId || null, ts: Date.now() });
+function panelAddFilled(label, value, source) {
+  panelState.filled.push({ label, value: String(value), source: source || "auto", ts: Date.now() });
   savePanelState();
   renderPanel();
 }
@@ -3270,84 +3147,101 @@ function panelLog(msg) {
   renderPanel();
 }
 
+async function markApprovedItemApplied() {
+  const item = panelState.approvedItem;
+  if (!item?.id) {
+    panelLog("No approved queue item is active on this page.");
+    return;
+  }
+  try {
+    const { apiUrl } = await getSettings();
+    const res = await fetchWithTimeout(`${apiUrl}/queue/${encodeURIComponent(item.id)}/mark-applied`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }, 15000);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    panelState.appliedAt = new Date().toISOString();
+    savePanelState();
+    panelLog("Marked as applied in tracker.");
+  } catch (e) {
+    panelLog("Mark as applied failed: " + (e?.message || String(e)));
+  }
+}
+
 function injectPanelStyles() {
-  if (!panelRoot || panelRoot.querySelector("#lh-panel-styles")) return;
+  if (document.getElementById("lh-panel-styles")) return;
   const s = document.createElement("style");
   s.id = "lh-panel-styles";
-  // Styles live INSIDE the shadow root, so selectors are unscoped (.lh-*), and the
-  // host-site's global CSS cannot reach them. ':host { all: initial }' also blocks the
-  // one channel Shadow DOM leaves open — inherited font/color/line-height — which is
-  // what made the panel look cramped on real sites.
   s.textContent = `
-  :host { all: initial; position: fixed; right: 16px; bottom: 16px; z-index: 2147483646;
+  #${PANEL_ID} { position: fixed; right: 16px; bottom: 16px; z-index: 2147483646;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 13px; line-height: 1.4; color: #1f2937; }
-  :host, :host * { box-sizing: border-box; }
-  .lh-pill { width: 52px; height: 52px; border-radius: 50%;
+    color: #1f2937; }
+  #${PANEL_ID} .lh-pill { width: 52px; height: 52px; border-radius: 50%;
     background: linear-gradient(135deg, #F97316, #EA580C); color: white;
     display: flex; align-items: center; justify-content: center; cursor: pointer;
     box-shadow: 0 8px 24px rgba(249,115,22,0.4); font-size: 22px; font-weight: bold;
     user-select: none; transition: transform 0.15s; }
-  .lh-pill:hover { transform: scale(1.08); }
-  .lh-card { width: 380px; max-height: 600px; background: white;
+  #${PANEL_ID} .lh-pill:hover { transform: scale(1.08); }
+  #${PANEL_ID} .lh-card { width: 380px; max-height: 600px; background: white;
     border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.18);
     display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e5e7eb; }
-  .lh-head { padding: 12px 14px; background: linear-gradient(135deg, #F97316, #EA580C);
+  #${PANEL_ID} .lh-head { padding: 12px 14px; background: linear-gradient(135deg, #F97316, #EA580C);
     color: white; display: flex; align-items: center; justify-content: space-between; }
-  .lh-head .lh-title { font-weight: 600; font-size: 14px; }
-  .lh-head .lh-sub { font-size: 11px; opacity: 0.9; }
-  .lh-x { cursor: pointer; font-size: 20px; line-height: 1; padding: 0 4px; }
-  .lh-tabs { display: flex; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
-  .lh-tab { flex: 1; padding: 8px; font-size: 12px; cursor: pointer;
+  #${PANEL_ID} .lh-head .lh-title { font-weight: 600; font-size: 14px; }
+  #${PANEL_ID} .lh-head .lh-sub { font-size: 11px; opacity: 0.9; }
+  #${PANEL_ID} .lh-x { cursor: pointer; font-size: 20px; line-height: 1; padding: 0 4px; }
+  #${PANEL_ID} .lh-tabs { display: flex; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+  #${PANEL_ID} .lh-tab { flex: 1; padding: 8px; font-size: 12px; cursor: pointer;
     text-align: center; color: #6b7280; font-weight: 500; }
-  .lh-tab.active { color: #EA580C; border-bottom: 2px solid #EA580C; background: white; }
-  .lh-body { padding: 12px; overflow-y: auto; flex: 1; font-size: 13px; }
-  .lh-btn { background: #F97316; color: white; border: 0; padding: 8px 12px;
+  #${PANEL_ID} .lh-tab.active { color: #EA580C; border-bottom: 2px solid #EA580C; background: white; }
+  #${PANEL_ID} .lh-body { padding: 12px; overflow-y: auto; flex: 1; font-size: 13px; }
+  #${PANEL_ID} .lh-btn { background: #F97316; color: white; border: 0; padding: 8px 12px;
     border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; }
-  .lh-btn:hover { background: #EA580C; }
-  .lh-btn.lh-sec { background: #f3f4f6; color: #1f2937; }
-  .lh-btn.lh-sec:hover { background: #e5e7eb; }
-  .lh-row { display: flex; gap: 6px; margin-bottom: 8px; }
-  .lh-fill-item { padding: 8px; background: #f9fafb; border-radius: 6px;
+  #${PANEL_ID} .lh-btn:hover { background: #EA580C; }
+  #${PANEL_ID} .lh-btn.lh-sec { background: #f3f4f6; color: #1f2937; }
+  #${PANEL_ID} .lh-btn.lh-sec:hover { background: #e5e7eb; }
+  #${PANEL_ID} .lh-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  #${PANEL_ID} .lh-fill-item { padding: 8px; background: #f9fafb; border-radius: 6px;
     margin-bottom: 6px; border: 1px solid #e5e7eb; }
-  .lh-fill-label { font-size: 11px; color: #6b7280; margin-bottom: 4px; font-weight: 600; }
-  .lh-fill-input { width: 100%; padding: 6px; border: 1px solid #d1d5db;
+  #${PANEL_ID} .lh-fill-label { font-size: 11px; color: #6b7280; margin-bottom: 4px; font-weight: 600; }
+  #${PANEL_ID} .lh-fill-input { width: 100%; padding: 6px; border: 1px solid #d1d5db;
     border-radius: 4px; font-size: 12px; box-sizing: border-box; font-family: inherit; }
-  .lh-fill-actions { display: flex; gap: 4px; margin-top: 4px; }
-  .lh-mini { padding: 4px 8px; font-size: 11px; border: 0; border-radius: 4px;
+  #${PANEL_ID} .lh-fill-actions { display: flex; gap: 4px; margin-top: 4px; }
+  #${PANEL_ID} .lh-mini { padding: 4px 8px; font-size: 11px; border: 0; border-radius: 4px;
     cursor: pointer; font-weight: 600; }
-  .lh-mini.upd { background: #10b981; color: white; }
-  .lh-mini.del { background: #ef4444; color: white; }
-  .lh-log { font-size: 11px; color: #6b7280; max-height: 80px; overflow-y: auto;
+  #${PANEL_ID} .lh-mini.upd { background: #10b981; color: white; }
+  #${PANEL_ID} .lh-mini.del { background: #ef4444; color: white; }
+  #${PANEL_ID} .lh-log { font-size: 11px; color: #6b7280; max-height: 80px; overflow-y: auto;
     padding: 6px; background: #f9fafb; border-radius: 6px; margin-top: 8px; }
-  textarea.lh-area { width: 100%; min-height: 100px; padding: 8px;
+  #${PANEL_ID} textarea.lh-area { width: 100%; min-height: 100px; padding: 8px;
     border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; box-sizing: border-box;
     font-family: inherit; resize: vertical; }
-  .lh-out { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
+  #${PANEL_ID} .lh-out { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
     padding: 10px; font-size: 12px; white-space: pre-wrap; max-height: 280px; overflow-y: auto;
     margin-top: 8px; line-height: 1.5; }
-  .lh-input { width: 100%; padding: 8px; border: 1px solid #d1d5db;
+  #${PANEL_ID} .lh-input { width: 100%; padding: 8px; border: 1px solid #d1d5db;
     border-radius: 6px; font-size: 12px; box-sizing: border-box; font-family: inherit; }
-  .lh-status { font-size: 11px; color: #6b7280; margin-bottom: 8px; }
-  .lh-spinner { display: inline-block; width: 16px; height: 16px;
+  #${PANEL_ID} .lh-status { font-size: 11px; color: #6b7280; margin-bottom: 8px; }
+  #${PANEL_ID} .lh-spinner { display: inline-block; width: 16px; height: 16px;
     border: 2px solid #e5e7eb; border-top-color: #F97316; border-radius: 50%;
     animation: lh-spin 0.7s linear infinite; margin-right: 8px; vertical-align: middle; }
   @keyframes lh-spin { to { transform: rotate(360deg); } }
-  .lh-approved { padding: 8px 10px; margin-bottom: 8px; border-radius: 8px;
+  #${PANEL_ID} .lh-approved { padding: 8px 10px; margin-bottom: 8px; border-radius: 8px;
     background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 12px; }
-  .lh-approved-sub { font-size: 10px; opacity: 0.8; margin-top: 2px;
+  #${PANEL_ID} .lh-approved-sub { font-size: 10px; opacity: 0.8; margin-top: 2px;
     word-break: break-all; }
-  .lh-needs { margin-top: 10px; padding: 8px; border-radius: 8px;
+  #${PANEL_ID} .lh-needs { margin-top: 10px; padding: 8px; border-radius: 8px;
     background: #fffbeb; border: 1px solid #fde68a; }
-  .lh-needs-h { font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 6px; }
-  .lh-src { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px;
+  #${PANEL_ID} .lh-needs-h { font-size: 12px; font-weight: 600; color: #92400e; margin-bottom: 6px; }
+  #${PANEL_ID} .lh-src { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 6px;
     vertical-align: middle; }
-  .lh-src-approved { background: #d1fae5; color: #065f46; }
-  .lh-src-learned  { background: #dbeafe; color: #1e40af; }
-  .lh-src-profile  { background: #f3e8ff; color: #6b21a8; }
-  .lh-src-asked    { background: #fef3c7; color: #92400e; }
+  #${PANEL_ID} .lh-src-approved { background: #d1fae5; color: #065f46; }
+  #${PANEL_ID} .lh-src-learned  { background: #dbeafe; color: #1e40af; }
+  #${PANEL_ID} .lh-src-profile  { background: #f3e8ff; color: #6b21a8; }
+  #${PANEL_ID} .lh-src-asked    { background: #fef3c7; color: #92400e; }
   `;
-  panelRoot.appendChild(s);
+  (document.head || document.documentElement).appendChild(s);
 }
 
 function renderPanel() {
@@ -3407,7 +3301,7 @@ function renderFillTab() {
       <div class="lh-fill-label">${escapeHtml(f.label)} ${SOURCE_BADGE[f.source] || ""}</div>
       <textarea class="lh-fill-input" data-idx="${i}" rows="${f.value.length>60?3:1}">${escapeHtml(f.value)}</textarea>
       <div class="lh-fill-actions">
-        <button class="lh-mini upd" data-upd="${i}" data-reg="${escapeHtml(f.regId||'')}">Update on page</button>
+        <button class="lh-mini upd" data-upd="${i}">Update on page</button>
         <button class="lh-mini del" data-del="${i}">Remove</button>
       </div>
     </div>`).join("") || `<div class="lh-status">No fields filled yet. Click "Fill This Form" to start.</div>`;
@@ -3418,13 +3312,12 @@ function renderFillTab() {
   const nc = panelState.needsCall || [];
   const banner = ai && ai.id ? `
     <div class="lh-approved">
-      📦 Customized package: <b>${escapeHtml(ai.company || "")}</b>${ai.role ? " — " + escapeHtml(ai.role) : ""}
+      📦 Approved package: <b>${escapeHtml(ai.company || "")}</b>${ai.role ? " — " + escapeHtml(ai.role) : ""}
       ${ai.variantId ? `<div class="lh-approved-sub">resume: ${escapeHtml(ai.variantId)}</div>` : ""}
     </div>` : "";
-
-  const markAppliedBtn = ai && ai.queueMatchId ? `
-    <button class="lh-btn" id="lh-mark-applied" style="margin-top:6px;background:#166534;color:#fff;border-color:#166534">
-      ✓ Mark as applied (submitted)
+  const markApplied = ai && ai.id ? `
+    <button class="lh-btn lh-sec" id="lh-mark-applied" style="margin-top:6px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0">
+      ${panelState.appliedAt ? "Marked Applied ✓" : "Mark as Applied"}
     </button>` : "";
 
   const by = panelState.filled.reduce((m, f) => { const s = f.source || "auto"; m[s] = (m[s] || 0) + 1; return m; }, {});
@@ -3454,7 +3347,7 @@ function renderFillTab() {
       <button class="lh-btn lh-sec" id="lh-clear" style="flex:0 0 90px">Clear</button>
     </div>
     <button class="lh-btn lh-sec" id="lh-next" style="margin-top:6px">Next Page →</button>
-    ${markAppliedBtn}
+    ${markApplied}
     <button class="lh-btn lh-sec" id="lh-customize" style="margin-top:6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">✨ Customize Resume on Web</button>
     ${tracker}
     ${summary}
@@ -3759,7 +3652,7 @@ function bindBodyHandlers(tab) {
     panelEl.querySelector("#lh-fill").onclick = async () => {
       const item = await resolveReadyApplication(true);
       if (item && item.id) {
-        autoFilledUrls.add(location.href);
+        autoFilledUrls.add(approvedFillGuardKey(item));
         panelLog("Starting approved fill…");
         runApprovedFill(item).catch(e => panelLog("Error: " + e.message));
         return;
@@ -3781,12 +3674,9 @@ function bindBodyHandlers(tab) {
     const markBtn = panelEl.querySelector("#lh-mark-applied");
     if (markBtn) {
       markBtn.onclick = async () => {
-        const qid = panelState.approvedItem?.queueMatchId;
-        if (!qid) { panelLog("No queue item linked."); return; }
-        if (!confirm("Mark this application as submitted? It will appear in Applications.")) return;
         markBtn.disabled = true;
-        await markQueueItemAppliedFromExtension(qid);
-        markBtn.disabled = false;
+        await markApprovedItemApplied();
+        renderPanel();
       };
     }
     const customizeBtn = panelEl.querySelector("#lh-customize");
@@ -3901,15 +3791,12 @@ function bindBodyHandlers(tab) {
         const label = panelState.filled[i].label;
         panelState.filled[i].value = newVal;
         savePanelState();
-        // Re-apply on page — address the EXACT element by its registry id, not by
-        // label (two fields can share a label), and route through fillField so
-        // custom comboboxes (veteran/EEO) update too.
-        const regId = b.dataset.reg || panelState.filled[i].regId;
-        const reg = (regId && filledRegistry.find(r => r.id === regId))
-          || filledRegistry.find(r => r.label === label);
+        // Re-apply on page
+        const reg = filledRegistry.find(r => r.label === label);
         const el = reg?.ref?.deref();
         if (el) {
-          await fillField(detectPlatform(), { element: el, label, type: reg?.type, widget: reg?.widget }, newVal, { force: true });
+          if (el.tagName === "SELECT") setSelectValue(el, newVal);
+          else setNativeValue(el, newVal);
           flashElement(el);
           panelLog("✓ Updated: " + label);
         } else {
@@ -3944,14 +3831,13 @@ function bindBodyHandlers(tab) {
         const platform = detectPlatform();
         const target = getFormFields(platform).find(
           f => (f.label || "") === need.label || (need.name && f.name === need.name));
-        let savedRegId = null;
         if (target) {
-          if (await fillField(platform, target, val, { force: true })) { flashElement(target.element); savedRegId = registerFilled(target, val, platform); }
+          if (fillField(platform, target, val)) { flashElement(target.element); registerFilled(target, val, platform); }
         } else {
           const grp = Object.values(getRadioGroups(platform)).find(g => g.label === need.label);
           if (grp && grp.container) setRadioGroup(grp.container, val);
         }
-        panelAddFilled(need.label, val, "asked", savedRegId);
+        panelAddFilled(need.label, val, "asked");
         try {
           const { apiUrl } = await getSettings();
           const ai = panelState.approvedItem;
@@ -4033,27 +3919,16 @@ function bindBodyHandlers(tab) {
 
 async function injectPanel() {
   if (window.top !== window) return; // top frame only
+  if (!isLhActivePage()) return;
   if (document.getElementById(PANEL_ID)) return;
   if (!document.body) {
     setTimeout(injectPanel, 500); return;
   }
   await loadPanelState();
-  // Host lives in the light DOM (keeps the id for the early-return guard); the panel
-  // itself lives in a shadow root so the host site's global CSS can't leak in and
-  // cram the layout.
-  const host = document.createElement("div");
-  host.id = PANEL_ID;
-  // Inline !important on the host itself: the shadow boundary isolates the panel's
-  // internals, but outer '* { … !important }' rules can still hit the light-DOM host
-  // and shove it around. Inline important beats selector important, so pin it.
-  [["position","fixed"],["right","16px"],["bottom","16px"],["top","auto"],["left","auto"],
-   ["margin","0"],["padding","0"],["width","auto"],["height","auto"],["z-index","2147483646"]]
-    .forEach(([k,v]) => host.style.setProperty(k, v, "important"));
-  panelRoot = host.attachShadow({ mode: "open" });
-  document.body.appendChild(host);
   injectPanelStyles();
   panelEl = document.createElement("div");
-  panelRoot.appendChild(panelEl);
+  panelEl.id = PANEL_ID;
+  document.body.appendChild(panelEl);
   renderPanel();
 }
 
@@ -4090,10 +3965,12 @@ if (document.readyState === "loading") {
 // ─────────────────────────────────────────────
 (function installSpaRetrigger() {
   if (window.top !== window) return;        // top frame only
+  if (!isLhActivePage()) return;
   if (window.__lhSpaInstalled) return;
   window.__lhSpaInstalled = true;
 
   let lastUrl = location.href;
+  let lastSignature = currentFormSignature(detectPlatform());
 
   function wrapHistoryMethod(method) {
     const original = history[method];
@@ -4112,8 +3989,10 @@ if (document.readyState === "loading") {
     clearTimeout(mutationTimer);
     mutationTimer = setTimeout(() => {
       const currentUrl = location.href;
-      if (currentUrl !== lastUrl) {
+      const currentSignature = currentFormSignature(detectPlatform());
+      if (currentUrl !== lastUrl || currentSignature !== lastSignature) {
         lastUrl = currentUrl;
+        lastSignature = currentSignature;
         window.dispatchEvent(new Event("lh-urlchange"));
       }
     }, 500);
@@ -4122,16 +4001,21 @@ if (document.readyState === "loading") {
 
   window.addEventListener("lh-urlchange", async () => {
     try {
-      if (!isLhActivePage()) return;
       if (isCurrentlyFilling) return; // BUG 8: don't retrigger mid-fill
       await delay(1500);
       if (isCurrentlyFilling) return; // re-check after delay
+      lastUrl = location.href;
+      lastSignature = currentFormSignature(detectPlatform());
 
-      // Customized-package fill takes priority on every step (ATS pages only).
+      // Approved-package fill takes priority on every step (user wants it on every page).
       const item = await resolveReadyApplication();
       if (item) {
-        if (getFormFields(detectPlatform()).length && !autoFilledUrls.has(location.href)) {
-          autoFilledUrls.add(location.href);
+        const platform = detectPlatform();
+        const fields = getFormFields(platform);
+        const radioGroups = getRadioGroups(platform);
+        const key = approvedFillGuardKey(item, platform, fields);
+        if ((fields.length || Object.keys(radioGroups).length) && !autoFilledUrls.has(key)) {
+          autoFilledUrls.add(key);
           panelLog("↻ New step — filling from approved package…");
           runApprovedFill(item).catch(e => panelLog("Approved fill error: " + e.message));
         }

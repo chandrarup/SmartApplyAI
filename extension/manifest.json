@@ -18,9 +18,8 @@
   "host_permissions": [
     "http://localhost:5001/*",
     "http://127.0.0.1:5001/*",
-    "*://api.ashbyhq.com/*",
-    "*://boards-api.greenhouse.io/*",
-    "*://api.lever.co/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
     "*://*.myworkdayjobs.com/*",
     "*://*.wd1.myworkdayjobs.com/*",
     "*://*.wd3.myworkdayjobs.com/*",
@@ -43,11 +42,16 @@
     "*://*.paycom.com/*",
     "*://*.workable.com/*",
     "*://*.recruitee.com/*",
-    "*://*.greenhouse.io/*"
+    "*://*.greenhouse.io/*",
+    "*://api.ashbyhq.com/*",
+    "*://boards-api.greenhouse.io/*",
+    "*://api.lever.co/*"
   ],
   "content_scripts": [
     {
       "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
         "*://*.myworkdayjobs.com/*",
         "*://*.wd1.myworkdayjobs.com/*",
         "*://*.wd3.myworkdayjobs.com/*",
@@ -57,8 +61,9 @@
         "*://*.greenhouse.io/*",
         "*://jobs.lever.co/*",
         "*://*.lever.co/*",
-        "*://*.bamboohr.com/*",
+        "*://*.ashbyhq.com/*",
         "*://*.icims.com/*",
+        "*://*.bamboohr.com/*",
         "*://careers.smartrecruiters.com/*",
         "*://*.smartrecruiters.com/*",
         "*://www.linkedin.com/*",
@@ -66,21 +71,26 @@
         "*://*.successfactors.com/*",
         "*://*.jobvite.com/*",
         "*://*.paylocity.com/*",
-        "*://*.ashbyhq.com/*",
         "*://*.rippling.com/*",
         "*://*.paycom.com/*",
         "*://*.workable.com/*",
         "*://*.recruitee.com/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["injected.js"],
+      "resources": [
+        "injected.js"
+      ],
       "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
         "*://*.myworkdayjobs.com/*",
         "*://*.wd1.myworkdayjobs.com/*",
         "*://*.wd3.myworkdayjobs.com/*",
@@ -90,8 +100,9 @@
         "*://*.greenhouse.io/*",
         "*://jobs.lever.co/*",
         "*://*.lever.co/*",
-        "*://*.bamboohr.com/*",
+        "*://*.ashbyhq.com/*",
         "*://*.icims.com/*",
+        "*://*.bamboohr.com/*",
         "*://careers.smartrecruiters.com/*",
         "*://*.smartrecruiters.com/*",
         "*://www.linkedin.com/*",
@@ -99,7 +110,6 @@
         "*://*.successfactors.com/*",
         "*://*.jobvite.com/*",
         "*://*.paylocity.com/*",
-        "*://*.ashbyhq.com/*",
         "*://*.rippling.com/*",
         "*://*.paycom.com/*",
         "*://*.workable.com/*",
