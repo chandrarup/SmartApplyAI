@@ -92,3 +92,4 @@ backend/tracker/tracker.db
 
 # LLM provider config (holds API keys — never commit)
 backend/llm_config.json
+backend/matcher/features.db

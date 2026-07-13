@@ -1555,6 +1555,33 @@ def jobs_stats():
     return jobs_store_stats()
 
 
+@app.get("/jobs/latest")
+def jobs_latest(hours: int = 72, days: int | None = None, q: str | None = None,
+                company: str | None = None, limit: int = 100):
+    """Freshest active jobs (sourcing-v3 §5.3). q and company are comma-separated."""
+    try:
+        from backend.scraper.store import latest_jobs
+    except ImportError:
+        from scraper.store import latest_jobs  # type: ignore
+    keywords = [k.strip() for k in q.split(",") if k.strip()] if q else None
+    companies = [c.strip() for c in company.split(",") if c.strip()] if company else None
+    rows = latest_jobs(
+        hours_first_seen=hours, days_posted=days,
+        keywords=keywords, companies=companies, limit=min(int(limit), 500),
+    )
+    return {"count": len(rows), "jobs": rows}
+
+
+@app.get("/jobs/runs")
+def jobs_runs(limit: int = 10):
+    """Recent scraper run history with per-provider coverage + anomalies."""
+    try:
+        from backend.scraper.store import recent_runs
+    except ImportError:
+        from scraper.store import recent_runs  # type: ignore
+    return {"runs": recent_runs(limit=min(int(limit), 50))}
+
+
 @app.put("/profile/contact")
 def update_contact(request: Request, payload: dict):
     pid = get_pid(request)

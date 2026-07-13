@@ -17,3 +17,17 @@ search_alignment_boost: 5
 search_bypass_internship: true
 enable_legitimacy_web: true
 
+# hybrid deterministic ranking (Phase-2 §3.5)
+# When true: prefilter -> job features (FTS5 + embeddings) -> candidate features
+# -> 5-component hybrid score over ALL survivors -> top_fit into the unchanged
+# LLM fit + 70/85 gate. Set false to fall back to the legacy recall+rerank path.
+use_hybrid_ranking: true
+features_db_path: backend/matcher/features.db
+scoring_version: v1
+hybrid_weights:
+  skills: 0.40
+  bm25: 0.20
+  embedding: 0.20
+  domain: 0.10
+  level: 0.10
+

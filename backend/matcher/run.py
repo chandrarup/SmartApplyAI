@@ -13,31 +13,17 @@ from .recall import recall_candidates
 from .rerank import rerank_candidates
 from .store import gate_and_store
 
+# role_mode -> hybrid candidate target level.
+_ROLE_TO_LEVEL = {"internship": "intern", "fulltime": "entry", "both": "intern"}
+
 
 def _resolve(root: Path, maybe_relative: str) -> Path:
     path = Path(maybe_relative)
     return path if path.is_absolute() else (root / path)
 
 
-def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
-    """Full recall → rerank → fit → gate run. Callable from CLI, nightly, or the API."""
-    cfg = load_config(config or None)
-    root = Path(__file__).resolve().parents[2]
-
-    jobs_db = _resolve(root, cfg.jobs_db_path)
-    filters_path = _resolve(root, cfg.filters_path)
-    matches_db = _resolve(root, cfg.matches_db_path)
-
-    survivors = prefilter_jobs(
-        jobs_db_path=jobs_db,
-        role_mode=cfg.role_mode,
-        filters_path=filters_path,
-        search_bypass_internship=cfg.search_bypass_internship,
-    )
-    if not survivors:
-        print("[done] no survivors after prefilter")
-        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "prefilter"}
-
+def _legacy_rank(profile_id: str, survivors: list[dict], cfg) -> list[dict]:
+    """Stage-1 semantic recall + stage-2 cross-encoder rerank (pre-hybrid path)."""
     recalled = recall_candidates(
         profile_id=profile_id,
         jobs=survivors,
@@ -45,9 +31,7 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
         evidence_k=cfg.recall_evidence_k,
     )
     if not recalled:
-        print("[done] no candidates after stage1 recall")
-        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "recall"}
-
+        return []
     reranked = rerank_candidates(
         profile_id=profile_id,
         recalled=recalled,
@@ -60,6 +44,103 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
             f"  {idx:02d}. s2={item['stage2_score']:.4f} s1={item['stage1_score']:.4f} | "
             f"{job.get('title', '')} @ {job.get('company', '')}"
         )
+    return reranked
+
+
+def _hybrid_rank(profile_id: str, survivors: list[dict], cfg, features_db: Path) -> list[dict]:
+    """Deterministic hybrid ranking over ALL survivors (Phase-2 §3.5).
+
+    Builds/refreshes job features (incremental), builds the cached candidate
+    features, scores every survivor, and returns reranked-shaped items so the
+    downstream LLM fit + gate stages are unchanged. Raises on any hard failure
+    so the caller can fall back to the legacy path (rule 7)."""
+    from .candidate_features import build_candidate_features
+    from .features import ensure_job_features
+    from .hybrid import score_jobs_hybrid
+    from .ontology import load_ontology
+
+    ontology = load_ontology()
+    stats = ensure_job_features(survivors, features_db, ontology=ontology)
+    print(f"[hybrid] features built={stats['built']} reused={stats['reused']} failed={stats['failed']}")
+
+    candidate = build_candidate_features(
+        profile_id,
+        ontology=ontology,
+        target_level=_ROLE_TO_LEVEL.get(cfg.role_mode, "intern"),
+        db_path=features_db,
+    )
+    scored = score_jobs_hybrid(
+        candidate, survivors, features_db, weights=cfg.hybrid_weights, ontology=ontology,
+    )
+    if not scored:
+        return []
+
+    print("[hybrid] top 10 by hybrid_total:")
+    for idx, s in enumerate(scored[:10], start=1):
+        job = s["job"]
+        c = s["components"]
+        print(
+            f"  {idx:02d}. total={s['hybrid_total']:.1f} "
+            f"[sk={c['skills']:.0f} bm={c['bm25']:.0f} emb={c['embedding']:.0f} "
+            f"dom={c['domain']:.0f} lvl={c['level']:.0f}] | "
+            f"{job.get('title', '')} @ {job.get('company', '')}"
+        )
+
+    reranked: list[dict] = []
+    for s in scored:
+        reranked.append(
+            {
+                "job": s["job"],
+                # schema compatibility with the legacy path / matches columns
+                "stage1_score": float(s["components"]["embedding"]) / 100.0,
+                "stage2_score": float(s["hybrid_total"]) / 100.0,
+                "hybrid": {
+                    "total": s["hybrid_total"],
+                    "components": s["components"],
+                    "explanation": s["explanation"],
+                    "scoring_version": s["scoring_version"],
+                },
+            }
+        )
+    return reranked
+
+
+def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
+    """Full recall → rerank → fit → gate run. Callable from CLI, nightly, or the API."""
+    cfg = load_config(config or None)
+    root = Path(__file__).resolve().parents[2]
+
+    jobs_db = _resolve(root, cfg.jobs_db_path)
+    filters_path = _resolve(root, cfg.filters_path)
+    matches_db = _resolve(root, cfg.matches_db_path)
+    features_db = _resolve(root, cfg.features_db_path)
+
+    survivors = prefilter_jobs(
+        jobs_db_path=jobs_db,
+        role_mode=cfg.role_mode,
+        filters_path=filters_path,
+        search_bypass_internship=cfg.search_bypass_internship,
+    )
+    if not survivors:
+        print("[done] no survivors after prefilter")
+        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "prefilter"}
+
+    ranking = "legacy"
+    reranked: list[dict] = []
+    if cfg.use_hybrid_ranking:
+        try:
+            reranked = _hybrid_rank(profile_id, survivors, cfg, features_db)
+            ranking = "hybrid"
+        except Exception as exc:  # noqa: BLE001 — degrade to legacy, never kill the run
+            print(f"[hybrid] failed: {type(exc).__name__}: {exc} — falling back to legacy recall/rerank")
+            reranked = []
+    if not reranked:
+        reranked = _legacy_rank(profile_id, survivors, cfg)
+        ranking = "legacy" if ranking != "hybrid" else "hybrid_empty→legacy"
+    if not reranked:
+        print("[done] no candidates after ranking")
+        return {"stored": 0, "strong": 0, "stretch": 0, "stage": "rank"}
+    print(f"[rank] using {ranking}; candidates={len(reranked)}")
 
     # Per-job search boost from matched_searches (config default, capped in scorer).
     try:
@@ -100,11 +181,14 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
     if fitted:
         print("[stage3] sample fit object:")
         print(json.dumps(fitted[0].get("fit", {}), indent=2, ensure_ascii=False))
-        # Persist matched_searches onto fit for My Searches view
+        # Persist matched_searches + hybrid components onto fit (dashboard +
+        # calibration read them back out of fit_json).
         for item in fitted:
             tags = (item.get("job") or {}).get("matched_searches") or []
             fit = item.setdefault("fit", {})
             fit["matched_searches"] = tags
+            if item.get("hybrid"):
+                fit["hybrid"] = item["hybrid"]
         stored = gate_and_store(
             matches_db_path=matches_db,
             profile_id=profile_id,

@@ -1,0 +1,926 @@
+# Phase-2 curated skills ontology (contract §3.1). ~150 skills, ESCO-style.
+# Every parents:/related: id MUST exist as an id below (test enforces this).
+# synonyms are matched case-insensitively as \b-bounded literals (see ontology.py).
+# Folds backend/scoring.py EQUIVALENCES (ml/dl, llm/rag/fine-tuning, aws/azure,
+# vector dbs, ml pipelines) into synonyms + related links.
+version: 1
+skills:
+  # ── AI / ML core ──────────────────────────────────────────────────
+  - id: "skill:ai"
+    name: "Artificial Intelligence"
+    synonyms: ["artificial intelligence", "ai"]
+    related: ["skill:machine-learning", "skill:deep-learning"]
+    weight: 0.8
+  - id: "skill:machine-learning"
+    name: "Machine Learning"
+    synonyms: ["machine learning", "ml", "machine-learning", "predictive analytics", "predictive modeling"]
+    parents: ["skill:ai"]
+    related: ["skill:deep-learning", "skill:classical-ml", "skill:data-science", "skill:research"]
+    weight: 1.2
+  - id: "skill:deep-learning"
+    name: "Deep Learning"
+    synonyms: ["deep learning", "deep-learning", "dl", "neural network", "neural networks", "neural nets"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:pytorch", "skill:tensorflow", "skill:computer-vision", "skill:nlp"]
+    weight: 1.2
+  - id: "skill:supervised-learning"
+    name: "Supervised Learning"
+    synonyms: ["supervised learning", "supervised"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:regression", "skill:classification"]
+    weight: 0.9
+  - id: "skill:unsupervised-learning"
+    name: "Unsupervised Learning"
+    synonyms: ["unsupervised learning", "unsupervised"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:clustering", "skill:dimensionality-reduction"]
+    weight: 0.9
+  - id: "skill:reinforcement-learning"
+    name: "Reinforcement Learning"
+    synonyms: ["reinforcement learning", "rl", "deep rl", "q-learning", "policy gradient"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:deep-learning"]
+    weight: 0.9
+  - id: "skill:classification"
+    name: "Classification"
+    synonyms: ["classification", "classifier"]
+    parents: ["skill:supervised-learning"]
+    related: ["skill:regression"]
+    weight: 0.8
+  - id: "skill:dimensionality-reduction"
+    name: "Dimensionality Reduction"
+    synonyms: ["dimensionality reduction", "pca", "t-sne", "umap"]
+    parents: ["skill:unsupervised-learning"]
+    related: ["skill:clustering"]
+    weight: 0.7
+  - id: "skill:data-science"
+    name: "Data Science"
+    synonyms: ["data science", "data scientist", "data-science"]
+    parents: ["skill:ai"]
+    related: ["skill:machine-learning", "skill:statistics", "skill:pandas"]
+    weight: 1.0
+  - id: "skill:statistics"
+    name: "Statistics"
+    synonyms: ["statistics", "statistical", "statistical modeling", "hypothesis testing"]
+    related: ["skill:data-science", "skill:regression"]
+    weight: 0.9
+  - id: "skill:feature-engineering"
+    name: "Feature Engineering"
+    synonyms: ["feature engineering", "feature extraction", "feature selection"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:classical-ml"]
+    weight: 0.8
+
+  # ── DL frameworks ─────────────────────────────────────────────────
+  - id: "skill:pytorch"
+    name: "PyTorch"
+    synonyms: ["pytorch", "torch", "libtorch"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:computer-vision", "skill:huggingface"]
+    weight: 1.1
+  - id: "skill:tensorflow"
+    name: "TensorFlow"
+    synonyms: ["tensorflow", "tf2", "tensorflow2"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:keras"]
+    weight: 1.0
+  - id: "skill:keras"
+    name: "Keras"
+    synonyms: ["keras"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:tensorflow"]
+    weight: 0.8
+  - id: "skill:jax"
+    name: "JAX"
+    synonyms: ["jax", "flax"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:pytorch"]
+    weight: 0.8
+
+  # ── LLM / GenAI stack ─────────────────────────────────────────────
+  - id: "skill:generative-ai"
+    name: "Generative AI"
+    synonyms: ["generative ai", "genai", "gen ai", "generative models"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:llm", "skill:diffusion-models"]
+    weight: 1.1
+  - id: "skill:llm"
+    name: "Large Language Models"
+    synonyms: ["llm", "llms", "large language model", "large language models", "language model", "gpt", "foundation model"]
+    parents: ["skill:generative-ai", "skill:nlp"]
+    related: ["skill:rag", "skill:fine-tuning", "skill:prompt-engineering", "skill:agents"]
+    weight: 1.3
+  - id: "skill:rag"
+    name: "Retrieval-Augmented Generation"
+    synonyms: ["rag", "retrieval augmented generation", "retrieval-augmented generation", "retrieval augmentation"]
+    parents: ["skill:llm"]
+    related: ["skill:vector-databases", "skill:embeddings", "skill:langchain"]
+    weight: 1.2
+  - id: "skill:fine-tuning"
+    name: "Fine-Tuning"
+    synonyms: ["fine-tuning", "fine tuning", "finetuning", "lora", "peft", "instruction tuning", "rlhf"]
+    parents: ["skill:llm"]
+    related: ["skill:huggingface"]
+    weight: 1.1
+  - id: "skill:prompt-engineering"
+    name: "Prompt Engineering"
+    synonyms: ["prompt engineering", "prompting", "prompt design", "few-shot", "chain-of-thought"]
+    parents: ["skill:llm"]
+    related: ["skill:rag"]
+    weight: 1.0
+  - id: "skill:agents"
+    name: "AI Agents"
+    synonyms: ["ai agents", "agentic", "autonomous agents", "agent framework", "multi-agent", "tool use"]
+    parents: ["skill:llm"]
+    related: ["skill:langchain", "skill:llamaindex"]
+    weight: 1.1
+  - id: "skill:langchain"
+    name: "LangChain"
+    synonyms: ["langchain", "langgraph"]
+    parents: ["skill:llm"]
+    related: ["skill:rag", "skill:agents", "skill:llamaindex"]
+    weight: 1.0
+  - id: "skill:llamaindex"
+    name: "LlamaIndex"
+    synonyms: ["llamaindex", "llama-index", "llama index"]
+    parents: ["skill:llm"]
+    related: ["skill:rag", "skill:langchain"]
+    weight: 0.9
+  - id: "skill:huggingface"
+    name: "Hugging Face / Transformers"
+    synonyms: ["huggingface", "hugging face", "transformers", "transformer", "attention mechanism"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:llm", "skill:nlp", "skill:pytorch"]
+    weight: 1.1
+  - id: "skill:embeddings"
+    name: "Embeddings"
+    synonyms: ["embedding", "embeddings", "sentence embeddings", "text embeddings", "vector embeddings"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:vector-databases", "skill:rag", "skill:semantic-search"]
+    weight: 1.0
+  - id: "skill:semantic-search"
+    name: "Semantic Search"
+    synonyms: ["semantic search", "vector search", "similarity search", "nearest neighbor search"]
+    related: ["skill:embeddings", "skill:vector-databases"]
+    weight: 0.9
+  - id: "skill:vector-databases"
+    name: "Vector Databases"
+    synonyms: ["vector database", "vector databases", "vector db", "vector store", "vector index"]
+    parents: ["skill:databases"]
+    related: ["skill:embeddings", "skill:rag", "skill:pinecone", "skill:chroma", "skill:weaviate", "skill:pgvector", "skill:qdrant", "skill:faiss"]
+    weight: 1.0
+  - id: "skill:pinecone"
+    name: "Pinecone"
+    synonyms: ["pinecone"]
+    parents: ["skill:vector-databases"]
+    weight: 0.8
+  - id: "skill:chroma"
+    name: "Chroma"
+    synonyms: ["chroma", "chromadb"]
+    parents: ["skill:vector-databases"]
+    weight: 0.8
+  - id: "skill:weaviate"
+    name: "Weaviate"
+    synonyms: ["weaviate"]
+    parents: ["skill:vector-databases"]
+    weight: 0.8
+  - id: "skill:pgvector"
+    name: "pgvector"
+    synonyms: ["pgvector"]
+    parents: ["skill:vector-databases"]
+    related: ["skill:postgresql"]
+    weight: 0.8
+  - id: "skill:qdrant"
+    name: "Qdrant"
+    synonyms: ["qdrant"]
+    parents: ["skill:vector-databases"]
+    weight: 0.8
+  - id: "skill:faiss"
+    name: "FAISS"
+    synonyms: ["faiss"]
+    parents: ["skill:vector-databases"]
+    weight: 0.8
+  - id: "skill:ollama"
+    name: "Ollama"
+    synonyms: ["ollama"]
+    parents: ["skill:llm"]
+    related: ["skill:model-deployment"]
+    weight: 0.8
+  - id: "skill:diffusion-models"
+    name: "Diffusion Models"
+    synonyms: ["diffusion model", "diffusion models", "stable diffusion", "latent diffusion"]
+    parents: ["skill:generative-ai"]
+    related: ["skill:computer-vision"]
+    weight: 0.8
+
+  # ── classical ML ──────────────────────────────────────────────────
+  - id: "skill:classical-ml"
+    name: "Classical Machine Learning"
+    synonyms: ["classical ml", "traditional ml", "shallow learning"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:sklearn", "skill:xgboost"]
+    weight: 0.8
+  - id: "skill:sklearn"
+    name: "scikit-learn"
+    synonyms: ["scikit-learn", "scikit learn", "sklearn"]
+    parents: ["skill:classical-ml"]
+    related: ["skill:pandas", "skill:numpy"]
+    weight: 1.0
+  - id: "skill:xgboost"
+    name: "XGBoost / Gradient Boosting"
+    synonyms: ["xgboost", "lightgbm", "catboost", "gradient boosting", "gradient-boosted trees"]
+    parents: ["skill:classical-ml"]
+    related: ["skill:classification", "skill:regression"]
+    weight: 0.9
+  - id: "skill:regression"
+    name: "Regression"
+    synonyms: ["regression", "linear regression", "logistic regression"]
+    parents: ["skill:supervised-learning"]
+    related: ["skill:statistics", "skill:classification"]
+    weight: 0.8
+  - id: "skill:clustering"
+    name: "Clustering"
+    synonyms: ["clustering", "k-means", "kmeans", "dbscan", "hierarchical clustering"]
+    parents: ["skill:unsupervised-learning"]
+    related: ["skill:dimensionality-reduction"]
+    weight: 0.8
+  - id: "skill:time-series"
+    name: "Time Series"
+    synonyms: ["time series", "time-series", "forecasting", "arima", "prophet"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:statistics"]
+    weight: 0.8
+  - id: "skill:recommender-systems"
+    name: "Recommender Systems"
+    synonyms: ["recommender system", "recommendation system", "recommender systems", "collaborative filtering"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:embeddings"]
+    weight: 0.8
+
+  # ── computer vision ───────────────────────────────────────────────
+  - id: "skill:computer-vision"
+    name: "Computer Vision"
+    synonyms: ["computer vision", "computer-vision", "image processing"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:cnn", "skill:image-segmentation", "skill:object-detection", "skill:opencv"]
+    weight: 1.1
+  - id: "skill:cnn"
+    name: "Convolutional Neural Networks"
+    synonyms: ["cnn", "convolutional neural network", "convnet", "resnet", "efficientnet"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:deep-learning"]
+    weight: 0.9
+  - id: "skill:image-segmentation"
+    name: "Image Segmentation"
+    synonyms: ["image segmentation", "semantic segmentation", "instance segmentation", "segmentation mask", "unet", "u-net"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:cell-segmentation", "skill:object-detection"]
+    weight: 0.9
+  - id: "skill:object-detection"
+    name: "Object Detection"
+    synonyms: ["object detection", "object-detection", "bounding box", "detr"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:yolo", "skill:image-segmentation"]
+    weight: 0.9
+  - id: "skill:opencv"
+    name: "OpenCV"
+    synonyms: ["opencv", "cv2"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:image-segmentation"]
+    weight: 0.8
+  - id: "skill:yolo"
+    name: "YOLO"
+    synonyms: ["yolo", "yolov5", "yolov8", "ultralytics"]
+    parents: ["skill:object-detection"]
+    related: ["skill:computer-vision"]
+    weight: 0.8
+  - id: "skill:image-classification"
+    name: "Image Classification"
+    synonyms: ["image classification", "image recognition"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:cnn", "skill:classification"]
+    weight: 0.8
+
+  # ── NLP ───────────────────────────────────────────────────────────
+  - id: "skill:nlp"
+    name: "Natural Language Processing"
+    synonyms: ["natural language processing", "nlp", "text mining", "text analytics"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:llm", "skill:huggingface", "skill:named-entity-recognition"]
+    weight: 1.1
+  - id: "skill:named-entity-recognition"
+    name: "Named Entity Recognition"
+    synonyms: ["named entity recognition", "ner", "entity extraction", "spacy", "nltk"]
+    parents: ["skill:nlp"]
+    related: ["skill:text-classification"]
+    weight: 0.8
+  - id: "skill:text-classification"
+    name: "Text Classification"
+    synonyms: ["text classification", "sentiment analysis", "topic modeling"]
+    parents: ["skill:nlp"]
+    related: ["skill:classification", "skill:named-entity-recognition"]
+    weight: 0.8
+  - id: "skill:speech-recognition"
+    name: "Speech Recognition"
+    synonyms: ["speech recognition", "speech-to-text", "asr", "whisper", "text-to-speech"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:nlp"]
+    weight: 0.7
+
+  # ── biomedical / imaging ──────────────────────────────────────────
+  - id: "skill:biomedical-imaging"
+    name: "Biomedical Imaging"
+    synonyms: ["biomedical imaging", "medical imaging", "bioimage", "bioimaging", "radiology imaging"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:microscopy", "skill:cell-segmentation", "skill:image-segmentation"]
+    weight: 1.0
+  - id: "skill:microscopy"
+    name: "Microscopy"
+    synonyms: ["microscopy", "confocal", "fluorescence microscopy", "light microscopy", "electron microscopy"]
+    parents: ["skill:biomedical-imaging"]
+    related: ["skill:cell-segmentation", "skill:spatial-omics"]
+    weight: 0.9
+  - id: "skill:cell-segmentation"
+    name: "Cell Segmentation"
+    synonyms: ["cell segmentation", "nuclei segmentation", "cell detection"]
+    parents: ["skill:image-segmentation"]
+    related: ["skill:cellpose", "skill:stardist", "skill:microscopy"]
+    weight: 0.9
+  - id: "skill:cellpose"
+    name: "Cellpose"
+    synonyms: ["cellpose"]
+    parents: ["skill:cell-segmentation"]
+    related: ["skill:microscopy"]
+    weight: 0.8
+  - id: "skill:stardist"
+    name: "StarDist"
+    synonyms: ["stardist"]
+    parents: ["skill:cell-segmentation"]
+    related: ["skill:microscopy"]
+    weight: 0.8
+  - id: "skill:spatial-omics"
+    name: "Spatial Omics"
+    synonyms: ["spatial omics", "spatial transcriptomics", "spatial biology", "visium", "merfish"]
+    parents: ["skill:bioinformatics"]
+    related: ["skill:spatial-proteomics", "skill:single-cell", "skill:microscopy"]
+    weight: 0.9
+  - id: "skill:spatial-proteomics"
+    name: "Spatial Proteomics"
+    synonyms: ["spatial proteomics", "proteomics", "codex imaging", "imaging mass cytometry"]
+    parents: ["skill:bioinformatics"]
+    related: ["skill:spatial-omics", "skill:single-cell"]
+    weight: 0.8
+  - id: "skill:single-cell"
+    name: "Single-Cell Analysis"
+    synonyms: ["single-cell", "single cell", "scrna-seq", "scrnaseq", "scanpy", "seurat"]
+    parents: ["skill:bioinformatics"]
+    related: ["skill:spatial-omics", "skill:clustering"]
+    weight: 0.9
+  - id: "skill:bioinformatics"
+    name: "Bioinformatics"
+    synonyms: ["bioinformatics", "computational biology", "genomics", "sequencing analysis"]
+    parents: ["skill:data-science"]
+    related: ["skill:single-cell", "skill:spatial-omics"]
+    weight: 0.9
+
+  # ── data engineering ──────────────────────────────────────────────
+  - id: "skill:data-engineering"
+    name: "Data Engineering"
+    synonyms: ["data engineering", "data engineer", "data-engineering"]
+    related: ["skill:etl", "skill:data-pipelines", "skill:spark", "skill:sql"]
+    weight: 1.0
+  - id: "skill:etl"
+    name: "ETL"
+    synonyms: ["etl", "elt", "data ingestion", "data transformation"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:data-pipelines", "skill:airflow"]
+    weight: 0.9
+  - id: "skill:data-pipelines"
+    name: "Data Pipelines"
+    synonyms: ["data pipeline", "data pipelines", "big data", "data sets", "dataset", "batch processing"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:etl", "skill:airflow", "skill:spark", "skill:kafka"]
+    weight: 0.9
+  - id: "skill:airflow"
+    name: "Apache Airflow"
+    synonyms: ["airflow", "apache airflow", "dags"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:data-pipelines", "skill:kubeflow"]
+    weight: 0.9
+  - id: "skill:spark"
+    name: "Apache Spark"
+    synonyms: ["spark", "apache spark", "pyspark", "databricks"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:data-pipelines"]
+    weight: 0.9
+  - id: "skill:kafka"
+    name: "Apache Kafka"
+    synonyms: ["kafka", "apache kafka", "event streaming", "kinesis"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:data-pipelines"]
+    weight: 0.8
+  - id: "skill:pandas"
+    name: "pandas"
+    synonyms: ["pandas", "dataframe", "dataframes"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:numpy", "skill:python"]
+    weight: 1.0
+  - id: "skill:numpy"
+    name: "NumPy"
+    synonyms: ["numpy", "ndarray"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:pandas", "skill:python"]
+    weight: 1.0
+  - id: "skill:dbt"
+    name: "dbt"
+    synonyms: ["dbt", "data build tool"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:sql", "skill:etl"]
+    weight: 0.7
+  - id: "skill:data-warehouse"
+    name: "Data Warehousing"
+    synonyms: ["data warehouse", "data warehousing", "snowflake", "bigquery", "redshift"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:sql", "skill:etl"]
+    weight: 0.8
+
+  # ── MLOps ─────────────────────────────────────────────────────────
+  - id: "skill:mlops"
+    name: "MLOps"
+    synonyms: ["mlops", "ml ops", "ml infrastructure", "ml platform"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:mlflow", "skill:model-deployment", "skill:kubeflow", "skill:docker"]
+    weight: 1.0
+  - id: "skill:mlflow"
+    name: "MLflow"
+    synonyms: ["mlflow", "experiment tracking", "weights and biases", "wandb"]
+    parents: ["skill:mlops"]
+    related: ["skill:model-deployment"]
+    weight: 0.8
+  - id: "skill:kubeflow"
+    name: "Kubeflow"
+    synonyms: ["kubeflow"]
+    parents: ["skill:mlops"]
+    related: ["skill:kubernetes", "skill:airflow"]
+    weight: 0.8
+  - id: "skill:model-deployment"
+    name: "Model Deployment / Serving"
+    synonyms: ["model deployment", "model serving", "model inference", "triton", "torchserve", "onnx"]
+    parents: ["skill:mlops"]
+    related: ["skill:docker", "skill:rest-api"]
+    weight: 0.9
+  - id: "skill:docker"
+    name: "Docker"
+    synonyms: ["docker", "containerization", "containers", "dockerfile"]
+    parents: ["skill:devops"]
+    related: ["skill:kubernetes", "skill:model-deployment"]
+    weight: 1.0
+  - id: "skill:kubernetes"
+    name: "Kubernetes"
+    synonyms: ["kubernetes", "k8s", "helm", "kubectl"]
+    parents: ["skill:devops"]
+    related: ["skill:docker", "skill:kubeflow"]
+    weight: 0.9
+  - id: "skill:ci-cd"
+    name: "CI/CD"
+    synonyms: ["ci/cd", "ci-cd", "continuous integration", "continuous deployment", "github actions", "jenkins", "gitlab ci"]
+    parents: ["skill:devops"]
+    related: ["skill:docker", "skill:git"]
+    weight: 0.8
+  - id: "skill:devops"
+    name: "DevOps"
+    synonyms: ["devops", "sre", "site reliability", "infrastructure as code", "terraform"]
+    related: ["skill:docker", "skill:kubernetes", "skill:ci-cd", "skill:cloud"]
+    weight: 0.8
+  - id: "skill:monitoring"
+    name: "Observability / Monitoring"
+    synonyms: ["monitoring", "observability", "prometheus", "grafana", "datadog"]
+    parents: ["skill:devops"]
+    related: ["skill:mlops"]
+    weight: 0.7
+
+  # ── cloud ─────────────────────────────────────────────────────────
+  - id: "skill:cloud"
+    name: "Cloud Computing"
+    synonyms: ["cloud computing", "cloud", "cloud infrastructure"]
+    related: ["skill:aws", "skill:gcp", "skill:azure"]
+    weight: 0.9
+  - id: "skill:aws"
+    name: "AWS"
+    synonyms: ["aws", "amazon web services"]
+    parents: ["skill:cloud"]
+    related: ["skill:ec2", "skill:s3", "skill:sagemaker"]
+    weight: 1.0
+  - id: "skill:ec2"
+    name: "AWS EC2"
+    synonyms: ["ec2"]
+    parents: ["skill:aws"]
+    weight: 0.6
+  - id: "skill:s3"
+    name: "AWS S3"
+    synonyms: ["s3"]
+    parents: ["skill:aws"]
+    weight: 0.6
+  - id: "skill:sagemaker"
+    name: "AWS SageMaker"
+    synonyms: ["sagemaker"]
+    parents: ["skill:aws"]
+    related: ["skill:mlops"]
+    weight: 0.7
+  - id: "skill:gcp"
+    name: "Google Cloud Platform"
+    synonyms: ["gcp", "google cloud", "vertex ai", "bigquery"]
+    parents: ["skill:cloud"]
+    related: ["skill:aws"]
+    weight: 0.9
+  - id: "skill:azure"
+    name: "Microsoft Azure"
+    synonyms: ["azure", "microsoft azure", "azure ml"]
+    parents: ["skill:cloud"]
+    related: ["skill:aws"]
+    weight: 0.9
+
+  # ── languages ─────────────────────────────────────────────────────
+  - id: "skill:python"
+    name: "Python"
+    synonyms: ["python", "python3"]
+    parents: ["skill:programming"]
+    related: ["skill:pandas", "skill:numpy", "skill:fastapi"]
+    weight: 1.2
+  - id: "skill:java"
+    name: "Java"
+    synonyms: ["java", "jvm", "spring boot", "spring framework"]
+    parents: ["skill:programming"]
+    related: ["skill:javascript"]
+    weight: 0.9
+  - id: "skill:cpp"
+    name: "C++"
+    synonyms: ["c++", "cpp", "c plus plus"]
+    parents: ["skill:programming"]
+    related: ["skill:c"]
+    weight: 0.9
+  - id: "skill:c"
+    name: "C"
+    synonyms: ["c"]
+    parents: ["skill:programming"]
+    related: ["skill:cpp"]
+    weight: 0.7
+  - id: "skill:csharp"
+    name: "C#"
+    synonyms: ["c#", "csharp", ".net", "dotnet"]
+    parents: ["skill:programming"]
+    related: ["skill:java"]
+    weight: 0.8
+  - id: "skill:javascript"
+    name: "JavaScript"
+    synonyms: ["javascript", "js", "typescript", "ts", "es6"]
+    parents: ["skill:programming"]
+    related: ["skill:nodejs", "skill:react"]
+    weight: 1.0
+  - id: "skill:r"
+    name: "R"
+    synonyms: ["r"]
+    parents: ["skill:programming"]
+    related: ["skill:statistics", "skill:bioinformatics"]
+    weight: 0.8
+  - id: "skill:matlab"
+    name: "MATLAB"
+    synonyms: ["matlab"]
+    parents: ["skill:programming"]
+    related: ["skill:microscopy"]
+    weight: 0.7
+  - id: "skill:bash"
+    name: "Bash / Shell"
+    synonyms: ["bash", "shell scripting", "shell script", "zsh"]
+    parents: ["skill:programming"]
+    related: ["skill:linux"]
+    weight: 0.7
+  - id: "skill:go"
+    name: "Go"
+    synonyms: ["go", "golang"]
+    parents: ["skill:programming"]
+    related: ["skill:rust"]
+    weight: 0.8
+  - id: "skill:rust"
+    name: "Rust"
+    synonyms: ["rust"]
+    parents: ["skill:programming"]
+    related: ["skill:go", "skill:cpp"]
+    weight: 0.7
+  - id: "skill:scala"
+    name: "Scala"
+    synonyms: ["scala"]
+    parents: ["skill:programming"]
+    related: ["skill:spark", "skill:java"]
+    weight: 0.7
+  - id: "skill:programming"
+    name: "Programming"
+    synonyms: ["programming", "software development", "software engineering", "coding"]
+    related: ["skill:python", "skill:git"]
+    weight: 0.7
+
+  # ── databases ─────────────────────────────────────────────────────
+  - id: "skill:databases"
+    name: "Databases"
+    synonyms: ["database", "databases", "rdbms"]
+    related: ["skill:sql", "skill:postgresql", "skill:mongodb"]
+    weight: 0.8
+  - id: "skill:sql"
+    name: "SQL"
+    synonyms: ["sql", "query optimization"]
+    parents: ["skill:databases"]
+    related: ["skill:postgresql", "skill:mysql"]
+    weight: 1.0
+  - id: "skill:postgresql"
+    name: "PostgreSQL"
+    synonyms: ["postgresql", "postgres", "psql"]
+    parents: ["skill:databases"]
+    related: ["skill:sql", "skill:pgvector"]
+    weight: 0.9
+  - id: "skill:mysql"
+    name: "MySQL"
+    synonyms: ["mysql", "mariadb"]
+    parents: ["skill:databases"]
+    related: ["skill:sql"]
+    weight: 0.7
+  - id: "skill:mongodb"
+    name: "MongoDB"
+    synonyms: ["mongodb", "mongo", "nosql"]
+    parents: ["skill:databases"]
+    related: ["skill:redis"]
+    weight: 0.8
+  - id: "skill:sqlite"
+    name: "SQLite"
+    synonyms: ["sqlite", "sqlite3", "fts5"]
+    parents: ["skill:databases"]
+    related: ["skill:sql"]
+    weight: 0.7
+  - id: "skill:redis"
+    name: "Redis"
+    synonyms: ["redis", "memcached"]
+    parents: ["skill:databases"]
+    related: ["skill:mongodb"]
+    weight: 0.7
+
+  # ── web / backends ────────────────────────────────────────────────
+  - id: "skill:fastapi"
+    name: "FastAPI"
+    synonyms: ["fastapi"]
+    parents: ["skill:backend"]
+    related: ["skill:python", "skill:rest-api", "skill:flask"]
+    weight: 0.9
+  - id: "skill:flask"
+    name: "Flask"
+    synonyms: ["flask"]
+    parents: ["skill:backend"]
+    related: ["skill:python", "skill:rest-api"]
+    weight: 0.8
+  - id: "skill:django"
+    name: "Django"
+    synonyms: ["django"]
+    parents: ["skill:backend"]
+    related: ["skill:python", "skill:rest-api"]
+    weight: 0.8
+  - id: "skill:rest-api"
+    name: "REST APIs"
+    synonyms: ["rest api", "rest apis", "restful", "api development", "graphql", "grpc"]
+    parents: ["skill:backend"]
+    related: ["skill:fastapi", "skill:microservices"]
+    weight: 0.9
+  - id: "skill:nodejs"
+    name: "Node.js"
+    synonyms: ["node.js", "nodejs", "node", "express.js", "express"]
+    parents: ["skill:backend"]
+    related: ["skill:javascript"]
+    weight: 0.8
+  - id: "skill:react"
+    name: "React"
+    synonyms: ["react", "react.js", "reactjs", "next.js", "nextjs"]
+    parents: ["skill:frontend"]
+    related: ["skill:javascript"]
+    weight: 0.8
+  - id: "skill:backend"
+    name: "Backend Development"
+    synonyms: ["backend", "back-end", "server-side"]
+    parents: ["skill:programming"]
+    related: ["skill:rest-api", "skill:microservices"]
+    weight: 0.8
+  - id: "skill:frontend"
+    name: "Frontend Development"
+    synonyms: ["frontend", "front-end", "ui development", "html", "css"]
+    parents: ["skill:programming"]
+    related: ["skill:react", "skill:javascript"]
+    weight: 0.7
+  - id: "skill:microservices"
+    name: "Microservices"
+    synonyms: ["microservices", "microservice", "distributed systems"]
+    parents: ["skill:backend"]
+    related: ["skill:rest-api", "skill:kubernetes"]
+    weight: 0.8
+
+  # ── tools ─────────────────────────────────────────────────────────
+  - id: "skill:git"
+    name: "Git"
+    synonyms: ["git", "github", "gitlab", "version control"]
+    related: ["skill:ci-cd", "skill:programming"]
+    weight: 0.8
+  - id: "skill:linux"
+    name: "Linux"
+    synonyms: ["linux", "unix", "ubuntu"]
+    related: ["skill:bash", "skill:docker"]
+    weight: 0.8
+  - id: "skill:latex"
+    name: "LaTeX"
+    synonyms: ["latex"]
+    related: ["skill:python"]
+    weight: 0.5
+  - id: "skill:tableau"
+    name: "Data Visualization"
+    synonyms: ["tableau", "power bi", "powerbi", "data visualization", "matplotlib", "plotly", "seaborn"]
+    related: ["skill:data-science", "skill:statistics"]
+    weight: 0.7
+  - id: "skill:jupyter"
+    name: "Jupyter"
+    synonyms: ["jupyter", "jupyter notebook", "notebooks", "colab"]
+    related: ["skill:python", "skill:data-science"]
+    weight: 0.6
+  - id: "skill:agile"
+    name: "Agile / Scrum"
+    synonyms: ["agile", "scrum", "kanban", "jira"]
+    related: ["skill:programming"]
+    weight: 0.5
+  - id: "skill:testing"
+    name: "Software Testing"
+    synonyms: ["unit testing", "unit tests", "test automation", "pytest", "integration testing"]
+    parents: ["skill:programming"]
+    related: ["skill:ci-cd"]
+    weight: 0.6
+  - id: "skill:web-scraping"
+    name: "Web Scraping"
+    synonyms: ["web scraping", "web-scraping", "beautifulsoup", "scrapy", "selenium"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:python"]
+    weight: 0.6
+  - id: "skill:data-cleaning"
+    name: "Data Cleaning / Wrangling"
+    synonyms: ["data cleaning", "data wrangling", "data preprocessing", "data munging"]
+    parents: ["skill:data-engineering"]
+    related: ["skill:pandas"]
+    weight: 0.7
+  - id: "skill:elasticsearch"
+    name: "Elasticsearch"
+    synonyms: ["elasticsearch", "opensearch", "lucene"]
+    parents: ["skill:databases"]
+    related: ["skill:semantic-search"]
+    weight: 0.7
+
+  # ── extended ML / GenAI ───────────────────────────────────────────
+  - id: "skill:transfer-learning"
+    name: "Transfer Learning"
+    synonyms: ["transfer learning", "pretrained models", "pre-trained models"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:fine-tuning"]
+    weight: 0.8
+  - id: "skill:hyperparameter-tuning"
+    name: "Hyperparameter Tuning"
+    synonyms: ["hyperparameter tuning", "hyperparameter optimization", "grid search", "optuna"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:model-evaluation"]
+    weight: 0.7
+  - id: "skill:model-evaluation"
+    name: "Model Evaluation"
+    synonyms: ["model evaluation", "cross-validation", "cross validation", "evaluation metrics"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:statistics"]
+    weight: 0.7
+  - id: "skill:anomaly-detection"
+    name: "Anomaly Detection"
+    synonyms: ["anomaly detection", "outlier detection", "fraud detection"]
+    parents: ["skill:machine-learning"]
+    related: ["skill:clustering"]
+    weight: 0.7
+  - id: "skill:gan"
+    name: "Generative Adversarial Networks"
+    synonyms: ["gan", "gans", "generative adversarial"]
+    parents: ["skill:generative-ai"]
+    related: ["skill:computer-vision"]
+    weight: 0.7
+  - id: "skill:multimodal"
+    name: "Multimodal Learning"
+    synonyms: ["multimodal", "multi-modal", "vision-language", "clip model", "openai clip"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:llm", "skill:computer-vision"]
+    weight: 0.8
+  - id: "skill:graph-ml"
+    name: "Graph Machine Learning"
+    synonyms: ["graph neural network", "graph neural networks", "gnn", "graph ml"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:embeddings"]
+    weight: 0.7
+  - id: "skill:openai-api"
+    name: "OpenAI API"
+    synonyms: ["openai", "openai api", "chatgpt", "gpt-4", "gpt-4o"]
+    parents: ["skill:llm"]
+    related: ["skill:prompt-engineering"]
+    weight: 0.8
+  - id: "skill:vllm"
+    name: "vLLM"
+    synonyms: ["vllm", "tgi", "text generation inference"]
+    parents: ["skill:model-deployment"]
+    related: ["skill:llm"]
+    weight: 0.7
+  - id: "skill:model-optimization"
+    name: "Model Optimization"
+    synonyms: ["quantization", "distillation", "model pruning", "tensorrt"]
+    parents: ["skill:model-deployment"]
+    related: ["skill:mlops"]
+    weight: 0.7
+  - id: "skill:feature-store"
+    name: "Feature Store"
+    synonyms: ["feature store", "feast"]
+    parents: ["skill:mlops"]
+    related: ["skill:data-engineering"]
+    weight: 0.6
+  - id: "skill:ray"
+    name: "Ray"
+    synonyms: ["ray tune", "ray serve", "ray cluster", "anyscale"]
+    parents: ["skill:mlops"]
+    related: ["skill:distributed-training"]
+    weight: 0.6
+  - id: "skill:distributed-training"
+    name: "Distributed Training"
+    synonyms: ["distributed training", "data parallel", "model parallel", "deepspeed"]
+    parents: ["skill:deep-learning"]
+    related: ["skill:pytorch", "skill:cuda"]
+    weight: 0.7
+  - id: "skill:cuda"
+    name: "CUDA / GPU"
+    synonyms: ["cuda", "gpu", "cudnn", "nvidia gpu"]
+    parents: ["skill:programming"]
+    related: ["skill:pytorch", "skill:deep-learning"]
+    weight: 0.7
+
+  # ── extended CV ───────────────────────────────────────────────────
+  - id: "skill:vision-transformers"
+    name: "Vision Transformers"
+    synonyms: ["vision transformer", "vision transformers", "vit"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:huggingface", "skill:cnn"]
+    weight: 0.7
+  - id: "skill:ocr"
+    name: "Optical Character Recognition"
+    synonyms: ["ocr", "optical character recognition", "tesseract"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:nlp"]
+    weight: 0.7
+  - id: "skill:pose-estimation"
+    name: "Pose Estimation"
+    synonyms: ["pose estimation", "keypoint detection", "landmark detection"]
+    parents: ["skill:computer-vision"]
+    related: ["skill:object-detection"]
+    weight: 0.6
+
+  # ── extended biomedical ───────────────────────────────────────────
+  - id: "skill:digital-pathology"
+    name: "Digital Pathology"
+    synonyms: ["digital pathology", "whole slide imaging", "histopathology", "wsi"]
+    parents: ["skill:biomedical-imaging"]
+    related: ["skill:microscopy", "skill:spatial-proteomics"]
+    weight: 0.8
+  - id: "skill:napari"
+    name: "napari"
+    synonyms: ["napari"]
+    parents: ["skill:biomedical-imaging"]
+    related: ["skill:microscopy", "skill:image-segmentation"]
+    weight: 0.6
+  - id: "skill:imagej"
+    name: "ImageJ / Fiji"
+    synonyms: ["imagej", "fiji"]
+    parents: ["skill:biomedical-imaging"]
+    related: ["skill:microscopy"]
+    weight: 0.6
+  - id: "skill:qupath"
+    name: "QuPath"
+    synonyms: ["qupath"]
+    parents: ["skill:biomedical-imaging"]
+    related: ["skill:spatial-proteomics"]
+    weight: 0.6
+
+  # ── extended statistics ───────────────────────────────────────────
+  - id: "skill:causal-inference"
+    name: "Causal Inference / Experimentation"
+    synonyms: ["causal inference", "a/b testing", "ab testing", "experimentation"]
+    parents: ["skill:statistics"]
+    related: ["skill:regression"]
+    weight: 0.7
+  - id: "skill:bayesian"
+    name: "Bayesian Methods"
+    synonyms: ["bayesian", "mcmc", "probabilistic programming", "pymc"]
+    parents: ["skill:statistics"]
+    related: ["skill:regression"]
+    weight: 0.7
+  - id: "skill:research"
+    name: "Research / Publications"
+    synonyms: ["research", "publication", "publications", "published", "peer-reviewed", "peer reviewed", "conference paper", "journal article"]
+    related: ["skill:data-science", "skill:statistics", "skill:machine-learning"]
+    weight: 0.7
