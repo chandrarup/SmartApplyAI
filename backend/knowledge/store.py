@@ -67,6 +67,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             source TEXT,
             first_seen TEXT,
             last_used TEXT,
+            archived_at TEXT,
             UNIQUE(profile_id, category, name)
         );
         CREATE INDEX IF NOT EXISTS idx_skills_profile_category
@@ -83,6 +84,12 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
+    skill_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(skills)").fetchall()
+    }
+    if "archived_at" not in skill_columns:
+        conn.execute("ALTER TABLE skills ADD COLUMN archived_at TEXT")
     row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
     if row is None:
         conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
@@ -122,27 +129,63 @@ def _write_section(conn: sqlite3.Connection, pid: str, key: str, value: Any) -> 
 
 
 def _sync_skills_table(conn: sqlite3.Connection, pid: str, skills: dict | None) -> int:
-    conn.execute("DELETE FROM skills WHERE profile_id = ?", (pid,))
     count = 0
     if not isinstance(skills, dict):
+        conn.execute(
+            "UPDATE skills SET archived_at = ? WHERE profile_id = ? AND archived_at IS NULL",
+            (_utc_now(), pid),
+        )
         return count
     now = _utc_now()
+    seen: set[tuple[str, str]] = set()
     for category, items in skills.items():
         if not isinstance(items, list):
             continue
         for idx, name in enumerate(items):
             if not isinstance(name, str) or not name.strip():
                 continue
-            conn.execute(
+            clean_name = name.strip()
+            key = (str(category), clean_name.casefold())
+            seen.add(key)
+            existing = conn.execute(
+                """
+                SELECT id
+                FROM skills
+                WHERE profile_id = ? AND category = ? AND lower(name) = lower(?)
+                ORDER BY id
+                LIMIT 1
+                """,
+                (pid, category, clean_name),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """
+                    UPDATE skills
+                    SET name = ?, sort_index = ?, archived_at = NULL
+                    WHERE id = ?
+                    """,
+                    (clean_name, idx, int(existing["id"])),
+                )
+            else:
+                conn.execute(
                 """
                 INSERT INTO skills(
                     profile_id, category, name, sort_index,
-                    proficiency, evidence, source, first_seen, last_used
-                ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, NULL)
+                    proficiency, evidence, source, first_seen, last_used, archived_at
+                ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, NULL, NULL)
                 """,
-                (pid, category, name, idx, now),
-            )
+                    (pid, category, clean_name, idx, now),
+                )
             count += 1
+    for row in conn.execute(
+        "SELECT id, category, name FROM skills WHERE profile_id = ? AND archived_at IS NULL",
+        (pid,),
+    ).fetchall():
+        if (row["category"], row["name"].casefold()) not in seen:
+            conn.execute(
+                "UPDATE skills SET archived_at = ? WHERE id = ?",
+                (now, int(row["id"])),
+            )
     return count
 
 
@@ -157,6 +200,7 @@ def _project_skills(conn: sqlite3.Connection, pid: str) -> dict:
         SELECT category, name
         FROM skills
         WHERE profile_id = ?
+          AND archived_at IS NULL
         ORDER BY category, sort_index, id
         """,
         (pid,),
@@ -193,7 +237,7 @@ def get_profile(pid: str) -> dict:
             profile[row["key"]] = json.loads(row["json"])
 
         if "skills" in profile or conn.execute(
-            "SELECT 1 FROM skills WHERE profile_id = ? LIMIT 1", (pid,)
+            "SELECT 1 FROM skills WHERE profile_id = ? AND archived_at IS NULL LIMIT 1", (pid,)
         ).fetchone():
             profile["skills"] = _project_skills(conn, pid)
 
@@ -204,7 +248,6 @@ def save_profile(pid: str, data: dict) -> None:
     data = data or {}
     with _connect() as conn:
         conn.execute("DELETE FROM sections WHERE profile_id = ?", (pid,))
-        conn.execute("DELETE FROM skills WHERE profile_id = ?", (pid,))
 
         for key, value in data.items():
             _write_section(conn, pid, key, value)

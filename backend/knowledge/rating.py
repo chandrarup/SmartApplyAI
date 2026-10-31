@@ -14,7 +14,7 @@ def list_unrated(pid: str) -> list[dict[str, Any]]:
             """
             SELECT id, category, name, sort_index, source, first_seen
             FROM skills
-            WHERE profile_id = ? AND proficiency IS NULL
+            WHERE profile_id = ? AND archived_at IS NULL AND proficiency IS NULL
             ORDER BY category, sort_index, id
             """,
             (pid,),
@@ -50,6 +50,7 @@ def set_rating(
             SELECT id, name, category
             FROM skills
             WHERE profile_id = ? AND id = ?
+              AND archived_at IS NULL
             """,
             (pid, int(skill_id)),
         ).fetchone()
@@ -84,6 +85,7 @@ def get_skill_by_name(pid: str, skill_name: str) -> dict[str, Any] | None:
                    source, first_seen, last_used
             FROM skills
             WHERE profile_id = ? AND lower(name) = lower(?)
+              AND archived_at IS NULL
             ORDER BY sort_index, id
             LIMIT 1
             """,
@@ -178,6 +180,7 @@ def list_all(pid: str) -> list[dict[str, Any]]:
             SELECT id, category, name, sort_index, proficiency, evidence, source, first_seen, last_used
             FROM skills
             WHERE profile_id = ?
+              AND archived_at IS NULL
             ORDER BY category, sort_index, id
             """,
             (pid,),
