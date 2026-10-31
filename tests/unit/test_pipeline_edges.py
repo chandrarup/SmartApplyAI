@@ -236,8 +236,8 @@ def test_x_profile_id_defaults_to_default():
     assert main.get_pid(req2) == "custom"
 
 
-def test_skill_rating_lost_on_save_profile_remigrate(temp_knowledge_env):
-    """Documents Phase-1 gap: save_profile re-sync wipes proficiency."""
+def test_skill_rating_preserved_on_save_profile_remigrate(temp_knowledge_env):
+    """Full profile saves preserve skill proficiency and evidence."""
     pid = "default"
     base = {
         "contact_info": {"name": "T"},
@@ -256,7 +256,10 @@ def test_skill_rating_lost_on_save_profile_remigrate(temp_knowledge_env):
 
     # Re-migrate / full save_profile simulates migrate.py
     knowledge_store.save_profile(pid, base)
-    assert knowledge_rating.get_proficiency(pid, "Kubernetes") is None
+    assert knowledge_rating.get_proficiency(pid, "Kubernetes") == 4
+    saved = knowledge_rating.get_skill_by_name(pid, "Kubernetes")
+    assert saved is not None
+    assert saved["evidence"] == "used in prod"
 
 
 # ── Matcher ─────────────────────────────────────────────────────────────────
