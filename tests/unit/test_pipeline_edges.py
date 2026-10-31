@@ -23,6 +23,7 @@ import main  # noqa: E402
 import scoring  # noqa: E402
 from knowledge import rating as knowledge_rating  # noqa: E402
 from knowledge import store as knowledge_store  # noqa: E402
+from teach import store as teach_store  # noqa: E402
 from matcher import fit as matcher_fit  # noqa: E402
 from matcher import store as matcher_store  # noqa: E402
 from matcher.prefilter import prefilter_jobs  # noqa: E402
@@ -65,11 +66,13 @@ def temp_jobs_db(tmp_path, monkeypatch):
 @pytest.fixture
 def temp_knowledge_env(tmp_path, monkeypatch):
     db = tmp_path / "knowledge.db"
+    reviews_db = tmp_path / "reviews.db"
     profiles = tmp_path / "profiles"
     profiles.mkdir()
     monkeypatch.setattr(knowledge_store, "DB_PATH", str(db))
+    monkeypatch.setattr(teach_store, "DB_PATH", str(reviews_db))
     monkeypatch.setattr(main, "PROFILES_DIR", str(profiles))
-    return {"db": db, "profiles": profiles}
+    return {"db": db, "profiles": profiles, "reviews_db": reviews_db}
 
 
 # ── Scraper ───────────────────────────────────────────────────────────────────
@@ -236,8 +239,7 @@ def test_x_profile_id_defaults_to_default():
     assert main.get_pid(req2) == "custom"
 
 
-def test_skill_rating_preserved_on_save_profile_remigrate(temp_knowledge_env):
-    """Full profile saves preserve skill proficiency and evidence."""
+def test_skill_rating_survives_save_profile_remigrate(temp_knowledge_env):
     pid = "default"
     base = {
         "contact_info": {"name": "T"},
@@ -256,10 +258,65 @@ def test_skill_rating_preserved_on_save_profile_remigrate(temp_knowledge_env):
 
     # Re-migrate / full save_profile simulates migrate.py
     knowledge_store.save_profile(pid, base)
-    assert knowledge_rating.get_proficiency(pid, "Kubernetes") == 4
-    saved = knowledge_rating.get_skill_by_name(pid, "Kubernetes")
-    assert saved is not None
-    assert saved["evidence"] == "used in prod"
+    restored = knowledge_rating.get_skill_by_name(pid, "Kubernetes")
+    assert restored is not None
+    assert restored["id"] == skill["id"]
+    assert restored["proficiency"] == 4
+    assert restored["evidence"] == "used in prod"
+
+
+def test_removed_skill_is_archived_and_readd_restores_same_row(temp_knowledge_env):
+    pid = "default"
+    knowledge_store.save_profile(
+        pid,
+        {"skills": {"domains": ["Python", "Kubernetes"]}, "summary": "s"},
+    )
+    skill = knowledge_rating.set_rating_by_name(
+        pid, "Kubernetes", 5, evidence="production", category="domains"
+    )
+    skill_id = skill["skill_id"]
+
+    knowledge_store.replace_section(pid, "skills", {"domains": ["Python"]})
+    with knowledge_store._connect() as conn:
+        archived = conn.execute(
+            "SELECT id, archived_at FROM skills WHERE profile_id = ? AND id = ?",
+            (pid, skill_id),
+        ).fetchone()
+    assert archived["id"] == skill_id
+    assert archived["archived_at"] is not None
+    assert knowledge_rating.get_skill_by_name(pid, "Kubernetes") is None
+
+    knowledge_store.replace_section(
+        pid, "skills", {"domains": ["Python", "Kubernetes"]}
+    )
+    restored = knowledge_rating.get_skill_by_name(pid, "Kubernetes")
+    assert restored is not None
+    assert restored["id"] == skill_id
+    assert restored["proficiency"] == 5
+    assert restored["evidence"] == "production"
+
+
+def test_skill_reconciliation_preserves_fsrs_history(temp_knowledge_env):
+    pid = "default"
+    knowledge_store.save_profile(pid, {"skills": {"domains": ["Python"]}})
+    state = teach_store.save_state(
+        pid,
+        "Python",
+        {
+            "stability": 2.5,
+            "difficulty": 4.0,
+            "reps": 3,
+            "lapses": 1,
+            "due_date": "2026-11-02",
+            "state": "review",
+            "last_grade": "good",
+        },
+    )
+
+    knowledge_store.save_profile(pid, {"skills": {}})
+    knowledge_store.save_profile(pid, {"skills": {"domains": ["Python"]}})
+
+    assert teach_store.get_state(pid, "Python") == state
 
 
 # ── Matcher ─────────────────────────────────────────────────────────────────

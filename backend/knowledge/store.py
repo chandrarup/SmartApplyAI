@@ -28,7 +28,7 @@ KNOWN_SECTION_KEYS = frozenset({
     "learned_answers",
 })
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def _utc_now() -> str:
@@ -84,15 +84,19 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    skill_columns = {
-        row["name"]
-        for row in conn.execute("PRAGMA table_info(skills)").fetchall()
-    }
-    if "archived_at" not in skill_columns:
-        conn.execute("ALTER TABLE skills ADD COLUMN archived_at TEXT")
     row = conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
     if row is None:
         conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
+        conn.commit()
+    else:
+        columns = {
+            column["name"]
+            for column in conn.execute("PRAGMA table_info(skills)").fetchall()
+        }
+        if "archived_at" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN archived_at TEXT")
+        if int(row["version"]) < SCHEMA_VERSION:
+            conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
         conn.commit()
 
 
@@ -130,61 +134,63 @@ def _write_section(conn: sqlite3.Connection, pid: str, key: str, value: Any) -> 
 
 def _sync_skills_table(conn: sqlite3.Connection, pid: str, skills: dict | None) -> int:
     count = 0
-    if not isinstance(skills, dict):
-        conn.execute(
-            "UPDATE skills SET archived_at = ? WHERE profile_id = ? AND archived_at IS NULL",
-            (_utc_now(), pid),
-        )
-        return count
     now = _utc_now()
-    seen: set[tuple[str, str]] = set()
-    for category, items in skills.items():
-        if not isinstance(items, list):
-            continue
-        for idx, name in enumerate(items):
-            if not isinstance(name, str) or not name.strip():
+    desired: set[tuple[str, str]] = set()
+    if isinstance(skills, dict):
+        for category, items in skills.items():
+            if not isinstance(items, list):
                 continue
-            clean_name = name.strip()
-            key = (str(category), clean_name.casefold())
-            seen.add(key)
-            existing = conn.execute(
-                """
-                SELECT id
-                FROM skills
-                WHERE profile_id = ? AND category = ? AND lower(name) = lower(?)
-                ORDER BY id
-                LIMIT 1
-                """,
-                (pid, category, clean_name),
-            ).fetchone()
-            if existing:
-                conn.execute(
+            for idx, name in enumerate(items):
+                if not isinstance(name, str) or not name.strip():
+                    continue
+                clean_name = name.strip()
+                key = (str(category), clean_name)
+                if key in desired:
+                    continue
+                desired.add(key)
+                row = conn.execute(
                     """
-                    UPDATE skills
-                    SET name = ?, sort_index = ?, archived_at = NULL
-                    WHERE id = ?
+                    SELECT id
+                    FROM skills
+                    WHERE profile_id = ? AND category = ? AND name = ?
                     """,
-                    (clean_name, idx, int(existing["id"])),
-                )
-            else:
-                conn.execute(
-                """
-                INSERT INTO skills(
-                    profile_id, category, name, sort_index,
-                    proficiency, evidence, source, first_seen, last_used, archived_at
-                ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, NULL, NULL)
-                """,
-                    (pid, category, clean_name, idx, now),
-                )
-            count += 1
-    for row in conn.execute(
-        "SELECT id, category, name FROM skills WHERE profile_id = ? AND archived_at IS NULL",
+                    (pid, category, clean_name),
+                ).fetchone()
+                if row:
+                    conn.execute(
+                        """
+                        UPDATE skills
+                        SET sort_index = ?, archived_at = NULL
+                        WHERE id = ?
+                        """,
+                        (idx, row["id"]),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO skills(
+                            profile_id, category, name, sort_index,
+                            proficiency, evidence, source, first_seen, last_used,
+                            archived_at
+                        ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, NULL, NULL)
+                        """,
+                        (pid, category, clean_name, idx, now),
+                    )
+                count += 1
+
+    active_rows = conn.execute(
+        """
+        SELECT id, category, name
+        FROM skills
+        WHERE profile_id = ? AND archived_at IS NULL
+        """,
         (pid,),
-    ).fetchall():
-        if (row["category"], row["name"].casefold()) not in seen:
+    ).fetchall()
+    for row in active_rows:
+        if (row["category"], row["name"]) not in desired:
             conn.execute(
                 "UPDATE skills SET archived_at = ? WHERE id = ?",
-                (now, int(row["id"])),
+                (now, row["id"]),
             )
     return count
 
@@ -199,8 +205,7 @@ def _project_skills(conn: sqlite3.Connection, pid: str) -> dict:
         """
         SELECT category, name
         FROM skills
-        WHERE profile_id = ?
-          AND archived_at IS NULL
+        WHERE profile_id = ? AND archived_at IS NULL
         ORDER BY category, sort_index, id
         """,
         (pid,),
@@ -237,7 +242,7 @@ def get_profile(pid: str) -> dict:
             profile[row["key"]] = json.loads(row["json"])
 
         if "skills" in profile or conn.execute(
-            "SELECT 1 FROM skills WHERE profile_id = ? AND archived_at IS NULL LIMIT 1", (pid,)
+            "SELECT 1 FROM skills WHERE profile_id = ? LIMIT 1", (pid,)
         ).fetchone():
             profile["skills"] = _project_skills(conn, pid)
 
