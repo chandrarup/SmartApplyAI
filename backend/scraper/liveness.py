@@ -137,6 +137,19 @@ def classify_liveness(
             "reason": f"pattern matched: {expired_body.pattern}",
         }
 
+    if (
+        requested_url
+        and final_url
+        and requested_url.rstrip("/") != final_url.rstrip("/")
+        and _job_id_token(requested_url) is None
+        and _job_id_token(final_url) is None
+    ):
+        return {
+            "result": "uncertain",
+            "code": "generic_redirect",
+            "reason": f"redirected to {final_url}",
+        }
+
     # Permalink that lost its job id after redirect → uncertain (portal migration
     # can 301 live postings too; false "expired" permanently filters a real job).
     job_id = _job_id_token(requested_url)
