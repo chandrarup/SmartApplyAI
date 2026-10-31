@@ -49,8 +49,7 @@ def set_rating(
             """
             SELECT id, name, category
             FROM skills
-            WHERE profile_id = ? AND id = ?
-              AND archived_at IS NULL
+            WHERE profile_id = ? AND id = ? AND archived_at IS NULL
             """,
             (pid, int(skill_id)),
         ).fetchone()
@@ -84,8 +83,7 @@ def get_skill_by_name(pid: str, skill_name: str) -> dict[str, Any] | None:
             SELECT id, profile_id, category, name, sort_index, proficiency, evidence,
                    source, first_seen, last_used
             FROM skills
-            WHERE profile_id = ? AND lower(name) = lower(?)
-              AND archived_at IS NULL
+            WHERE profile_id = ? AND archived_at IS NULL AND lower(name) = lower(?)
             ORDER BY sort_index, id
             LIMIT 1
             """,
@@ -179,8 +177,7 @@ def list_all(pid: str) -> list[dict[str, Any]]:
             """
             SELECT id, category, name, sort_index, proficiency, evidence, source, first_seen, last_used
             FROM skills
-            WHERE profile_id = ?
-              AND archived_at IS NULL
+            WHERE profile_id = ? AND archived_at IS NULL
             ORDER BY category, sort_index, id
             """,
             (pid,),
