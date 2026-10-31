@@ -1,0 +1,14 @@
+Role: Senior Computational Biologist / Spatial Omics Scientist
+Company: NanoString / 10x Genomics
+Location: Boston, MA (or Remote)
+
+About the Job:
+We are looking for a Computational Biologist / Spatial Omics Scientist to develop statistical models and analysis pipelines for high-plex single-cell spatial transcriptomics data. You will analyze CosMx and Xenium imaging datasets, perform cell segmentation, and conduct differential gene expression profiling.
+
+Key Responsibilities:
+- Build analysis pipelines in Python and R using tools such as Scanpy, Seurat, and spatial statistical modeling.
+- Perform cell typing and spatial clustering on high-dimensional single-cell datasets (100k+ cells across hundreds of genes).
+- Implement deep learning computer vision models (CellPose, StarDist) on multi-gigabyte fluorescence microscopy TIFF images.
+- Develop interactive visual analytics platforms (FastAPI, HTML5 Canvas) for biomedical collaborators.
+- Collaborate with cross-functional wet-lab and pathology teams to translate spatial findings into clinical insights.
+- M.S. or Ph.D. in Computational Biology, Biomedical Engineering, Bioinformatics, or Computer Science.

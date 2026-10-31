@@ -30,6 +30,7 @@ backend/test_pkg.*
 # Generated resume PDFs (runtime output)
 generated resume/
 backend/generated_resumes/
+output/
 
 # Versioned resume variants (runtime output)
 backend/profiles/*/resumes/

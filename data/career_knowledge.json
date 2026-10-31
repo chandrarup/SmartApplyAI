@@ -1,0 +1,515 @@
+{
+  "candidate": {
+    "identity": {
+      "name": "Chandra Rup Daka",
+      "location": "Houston, TX",
+      "phone": "+1 (253) 632-3181",
+      "email": "chandrarupdaka@gmail.com",
+      "linkedin": "https://www.linkedin.com/in/chandra-rup-daka/",
+      "github": "https://github.com/chandrarup",
+      "portfolio": "https://chandrarup.github.io/Portfolio/",
+      "career_repo": "https://github.com/chandrarup/career"
+    },
+    "work_authorization": {
+      "visa": "F-1 Student Visa",
+      "eligibility": "CPT / OPT & STEM-OPT Eligible (36 months work authorization upon May 2027 graduation)",
+      "graduation_date": "May 2027",
+      "security_clearance_eligible": false,
+      "us_citizenship": false
+    },
+    "education": [
+      {
+        "institution": "University of Houston",
+        "degree": "Master of Science in Engineering Data Science & Artificial Intelligence",
+        "dates": "Aug 2025 -- May 2027",
+        "location": "Houston, TX",
+        "gpa": "3.9/4.0",
+        "coursework": [
+          "Deep Learning for Signal & Image Processing",
+          "AI in Natural Language Processing",
+          "Reinforcement Learning",
+          "Big Data Analytics",
+          "Machine Learning",
+          "Robotics Vision"
+        ]
+      },
+      {
+        "institution": "Amrita Vishwa Vidyapeetham",
+        "degree": "Bachelor of Technology in Computer Science & Engineering (Artificial Intelligence)",
+        "dates": "Jun 2019 -- Jul 2023",
+        "location": "Bangalore, India",
+        "gpa": "First Class with Distinction",
+        "coursework": [
+          "Data Structures & Algorithms",
+          "Operating Systems",
+          "Database Management Systems",
+          "Computer Vision",
+          "Speech Processing"
+        ]
+      }
+    ],
+    "certifications": [
+      "Microsoft Certified: Azure AI Engineer Associate (AI-102)",
+      "Microsoft Certified: Azure AI Fundamentals (AI-900)",
+      "AWS Certified Cloud Practitioner (CCP)",
+      "NVIDIA Building Transformer-Based NLP Applications"
+    ],
+    "experience": [
+      {
+        "id": "exp_accenture",
+        "role": "Generative AI Engineer",
+        "organization": "Accenture — GenWizard Platform",
+        "dates": "Aug 2023 -- Jul 2025",
+        "location": "Chennai, India",
+        "summary": "Engineered enterprise GenAI platform delivering automated Change Impact Analysis, multi-agent code translation, and RAG pipelines across 30,000+ file codebases.",
+        "locked_metrics": {
+          "codebase_size": "30,000+ files",
+          "languages_supported": "15+ languages (COBOL, VB.NET, Java, SQL, JavaScript, Python)",
+          "coverage_achieved": "89% coverage",
+          "efficiency_improvement": "Turnaround reduced from weeks to hours",
+          "engineers_mentored": "30+ junior engineers",
+          "awards": [
+            "Wall of Fame (Q4 FY24)",
+            "Client Recognition Award",
+            "Best Team Award"
+          ]
+        },
+        "tech_stack": [
+          "Python",
+          "FastAPI",
+          "LangChain",
+          "LangGraph",
+          "AutoGen",
+          "CrewAI",
+          "Model Context Protocol (MCP)",
+          "RAG",
+          "BERTopic",
+          "Sentence Transformers",
+          "Neo4j",
+          "PostgreSQL",
+          "pgvector",
+          "Pinecone",
+          "ChromaDB",
+          "Milvus",
+          "OpenAI",
+          "Claude",
+          "Gemini",
+          "Azure OpenAI",
+          "Azure APIM",
+          "OAuth",
+          "Docker",
+          "Git CI/CD",
+          "SQL"
+        ],
+        "framing_vectors": {
+          "agentic_swe": [
+            "Built production \\textbf{REST APIs} and \\textbf{agent-to-agent (A2A)} workflows in \\textbf{Python} using \\textbf{FastAPI} and \\textbf{LangGraph}, validating schemas and handling retry fallbacks across \\textbf{30,000+ files}.",
+            "Architected \\textbf{Model Context Protocol (MCP)} connectors and multi-agent coordination pipelines (LangChain, AutoGen) for automated code translation and test generation, achieving \\textbf{89\\% diagnostic coverage}.",
+            "Implemented enterprise \\textbf{RAG} with \\textbf{PostgreSQL (pgvector)}, \\textbf{Pinecone}, and \\textbf{Neo4j} knowledge graphs using \\textbf{BERTopic} and sentence transformers, cutting review cycles from weeks to hours.",
+            "Mentored \\textbf{30+ engineers} on \\textbf{Python} agentic frameworks and \\textbf{Docker} CI/CD standards, earning the \\textbf{Wall of Fame (Q4 FY24)} and \\textbf{Client Recognition Award} for enterprise delivery."
+          ],
+          "forward_deployed_engineer": [
+            "Partnered directly with enterprise clients to scope and deploy \\textbf{Python (FastAPI)} LLM solutions for legacy modernization across \\textbf{30,000+ files} and \\textbf{15+ languages}, slashing review time from weeks to hours.",
+            "Translated ambiguous client SDLC requirements into production \\textbf{agentic workflows} and \\textbf{Neo4j} knowledge graphs, achieving \\textbf{89\\% test coverage} and earning the \\textbf{Client Recognition Award}.",
+            "Engineered secure \\textbf{Azure APIM} gateways with OAuth, custom token handling, and \\textbf{Docker} pipelines for Fortune-level clients, receiving the \\textbf{Wall of Fame (Q4 FY24)} award.",
+            "Led client enablement workshops and mentored \\textbf{30+ engineers} on production GenAI deployment, establishing reusable platform SDKs that drove zero-defect enterprise rollouts."
+          ],
+          "core_aiml": [
+            "Trained and evaluated dense and sparse semantic retrieval models using \\textbf{Sentence Transformers}, \\textbf{BERTopic}, and \\textbf{Neo4j} knowledge graphs across \\textbf{30,000+ multi-language files}.",
+            "Constructed offline evaluation harnesses for \\textbf{RAG} and LLM agent outputs, measuring precision, recall, and hallucination rates to secure \\textbf{89\\% diagnostic coverage} in production.",
+            "Engineered cross-encoder reranking pipelines over \\textbf{PostgreSQL (pgvector)}, \\textbf{ChromaDB}, and \\textbf{Pinecone}, optimizing similarity search latency across high-dimensional code embeddings.",
+            "Mentored \\textbf{30+ engineers} on fine-tuning strategies, prompt optimization, and \\textbf{PyTorch} ML workflows, earning the \\textbf{Wall of Fame (Q4 FY24)} and \\textbf{Best Team Award}."
+          ],
+          "bioinformatics_ai": [
+            "Constructed enterprise-scale \\textbf{Neo4j} entity-relationship knowledge graphs and \\textbf{Python} semantic parsers processing unstructured records across \\textbf{30,000+ files} with \\textbf{89\\% coverage}.",
+            "Engineered multi-vector embedding stores in \\textbf{PostgreSQL (pgvector)} and \\textbf{Pinecone} with \\textbf{BERTopic} clustering, accelerating complex semantic querying from days to hours.",
+            "Architected modular microservices using \\textbf{Python (FastAPI)} and \\textbf{Docker} containers to automate multi-stage data extraction and relational indexing for cross-functional teams."
+          ],
+          "data_analyst_ds": [
+            "Engineered automated \\textbf{SQL} ETL and graph data pipelines over \\textbf{PostgreSQL} and \\textbf{Neo4j}, extracting structured business intelligence from \\textbf{30,000+ files} across \\textbf{15+ languages}.",
+            "Benchmarked system SLAs and quality metrics, achieving \\textbf{89\\% diagnostic coverage} and accelerating manual audit turnaround from weeks to hours for client stakeholders.",
+            "Analyzed operational telemetry and error distributions across multi-agent pipelines, presenting quantitative insights that secured the \\textbf{Wall of Fame (Q4 FY24)} and \\textbf{Client Recognition Award}."
+          ]
+        }
+      },
+      {
+        "id": "exp_bauer",
+        "role": "AI & Data Science Researcher / Developer",
+        "organization": "UH C.T. Bauer College of Business",
+        "dates": "Apr 2026 -- Sep 2026",
+        "location": "Houston, TX",
+        "summary": "Developed the QXO HR longitudinal retention model and The Cost of Winning real-time multiplayer executive simulation.",
+        "locked_metrics": {
+          "hr_panel_rows": "289,000 rows",
+          "model_performance": "ROC-AUC 0.714",
+          "simulation_users": "60+ MBA students",
+          "scenes_count": "13-scene branching engine"
+        },
+        "tech_stack": [
+          "Python",
+          "SQL",
+          "Pandas",
+          "NumPy",
+          "Scikit-learn",
+          "Random Forest",
+          "SHAP",
+          "Power BI",
+          "DAX",
+          "Excel",
+          "TypeScript",
+          "JavaScript",
+          "React 19",
+          "Next.js",
+          "Drizzle ORM",
+          "PostgreSQL",
+          "Supabase",
+          "Neon",
+          "Vercel AI SDK",
+          "Model Context Protocol (MCP)",
+          "Claude",
+          "OpenAI",
+          "Gemini",
+          "LLM-as-judge"
+        ],
+        "framing_vectors": {
+          "agentic_swe": [
+            "Architected \\textbf{The Cost of Winning}, a real-time AI simulation in \\textbf{TypeScript (React 19, Next.js)} and \\textbf{PostgreSQL (Supabase)}, serving \\textbf{60+ MBA students} across 13 branching decision scenes.",
+            "Integrated multi-provider LLM routing (Claude, OpenAI, Gemini) using \\textbf{Model Context Protocol (MCP)} tools and built an \\textbf{LLM-as-judge} evaluation rubric for automated scoring.",
+            "Engineered predictive classification pipelines in \\textbf{Python (Scikit-learn, SQL)} on a \\textbf{289,000-row} longitudinal employee panel, utilizing \\textbf{SHAP} explainability to achieve \\textbf{ROC-AUC 0.714}."
+          ],
+          "forward_deployed_engineer": [
+            "Partnered with corporate partners and business school faculty to design and ship \\textbf{The Cost of Winning} (React 19, Supabase, MCP), gathering real-time feedback from \\textbf{60+ MBA executives}.",
+            "Delivered end-to-end workforce retention intelligence on a \\textbf{289,000-row} panel using \\textbf{Python, SQL, Random Forest}, and \\textbf{Power BI (DAX)}, presenting actionable retention levers to senior leadership.",
+            "Constructed resilient multi-LLM routing with automatic failovers and prompt guardrails, ensuring 100\\% simulation uptime during live executive boardroom sessions."
+          ],
+          "core_aiml": [
+            "Trained supervised \\textbf{Random Forest} and gradient boosting classifiers in \\textbf{Python (Scikit-learn)} on a \\textbf{289,000-row} panel, optimizing hyper-parameters to reach \\textbf{ROC-AUC 0.714}.",
+            "Applied \\textbf{SHAP} (Shapley Additive exPlanations) values and partial dependence plots to isolate non-linear feature interactions driving workforce attrition dynamics.",
+            "Designed automated \\textbf{LLM-as-judge} consensus scoring pipelines comparing Claude 3.5, GPT-4o, and Gemini 1.5 across complex multi-turn decision rationales."
+          ],
+          "bioinformatics_ai": [
+            "Executed high-dimensional longitudinal cohort modeling on \\textbf{289,000 observation records} in \\textbf{Python} and \\textbf{SQL}, employing \\textbf{Random Forest} and \\textbf{SHAP} for feature attribution.",
+            "Built interactive web-based data exploration interfaces in \\textbf{TypeScript} and \\textbf{PostgreSQL (Supabase)} to allow non-technical domain experts to inspect model risk stratifications."
+          ],
+          "data_analyst_ds": [
+            "Modeled workforce attrition dynamics across a \\textbf{289,000-row} panel using \\textbf{SQL}, \\textbf{Python (Pandas, Scikit-learn)}, and \\textbf{Random Forest}, achieving a validated \\textbf{ROC-AUC of 0.714}.",
+            "Built executive \\textbf{Power BI} dashboards with complex \\textbf{DAX} measures, cohort drill-downs, and \\textbf{Excel} financial models, uncovering key turnover drivers for corporate retention planning.",
+            "Constructed normalized \\textbf{PostgreSQL} schemas and tracking telemetry for \\textbf{The Cost of Winning}, capturing 10,000+ behavioral choices from \\textbf{60+ MBA participants}."
+          ]
+        }
+      },
+      {
+        "id": "exp_bme_roysam",
+        "role": "Spatial Omics & AI Research Collaborator",
+        "organization": "Dr. Mohan's Lab & Prof. Roysam's Lab, UH BME",
+        "dates": "Jan 2026 -- Present",
+        "location": "Houston, TX",
+        "summary": "Led single-cell spatial transcriptomics and deep learning microscopy analysis for Lupus Nephritis and neurodegenerative pathology.",
+        "locked_metrics": {
+          "cells_analyzed": "532,392 cells x 960 genes",
+          "patient_cohorts": "11 lupus nephritis patient biopsies (2 slides)",
+          "image_size": "5GB multichannel DAPI TIFFs"
+        },
+        "tech_stack": [
+          "Python",
+          "R",
+          "SQL",
+          "PySpark",
+          "InSituType",
+          "Scanpy",
+          "Seurat",
+          "InSituCor",
+          "UMAP",
+          "FastAPI",
+          "HTML5 Canvas",
+          "JavaScript",
+          "PyTorch",
+          "CellPose",
+          "StarDist",
+          "BioGPT"
+        ],
+        "framing_vectors": {
+          "agentic_swe": [
+            "Developed \\textbf{Gene-Viewer}, a high-throughput visual analytics platform using \\textbf{Python (FastAPI)} and \\textbf{JavaScript (HTML5 Canvas)} streaming \\textbf{532,392 single cells $\\times$ 960 genes} with sub-second latency.",
+            "Engineered asynchronous data streaming and spatial indexing algorithms in \\textbf{Python}, enabling wet-lab researchers to query multi-gigabyte spatial transcriptomics datasets interactively.",
+            "Automated high-content image segmentation pipelines in \\textbf{Python (PyTorch)} processing \\textbf{5GB multichannel TIFFs} with containerized batch execution."
+          ],
+          "forward_deployed_engineer": [
+            "Embedded with biomedical researchers and pathologists to replace manual image annotation with \\textbf{Gene-Viewer}, a self-serve \\textbf{FastAPI + Canvas} spatial analytics platform.",
+            "Delivered end-to-end biological data pipelines in \\textbf{Python} and \\textbf{R} analyzing \\textbf{532,392 cells} across 11 clinical biopsies, translating complex statistical outputs into actionable medical insights.",
+            "Deployed automated \\textbf{PyTorch} cell segmentation models on GPU clusters, accelerating sample processing turnaround from days to minutes."
+          ],
+          "core_aiml": [
+            "Implemented \\textbf{CellPose} and \\textbf{StarDist} deep learning models in \\textbf{PyTorch} for automated cell segmentation across \\textbf{5GB multichannel DAPI-stained microscopy TIFFs}.",
+            "Trained a domain-adapted \\textbf{BioGPT} generative language model from scratch on biomedical corpora in \\textbf{PyTorch}, enabling automated literature and pathology reasoning.",
+            "Formulated Bayesian negative-binomial likelihood models (\\textbf{InSituType}) in \\textbf{Python/R} to classify \\textbf{532,392 single cells} across high-dimensional spatial transcriptomics profiles."
+          ],
+          "bioinformatics_ai": [
+            "Processed NanoString CosMx SMI spatial transcriptomics for \\textbf{532,392 cells $\\times$ 960 genes} across 11 lupus nephritis biopsies using \\textbf{InSituType} Bayesian modeling and scRNA-seq references.",
+            "Identified tertiary lymphoid structures (TLS) and immune infiltration patterns using \\textbf{Python (Scanpy)} and \\textbf{R (Seurat, InSituCor)}, isolating statistically significant DEGs.",
+            "Built \\textbf{Gene-Viewer} (\\textbf{FastAPI + HTML5 Canvas}) for interactive spatial exploration and deployed \\textbf{CellPose/StarDist} on \\textbf{5GB DAPI TIFFs} for precision cell segmentation.",
+            "Pretrained a domain-specific \\textbf{BioGPT} language model from scratch in \\textbf{PyTorch} on biomedical literature for automated molecular phenotype reasoning."
+          ],
+          "data_analyst_ds": [
+            "Performed statistical quality control, log10 normalization, and batch correction on \\textbf{532,392 cells $\\times$ 960 genes} across 11 clinical cohorts using \\textbf{Python (Scanpy)} and \\textbf{R}.",
+            "Conducted differential gene expression (DEG) analysis and hierarchical clustering, generating clear statistical visual reports that guided downstream clinical research.",
+            "Built \\textbf{Gene-Viewer} (FastAPI + Canvas) to visualize spatial distributions and quantitative expression densities for non-computational researchers."
+          ]
+        }
+      },
+      {
+        "id": "exp_humana",
+        "role": "Healthcare AI Fellow (SHERP 2026)",
+        "organization": "Humana Institute",
+        "dates": "Jun 2026 -- Aug 2026",
+        "location": "Houston, TX",
+        "summary": "Built Companion Care, an adaptive voice AI agent for Alzheimer's and dementia patients.",
+        "locked_metrics": {
+          "team_disciplines": "4 disciplines (Engineering, Medicine, Pharmacy, Public Health)",
+          "stakeholders": "Humana RN, strategy VP, physicians, psychiatrist, epidemiologist",
+          "competition": "Runner-Up in Shark Tank executive pitch"
+        },
+        "tech_stack": [
+          "TypeScript",
+          "JavaScript",
+          "TanStack Start",
+          "PostgreSQL",
+          "Supabase",
+          "Google Gemini",
+          "ElevenLabs",
+          "Backboard Memory",
+          "OAuth",
+          "Python"
+        ],
+        "framing_vectors": {
+          "agentic_swe": [
+            "Engineered \\textbf{Companion Care}, a voice-first agentic web application using \\textbf{TypeScript (TanStack Start)}, \\textbf{PostgreSQL (Supabase)}, and \\textbf{Google Gemini} for dementia patients.",
+            "Integrated low-latency \\textbf{ElevenLabs} voice synthesis and \\textbf{Backboard} persistent memory, enforcing strict HIPAA-aligned OAuth and confirmation boundaries.",
+            "Awarded \\textbf{Runner-Up} in executive pitch after conducting user studies with a \\textbf{Humana RN}, \\textbf{strategy VP}, and clinical physicians across 4 disciplines."
+          ],
+          "forward_deployed_engineer": [
+            "Led product discovery and user testing across 4 clinical disciplines, interviewing a \\textbf{Humana RN}, \\textbf{strategy VP}, and physicians to pinpoint patient cognitive care gaps.",
+            "Rapidly prototyped and deployed \\textbf{Companion Care} (TypeScript, Supabase, Gemini), achieving \\textbf{Runner-Up} honors in the final executive Shark Tank competition.",
+            "Translated complex clinical workflows into an intuitive voice-driven AI interface with verifiable memory persistence and safety controls."
+          ],
+          "core_aiml": [
+            "Architected multimodal conversational memory retrieval combining \\textbf{Google Gemini} context caching, \\textbf{ElevenLabs} voice synthesis, and \\textbf{Backboard} persistent state.",
+            "Designed ethical AI safety filters and guardrails for vulnerable dementia patients, winning \\textbf{Runner-Up} in the executive healthcare competition."
+          ],
+          "bioinformatics_ai": [
+            "Collaborated with clinicians across Medicine, Pharmacy, and Public Health to analyze longitudinal behavioral tracking schemas in \\textbf{PostgreSQL} for cognitive decline monitoring.",
+            "Presented clinical AI findings and memory support efficacy to Humana healthcare leadership, securing \\textbf{Runner-Up} in the interdisciplinary innovation challenge."
+          ],
+          "data_analyst_ds": [
+            "Designed longitudinal patient symptom-tracking schemas in \\textbf{SQL (PostgreSQL / Supabase)}, capturing cognitive engagement metrics across multi-week clinical trials.",
+            "Synthesized multi-disciplinary feedback from a \\textbf{Humana RN}, physicians, and epidemiologists into KPI scorecards, winning \\textbf{Runner-Up} in the final executive pitch."
+          ]
+        }
+      }
+    ],
+    "projects": [
+      {
+        "id": "proj_smartapply",
+        "title": "SmartApplyAI — Multi-LLM Agentic Browser Copilot",
+        "url": "https://github.com/chandrarup/SmartApplyAI",
+        "tech_stack_short": "Python, TypeScript, Flask, SQLite, Bedrock, Gemini",
+        "year": "2026",
+        "bullet": "Built local-first Chrome extension (\\textbf{TypeScript}) with \\textbf{Python (Flask, SQLite)} backend orchestrating \\textbf{AWS Bedrock} and \\textbf{Gemini} to parse ATS DOM trees and compile \\textbf{LaTeX} resumes.",
+        "tracks": ["agentic_swe", "forward_deployed_engineer", "data_analyst_ds"]
+      },
+      {
+        "id": "proj_hush",
+        "title": "Hush — Cloud-Native & On-Device Voice AI Assistant",
+        "url": "https://github.com/chandrarup/Hush",
+        "tech_stack_short": "Python, GKE, Docker, mlx-whisper, Gemini",
+        "year": "2026",
+        "bullet": "Engineered low-latency voice assistant in \\textbf{Python} pairing Apple Silicon \\textbf{mlx-whisper} with containerized \\textbf{Google Kubernetes Engine (GKE)} and \\textbf{Docker} microservices with automatic cloud fallback.",
+        "tracks": ["agentic_swe", "forward_deployed_engineer", "core_aiml"]
+      },
+      {
+        "id": "proj_alignment",
+        "title": "Post-Training LLM Alignment: SFT vs. DPO vs. GRPO",
+        "url": "https://github.com/chandrarup/eds6352-sft-dpo-grpo",
+        "tech_stack_short": "PyTorch, Hugging Face, LoRA, Qwen2.5",
+        "year": "2026",
+        "bullet": "Benchmarked \\textbf{SFT}, \\textbf{DPO}, and \\textbf{GRPO} alignment in \\textbf{Python (PyTorch, LoRA)} on Qwen2.5-1.5B, analyzing mathematical reasoning stability and KL-divergence across \\textbf{GSM8K} and \\textbf{SVAMP}.",
+        "tracks": ["core_aiml", "agentic_swe", "forward_deployed_engineer"]
+      },
+      {
+        "id": "proj_gpt2",
+        "title": "GPT-2 Style Small Language Model Built from Scratch",
+        "url": "https://github.com/chandrarup/gpt2-style-slm-from-scratch",
+        "tech_stack_short": "PyTorch, Transformers, BPE, TinyStories",
+        "year": "2025",
+        "bullet": "Implemented \\textbf{100M+ parameter} decoder Transformer from scratch in \\textbf{Python (PyTorch)} with custom \\textbf{BPE} tokenization and multi-head attention, converging on Microsoft \\textbf{TinyStories}.",
+        "tracks": ["core_aiml", "agentic_swe", "forward_deployed_engineer"]
+      },
+      {
+        "id": "proj_xenium",
+        "title": "Alzheimer's Spatial-Gradient Transcriptomics Analysis",
+        "url": "https://chandrarup.github.io/Portfolio/",
+        "tech_stack_short": "Python, Scanpy, NumPy, 10x Xenium",
+        "year": "2026",
+        "bullet": "Quantified spatial gene-expression gradients and DAM microglial activation as a function of amyloid-$\\beta$ distance on \\textbf{10x Genomics Xenium} sections using \\textbf{Python (Scanpy, SciPy)}.",
+        "tracks": ["bioinformatics_ai"]
+      },
+      {
+        "id": "proj_marl",
+        "title": "Multi-Agent Deep RL for Autonomous Highway Merging",
+        "url": "https://github.com/chandrarup/Multi-Agent-Deep-Reinforcement-Learning-for-Highway-Merging",
+        "tech_stack_short": "PyTorch, DDQN, CNN, Gym",
+        "year": "2023",
+        "bullet": "Trained \\textbf{Multi-Agent Reinforcement Learning} policy in \\textbf{Python (PyTorch)} with Double DQN and CNN pixel encoders, ensuring collision-free autonomous on-ramp vehicle merging.",
+        "tracks": ["core_aiml"]
+      }
+    ],
+    "publications": [
+      {
+        "id": "pub_gcat2024",
+        "title": "Detection of Real and Manipulated Videos using Transfer Learning",
+        "url": "https://doi.org/10.1109/GCAT62922.2024.10924003",
+        "venue": "IEEE GCAT",
+        "year": "Oct 2024",
+        "bullet": "Published peer-reviewed deepfake detection pipeline combining \\textbf{PyTorch} CNNs (ResNet, XceptionNet) with Bi-LSTM temporal models, achieving \\textbf{96\\% accuracy} across 6,500 videos.",
+        "tracks": ["core_aiml", "bioinformatics_ai"]
+      },
+      {
+        "id": "pub_icaccs2023",
+        "title": "Indian Sign Language Generation from Live Audio/Text (Tamil)",
+        "url": "https://doi.org/10.1109/ICACCS57279.2023.10112880",
+        "venue": "IEEE ICACCS",
+        "year": "Mar 2023",
+        "bullet": "Published real-time multimodal speech-to-sign pipeline in \\textbf{Python (NLP, OpenCV)}, alongside \\textbf{Word2Vec + Bi-LSTM} models on 10,000+ texts reaching \\textbf{82\\% accuracy}.",
+        "tracks": ["core_aiml", "data_analyst_ds"]
+      }
+    ],
+    "skills_master": {
+      "languages": ["Python (Expert)", "TypeScript", "JavaScript", "SQL", "R", "Java", "C++", "HTML/CSS"],
+      "agentic_and_llms": [
+        "LangChain",
+        "LangGraph",
+        "AutoGen",
+        "CrewAI",
+        "Model Context Protocol (MCP)",
+        "RAG",
+        "Prompt Engineering",
+        "Fine-tuning (SFT/DPO/GRPO)",
+        "LoRA/PEFT",
+        "OpenAI API",
+        "Anthropic Claude API",
+        "Google Gemini API",
+        "Azure OpenAI",
+        "Ollama"
+      ],
+      "ai_ml_frameworks": [
+        "PyTorch",
+        "TensorFlow",
+        "Hugging Face Transformers",
+        "Scikit-learn",
+        "BERTopic",
+        "Sentence Transformers",
+        "CellPose",
+        "StarDist",
+        "Computer Vision (OpenCV)",
+        "Bioinformatics (Scanpy, Seurat, InSituType)"
+      ],
+      "cloud_devops": [
+        "Docker",
+        "Kubernetes (GKE)",
+        "Git",
+        "CI/CD Pipelines",
+        "Azure APIM",
+        "AWS Bedrock",
+        "Linux",
+        "Bash"
+      ],
+      "databases_storage": [
+        "PostgreSQL (pgvector)",
+        "Supabase",
+        "Neo4j",
+        "Pinecone",
+        "ChromaDB",
+        "Milvus",
+        "SQLite",
+        "MongoDB"
+      ],
+      "web_fullstack": [
+        "FastAPI",
+        "Flask",
+        "React 19",
+        "Next.js",
+        "TanStack Start",
+        "REST APIs",
+        "HTML5 Canvas",
+        "Power BI (DAX)",
+        "Excel"
+      ]
+    },
+    "base_language_dependencies": {
+      "FastAPI": ["Python", "REST APIs"],
+      "Flask": ["Python", "REST APIs"],
+      "PyTorch": ["Python"],
+      "TensorFlow": ["Python"],
+      "Scikit-learn": ["Python"],
+      "LangChain": ["Python"],
+      "LangGraph": ["Python"],
+      "AutoGen": ["Python"],
+      "CrewAI": ["Python"],
+      "Scanpy": ["Python"],
+      "InSituType": ["Python", "R"],
+      "Seurat": ["R"],
+      "React": ["TypeScript", "JavaScript"],
+      "Next.js": ["TypeScript", "JavaScript"],
+      "TanStack Start": ["TypeScript", "JavaScript"],
+      "PostgreSQL": ["SQL"],
+      "pgvector": ["SQL", "Python"],
+      "Supabase": ["SQL", "TypeScript"],
+      "SQLite": ["SQL", "Python"],
+      "Neo4j": ["Cypher", "Python"],
+      "Power BI": ["DAX", "SQL"],
+      "PySpark": ["Python", "SQL"]
+    },
+    "archetype_routing": {
+      "agentic_swe": {
+        "title": "Agentic AI & Full-Stack AI Engineer",
+        "triggers": ["ai engineer", "agentic", "langgraph", "mcp", "fastapi", "next.js", "react", "typescript", "full-stack", "microservices"],
+        "section_order": ["Summary", "Experience", "Selected Projects", "Education", "Skills"],
+        "lead_experience_ids": ["exp_accenture", "exp_bauer", "exp_humana", "exp_bme_roysam"],
+        "default_project_ids": ["proj_smartapply", "proj_hush", "proj_gpt2"],
+        "summary_template": "AI Systems Engineer with 2+ years of production experience building enterprise agentic workflows, Model Context Protocol (MCP) tool integrations, and resilient REST microservices in Python (FastAPI) and TypeScript (React, Next.js). Architected multi-agent orchestration for Fortune-scale platforms across 30,000+ files and 15+ languages. M.S. in Engineering Data Science & AI candidate at University of Houston (GPA: 3.9/4.0)."
+      },
+      "forward_deployed_engineer": {
+        "title": "Forward Deployed Engineer (FDE)",
+        "triggers": ["forward deployed", "customer-facing", "solutions engineer", "technical scoping", "client delivery", "legacy integration", "apim", "rapid prototyping"],
+        "section_order": ["Summary", "Experience", "Selected Projects", "Education", "Skills"],
+        "lead_experience_ids": ["exp_accenture", "exp_bauer", "exp_humana", "exp_bme_roysam"],
+        "default_project_ids": ["proj_smartapply", "proj_hush", "proj_alignment"],
+        "summary_template": "Forward Deployed AI Engineer with 2+ years of enterprise experience translating ambiguous customer workflows into high-impact AI systems. Proven record scoping, prototyping, and integrating production LLM solutions across 30,000+ files, earning Accenture's Wall of Fame and Client Recognition awards. Expert in Python (FastAPI), TypeScript, cloud deployment, and cross-functional leadership. M.S. candidate at University of Houston (GPA: 3.9/4.0)."
+      },
+      "core_aiml": {
+        "title": "Core AI/ML & Deep Learning Engineer",
+        "triggers": ["machine learning engineer", "applied scientist", "pytorch", "tensorflow", "fine-tuning", "rlhf", "sft", "dpo", "grpo", "lora", "computer vision", "deep rl"],
+        "section_order": ["Summary", "Education", "Experience", "Selected Projects", "Publications", "Skills"],
+        "lead_experience_ids": ["exp_accenture", "exp_bme_roysam", "exp_bauer"],
+        "default_project_ids": ["proj_alignment", "proj_gpt2", "proj_marl"],
+        "summary_template": "Machine Learning Engineer with 2+ years of experience training and deploying deep learning models, transformer architectures, and post-training alignment pipelines (SFT, DPO, GRPO) in PyTorch. Published researcher with 2 IEEE papers in computer vision and multimodal NLP. Built a 100M+ parameter GPT-2 model from scratch and scaled RAG pipelines across 30,000+ codebases. M.S. candidate at University of Houston (GPA: 3.9/4.0)."
+      },
+      "bioinformatics_ai": {
+        "title": "Bioinformatics & Spatial Omics Scientist",
+        "triggers": ["bioinformatics", "computational biology", "single-cell", "scrna-seq", "spatial transcriptomics", "seurat", "scanpy", "r", "genomics", "microscopy"],
+        "section_order": ["Summary", "Education", "Experience", "Selected Projects", "Publications", "Skills"],
+        "lead_experience_ids": ["exp_bme_roysam", "exp_humana", "exp_accenture"],
+        "default_project_ids": ["proj_xenium", "pub_gcat2024", "proj_smartapply"],
+        "summary_template": "Computational Biologist & AI Researcher specializing in single-cell spatial transcriptomics, deep learning cell segmentation (CellPose, StarDist), and biomedical NLP (BioGPT). Modeled 532,392 cells x 960 genes across 11 lupus nephritis cohorts using InSituType Bayesian statistics, Scanpy, and Seurat, and built the Gene-Viewer FastAPI streaming platform. M.S. candidate at University of Houston (GPA: 3.9/4.0)."
+      },
+      "data_analyst_ds": {
+        "title": "Data Analyst & Decision Scientist",
+        "triggers": ["data analyst", "business intelligence", "power bi", "tableau", "sql", "etl", "excel", "cohort analysis", "attrition", "a/b testing", "kpis"],
+        "section_order": ["Summary", "Experience", "Selected Projects", "Education", "Skills"],
+        "lead_experience_ids": ["exp_bauer", "exp_accenture", "exp_humana", "exp_bme_roysam"],
+        "default_project_ids": ["proj_smartapply", "proj_hush", "pub_icaccs2023"],
+        "summary_template": "Data Analyst & Decision Scientist experienced in statistical modeling, SQL ETL pipelines, and executive BI dashboards. Modeled longitudinal attrition across a 289,000-row workforce panel using Python (Scikit-learn Random Forest, SHAP, ROC-AUC 0.714) and built executive Power BI DAX dashboards. Analyzed 30,000+ files at Accenture achieving 89% diagnostic coverage. M.S. candidate at University of Houston (GPA: 3.9/4.0)."
+      }
+    }
+  }
+}

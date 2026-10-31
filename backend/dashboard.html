@@ -593,6 +593,39 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
         </div>
       </div>
     </div>
+
+    <!-- Autonomous Qualification Engine (Whitepaper Architecture) -->
+    <div class="card" style="margin-bottom:16px;border-left:4px solid var(--accent);background:linear-gradient(180deg,#fffdfa,#fff)">
+      <div class="ch" style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">⚡</span>
+          <div>
+            <h3 style="margin:0;font-size:14px;color:var(--t1)">Autonomous Qualification Engine <span class="badge" style="background:#ffedd5;color:#9a3412;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;margin-left:6px">Whitepaper Architecture</span></h3>
+            <div style="font-size:12px;color:var(--t3);margin-top:2px">Deconstructs JD requirements into 4-part qualification proofs (WHAT+HOW+WHY+WHERE), locks to truth-grounded career metrics, and compiles to a strictly verified 1-page vector PDF.</div>
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;font-size:13px;color:var(--accent-d)">
+          <input type="checkbox" id="tlr-use-autonomous" checked style="accent-color:var(--accent);width:16px;height:16px"> Enabled
+        </label>
+      </div>
+      <div class="cb" id="tlr-autonomous-options" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding-top:12px;border-top:1px solid var(--border-light)">
+        <div class="fld" style="flex:1;min-width:240px">
+          <label style="font-size:11.5px;font-weight:600;color:var(--t2)">Target Archetype Track</label>
+          <select id="tlr-track-override" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;background:#fff">
+            <option value="">Auto-Detect from JD (Recommended)</option>
+            <option value="Agentic AI &amp; Generative Workflows">Agentic AI &amp; Generative Workflows</option>
+            <option value="Quantitative &amp; Bio-Informatics Systems">Quantitative &amp; Bio-Informatics Systems</option>
+            <option value="Large-Scale LLM Post-Training &amp; Distillation">Large-Scale LLM Post-Training &amp; Distillation</option>
+            <option value="Real-Time Low-Latency ML Infrastructure">Real-Time Low-Latency ML Infrastructure</option>
+            <option value="Cloud &amp; Distributed Systems Engineering">Cloud &amp; Distributed Systems Engineering</option>
+          </select>
+        </div>
+        <div style="font-size:11.5px;color:var(--t3);line-height:1.4;flex:2">
+          <strong>Enforced Constraints:</strong> 1-page vector PDF, line-budget character limits (165–230 chars), anti-slop verbs, zero-hallucination metric locks (30K+ files, 15+ languages, 289K HR rows, 532K cells &times; 960 genes).
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
       <button class="btn bo" id="tlr-s2-back">← Back</button>
       <button class="btn bp" id="tlr-genBtn">Generate My Resume →</button>
@@ -604,6 +637,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
     <!-- Sticky action bar: Download PDF + AI Rewrite stay here; edits open in a modal -->
     <div id="tlr-stickyBar" style="position:sticky;top:calc(var(--hh) + 8px);z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.06)">
       <button class="btn bo" id="tlr-openEditsBtn" type="button">✎ Review Edits</button>
+      <button class="btn bo" id="tlr-openProofsBtn" type="button" style="display:none;background:#fef3c7;border-color:#fde68a;color:#92400e;font-weight:600">⚡ Qualification Proofs</button>
       <span id="tlr-acceptCount" style="font-size:12.5px;font-weight:600;color:var(--t3);white-space:nowrap"></span>
       <input id="tlr-aiAsk" type="text" placeholder="Tell me how you'd like to tweak your resume…" style="flex:1;min-width:220px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px">
       <button class="btn bo" id="tlr-aiRewrite">✦ Edit With AI</button>
@@ -673,6 +707,24 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
         <button type="button" class="btn bo" id="tlr-editsAcceptAll">Accept all grounded</button>
         <button type="button" class="btn bp" id="tlr-editsDone">Done</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tsenta Qualification Proofs Modal -->
+<div class="tlr-edits-mo" id="tlr-proofsModal" role="dialog" aria-modal="true" aria-labelledby="tlr-proofsTitle">
+  <div class="tlr-edits-md" style="width:min(960px,96vw)">
+    <div class="tlr-edits-mh">
+      <div>
+        <div id="tlr-proofsTitle" style="font-weight:800;font-size:16px">Tsenta 4-Part Qualification Proofs</div>
+        <div id="tlr-proofsModalSub" style="font-size:12.5px;color:var(--t3);margin-top:2px">Every synthesized bullet mapped into WHAT + HOW + WHY + WHERE truth-grounded claims</div>
+      </div>
+      <button type="button" class="btn bo bsm" id="tlr-proofsClose" aria-label="Close">✕ Close</button>
+    </div>
+    <div class="tlr-edits-mb" id="tlr-proofsModalBody" style="display:flex;flex-direction:column;gap:12px;padding:16px"></div>
+    <div class="tlr-edits-mf">
+      <span id="tlr-proofsModalCount" style="font-size:12.5px;color:var(--t3)"></span>
+      <button type="button" class="btn bp" id="tlr-proofsDone">Close</button>
     </div>
   </div>
 </div>
@@ -2584,6 +2636,63 @@ function tlrCloseEditsModal(){
   if (window.tlrLastResult) tlrRenderPreview(window.tlrLastResult);
 }
 
+function tlrOpenProofsModal(){
+  const res = window.tlrLastResult;
+  if (!res || !res._qualification_proofs) return;
+  const mo = document.getElementById('tlr-proofsModal');
+  const body = document.getElementById('tlr-proofsModalBody');
+  const count = document.getElementById('tlr-proofsModalCount');
+  if (!mo || !body) return;
+
+  count.textContent = `${res._qualification_proofs.length} proof-backed qualifications (${res._archetype_track || 'Custom Track'})`;
+
+  body.innerHTML = res._qualification_proofs.map((p, idx) => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;background:#fff;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,0.03)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+        <span style="font-size:12px;font-weight:700;color:var(--accent-d)">Requirement ${idx+1}: ${tlrEsc(p.requirement || 'Core Qualification')}</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f3f4f6;color:var(--t3);font-family:monospace">${tlrEsc(p.where_grounding || '')}</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--t1);padding:8px 12px;background:#f8fafc;border-radius:6px;border-left:3px solid var(--accent);line-height:1.4">
+        ${tlrEsc(p.target_bullet)}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:8px;font-size:12px">
+        <div style="background:#f0fdf4;padding:8px 10px;border-radius:6px;border:1px solid #bbf7d0">
+          <strong style="color:#166534">WHAT:</strong> ${tlrEsc(p.what_action || '')}
+        </div>
+        <div style="background:#eff6ff;padding:8px 10px;border-radius:6px;border:1px solid #bfdbfe">
+          <strong style="color:#1e40af">HOW:</strong> ${tlrEsc(p.how_method || '')}
+        </div>
+        <div style="background:#fdf2f8;padding:8px 10px;border-radius:6px;border:1px solid #fbcfe8">
+          <strong style="color:#9d174d">WHY:</strong> ${tlrEsc(p.why_impact || '')}
+        </div>
+      </div>
+      ${(p.truth_metrics && p.truth_metrics.length) ? `
+        <div style="font-size:11.5px;color:var(--t3);margin-top:2px">
+          <strong>Locked Career Metrics:</strong> ${p.truth_metrics.map(m=>`<span class="badge" style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;margin-right:4px;font-weight:600">${tlrEsc(m)}</span>`).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+
+  mo.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function tlrCloseProofsModal(){
+  const mo = document.getElementById('tlr-proofsModal');
+  if (!mo) return;
+  mo.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('tlr-openProofsBtn')?.addEventListener('click', tlrOpenProofsModal);
+document.getElementById('tlr-proofsClose')?.addEventListener('click', tlrCloseProofsModal);
+document.getElementById('tlr-proofsDone')?.addEventListener('click', tlrCloseProofsModal);
+document.getElementById('tlr-proofsModal')?.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('tlr-proofsModal')) tlrCloseProofsModal();
+});
+
+
 function tlrRenderEditControls(res){
   // Prefer modal body; fall back to hidden #tlr-editControls for compat.
   const wrap = document.getElementById('tlr-editsModalBody') || document.getElementById('tlr-editControls');
@@ -3292,8 +3401,9 @@ document.getElementById('tlr-editsAcceptAll')?.addEventListener('click', () => {
   toast(n ? `Accepted ${n} grounded edit(s)` : 'No grounded edits to accept');
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('tlr-editsModal')?.classList.contains('open')) {
-    tlrCloseEditsModal();
+  if (e.key === 'Escape') {
+    if (document.getElementById('tlr-editsModal')?.classList.contains('open')) tlrCloseEditsModal();
+    if (document.getElementById('tlr-proofsModal')?.classList.contains('open')) tlrCloseProofsModal();
   }
 });
 ['tlr-co','tlr-role'].forEach(id => {
@@ -3341,12 +3451,16 @@ document.getElementById('tlr-genBtn').addEventListener('click', async () => {
   const role = document.getElementById('tlr-role').value.trim();
   const company = document.getElementById('tlr-co').value.trim();
   const llm = document.getElementById('tlr-llm').value;
+  const useAutonomous = document.getElementById('tlr-use-autonomous')?.checked ?? true;
+  const trackOverride = document.getElementById('tlr-track-override')?.value || null;
   const btn = document.getElementById('tlr-genBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinning">↻</span> Tailoring resume…';
   try {
     const res = await tlrFetch('/tailor-resume', { method:'POST', body: JSON.stringify({
       jd_text: jd, role, company, selected_skills: [...tlrSelectedSkills], selected_projects: [...tlrSelectedProjects], llm,
-      analysis: tlrAnalysis || {}
+      analysis: tlrAnalysis || {},
+      engine_mode: useAutonomous ? 'autonomous' : 'classic',
+      track_override: trackOverride,
     })});
     const expCount = (res.experience||[]).length;
     const bulCount = (res.experience||[]).reduce((n,e)=>n+(e.bullets||[]).length, 0);
@@ -3383,6 +3497,7 @@ function renderTlrOut(res){
   tlrUpdateJobCtx();
   tlrRenderEditControls(window.tlrLastResult);
   document.getElementById('tlr-est').textContent = res.score_estimate ? `Estimated fit: ${res.score_estimate}%` : '';
+  
   // Show which model was used
   const meta = res._meta || {};
   if(meta.model_used){
@@ -3394,6 +3509,46 @@ function renderTlrOut(res){
     if(!existing){
       const est = document.getElementById('tlr-est');
       est.parentNode.insertBefore(pill, est.nextSibling);
+    }
+  }
+
+  // Autonomous Engine Archetype & 1-Page Fit Badges
+  if (res._archetype_track) {
+    let archPill = document.getElementById('tlr-arch-pill');
+    if (!archPill) {
+      archPill = document.createElement('span');
+      archPill.id = 'tlr-arch-pill';
+      const est = document.getElementById('tlr-est');
+      est.parentNode.insertBefore(archPill, est.nextSibling);
+    }
+    archPill.style.cssText = 'display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:#fef3c7;color:#92400e;margin-left:8px;border:1px solid #fde68a';
+    archPill.textContent = '🎯 ' + res._archetype_track;
+  } else if (document.getElementById('tlr-arch-pill')) {
+    document.getElementById('tlr-arch-pill').remove();
+  }
+
+  if (res._page_fit) {
+    let pagePill = document.getElementById('tlr-page-pill');
+    if (!pagePill) {
+      pagePill = document.createElement('span');
+      pagePill.id = 'tlr-page-pill';
+      const est = document.getElementById('tlr-est');
+      est.parentNode.insertBefore(pagePill, est.nextSibling);
+    }
+    pagePill.style.cssText = 'display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:#dcfce7;color:#166534;margin-left:8px;border:1px solid #bbf7d0';
+    pagePill.textContent = '✓ ' + (res._page_fit.badge || '1 Page Guaranteed') + ` (${res._page_fit.fill_pct || 94}% fill)`;
+  } else if (document.getElementById('tlr-page-pill')) {
+    document.getElementById('tlr-page-pill').remove();
+  }
+
+  // Tsenta Qualification Proofs Toggle Button
+  const proofsBtn = document.getElementById('tlr-openProofsBtn');
+  if (proofsBtn) {
+    if (res._qualification_proofs && res._qualification_proofs.length > 0) {
+      proofsBtn.style.display = 'inline-block';
+      proofsBtn.textContent = `⚡ Qualification Proofs (${res._qualification_proofs.length})`;
+    } else {
+      proofsBtn.style.display = 'none';
     }
   }
   const sd = res.summary_diff || {};

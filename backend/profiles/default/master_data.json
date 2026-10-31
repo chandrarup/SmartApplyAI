@@ -38,6 +38,42 @@
             ]
         },
         {
+            "role": "AI & Data Science Researcher / Developer",
+            "company": "UH C.T. Bauer College of Business",
+            "duration": "Apr 2026 - Sep 2026",
+            "location": "Houston, TX",
+            "details": [
+                "Architected The Cost of Winning, a real-time multiplayer executive AI simulation in TypeScript (React 19, Next.js) and PostgreSQL (Supabase), serving 60+ MBA students across 13 branching decision scenes.",
+                "Integrated multi-provider LLM routing (Claude, OpenAI, Gemini) using Model Context Protocol (MCP) tools and built an LLM-as-judge evaluation rubric for automated scoring.",
+                "Engineered predictive classification pipelines in Python (Scikit-learn, SQL) on a 289,000-row longitudinal employee panel, utilizing SHAP explainability to achieve ROC-AUC 0.714.",
+                "Constructed executive Power BI dashboards with complex DAX measures, cohort drill-downs, and financial models, uncovering key turnover drivers for corporate retention planning."
+            ]
+        },
+        {
+            "role": "Spatial Omics & AI Research Collaborator",
+            "company": "Dr. Mohan's Lab & Prof. Roysam's Lab, UH BME",
+            "duration": "Jan 2026 - Present",
+            "location": "Houston, TX",
+            "details": [
+                "Processed NanoString CosMx SMI spatial transcriptomics for 532,392 cells x 960 genes across 11 lupus nephritis biopsies using InSituType Bayesian modeling and scRNA-seq references.",
+                "Identified tertiary lymphoid structures (TLS) and immune infiltration patterns using Python (Scanpy) and R (Seurat, InSituCor), isolating statistically significant DEGs.",
+                "Developed Gene-Viewer, a high-throughput visual analytics platform using Python (FastAPI) and JavaScript (HTML5 Canvas) streaming 532,392 single cells x 960 genes with sub-second latency.",
+                "Implemented CellPose and StarDist deep learning models in PyTorch for automated cell segmentation across 5GB multichannel DAPI-stained microscopy TIFFs.",
+                "Pretrained a domain-adapted BioGPT generative language model from scratch in PyTorch on biomedical literature for automated molecular phenotype reasoning."
+            ]
+        },
+        {
+            "role": "Healthcare AI Fellow (SHERP 2026)",
+            "company": "Humana Institute",
+            "duration": "Jun 2026 - Aug 2026",
+            "location": "Houston, TX",
+            "details": [
+                "Engineered Companion Care, a voice-first agentic web application using TypeScript (TanStack Start), PostgreSQL (Supabase), and Google Gemini for dementia patients.",
+                "Integrated low-latency ElevenLabs voice synthesis and Backboard persistent memory, enforcing strict HIPAA-aligned OAuth and confirmation boundaries.",
+                "Conducted stakeholder discovery interviews with a Humana RN, strategy VP, and clinical physicians across 4 disciplines, achieving Runner-Up in the final executive Shark Tank competition."
+            ]
+        },
+        {
             "role": "Undergraduate Research Assistant",
             "company": "Amrita Vishwa Vidyapeetham",
             "duration": "Jan 2023 - May 2023",
@@ -59,6 +95,33 @@
         }
     ],
     "projects": [
+        {
+            "title": "SmartApplyAI — Multi-LLM Agentic Browser Copilot",
+            "date": "2026",
+            "tech_stack": "Python, TypeScript, Flask, SQLite, Bedrock, Gemini, LaTeX",
+            "details": [
+                "Built local-first Chrome extension (TypeScript) with Python (Flask, SQLite) backend orchestrating AWS Bedrock and Gemini to parse ATS DOM trees and dynamically compile LaTeX resumes with diff review."
+            ],
+            "url": "https://github.com/chandrarup/SmartApplyAI"
+        },
+        {
+            "title": "Hush — Cloud-Native & On-Device Voice AI Assistant",
+            "date": "2026",
+            "tech_stack": "Python, GKE, Docker, mlx-whisper, Gemini",
+            "details": [
+                "Engineered low-latency voice assistant in Python pairing Apple Silicon mlx-whisper with containerized Google Kubernetes Engine (GKE) and Docker microservices with cloud-to-local fallback routing."
+            ],
+            "url": "https://github.com/chandrarup/Hush"
+        },
+        {
+            "title": "Post-Training LLM Alignment: SFT vs. DPO vs. GRPO",
+            "date": "2026",
+            "tech_stack": "PyTorch, Hugging Face Transformers, LoRA/PEFT, Qwen2.5",
+            "details": [
+                "Benchmarked SFT, DPO, and GRPO post-training alignment in Python (PyTorch, LoRA) on Qwen2.5-1.5B, analyzing mathematical reasoning stability and KL-divergence across GSM8K and SVAMP."
+            ],
+            "url": "https://github.com/chandrarup/eds6352-sft-dpo-grpo"
+        },
         {
             "title": "GPT-2 Style Small Language Model --- Built from Scratch",
             "url": "https://github.com/chandrarup/Build-SLM-From-Scratch",

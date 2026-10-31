@@ -1,0 +1,15 @@
+Role: Senior Agentic AI Systems Engineer
+Company: Anthropic
+Location: San Francisco, CA (or Remote)
+
+About the Role:
+We are seeking an Agentic AI Systems Engineer to design and deploy autonomous multi-agent systems, Model Context Protocol (MCP) tool integrations, and low-latency REST APIs. In this role, you will architect agent-to-agent workflows, build high-throughput RAG pipelines over vector stores (PostgreSQL with pgvector, Pinecone), and implement rigorous automated evaluation harnesses (LLM-as-judge).
+
+Requirements:
+- 2+ years of production experience building LLM pipelines and agentic workflows using Python, FastAPI, and frameworks like LangGraph or LangChain.
+- Strong full-stack proficiency with TypeScript, React or Next.js, and modern web architectures.
+- Deep expertise in knowledge retrieval, RAG, dense/sparse embeddings, and vector databases (PostgreSQL/pgvector, Pinecone, Neo4j).
+- Experience engineering Model Context Protocol (MCP) servers and clients for dynamic tool routing.
+- Familiarity with containerization (Docker, Kubernetes) and CI/CD automation.
+- Proven ability to mentor junior engineers and collaborate with cross-functional product teams.
+- Master's degree in Computer Science, Data Science, Artificial Intelligence, or related technical field preferred.

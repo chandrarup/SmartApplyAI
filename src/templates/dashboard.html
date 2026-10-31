@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Autonomous Resume Engine — Chandra Rup Daka</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0F172A;
+      --surface: #1E293B;
+      --surface-border: #334155;
+      --accent: #38BDF8;
+      --accent-hover: #0EA5E9;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --green: #10B981;
+      --green-bg: rgba(16, 185, 129, 0.12);
+      --amber: #F59E0B;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --red: #EF4444;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(30, 41, 59, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--surface-border);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text);
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .header-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.6);
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--surface-border);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .header-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.15s;
+    }
+    .header-link:hover { color: var(--accent); }
+
+    main {
+      flex: 1;
+      padding: 24px 28px;
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 24px;
+      max-width: 1700px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    @media (max-width: 1024px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    input, select, textarea {
+      background: #0F172A;
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    textarea {
+      min-height: 240px;
+      resize: vertical;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .quick-samples {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .sample-btn {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sample-btn:hover {
+      background: var(--surface-border);
+      color: var(--text);
+    }
+
+    .btn-submit {
+      background: var(--accent);
+      color: #0F172A;
+      border: none;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .btn-submit:hover { background: var(--accent-hover); }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Results */
+    .results-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 480px;
+      color: var(--text-dim);
+      gap: 12px;
+      text-align: center;
+    }
+    .results-empty svg { opacity: 0.4; }
+
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .metric-card {
+      background: #0F172A;
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .metric-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 8px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 12px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .tab-btn.active {
+      background: var(--surface-border);
+      color: var(--text);
+    }
+
+    .preview-container {
+      background: #0B0F19;
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      min-height: 600px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .preview-container img {
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      border-radius: 4px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .preview-container iframe {
+      width: 100%;
+      height: 720px;
+      border: none;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .action-btn {
+      background: #0F172A;
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .action-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .spinner {
+      border: 2px solid rgba(15, 23, 42, 0.4);
+      border-top: 2px solid #0F172A;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <h1>Antigravity Autonomous Resume Engine</h1>
+      <span class="badge">v2.0 • 1-Page Vector LaTeX</span>
+    </div>
+    <div class="header-links">
+      <div class="status-pill">
+        <span class="dot"></span>
+        <span>Candidate: Chandra Rup Daka</span>
+      </div>
+      <a class="header-link" href="/docs" target="_blank">Swagger API</a>
+      <a class="header-link" href="https://github.com/chandrarup" target="_blank">GitHub</a>
+      <a class="header-link" href="https://chandrarup.github.io/Portfolio/" target="_blank">Portfolio</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Input Form -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>Target Job Description</span>
+        <span id="charCount" style="font-size:11px; font-weight:normal;">0 chars</span>
+      </div>
+
+      <div class="quick-samples">
+        <span style="font-size:11px; color:var(--text-dim); align-self:center;">Samples:</span>
+        <button class="sample-btn" onclick="loadSample('anthropic')">Anthropic (Agentic SWE)</button>
+        <button class="sample-btn" onclick="loadSample('nanostring')">NanoString (Spatial Omics)</button>
+        <button class="sample-btn" onclick="loadSample('humana')">Humana (Healthcare AI)</button>
+      </div>
+
+      <div class="form-group">
+        <label for="companyName">Target Company Name (Optional)</label>
+        <input type="text" id="companyName" placeholder="e.g. Anthropic, OpenAI, Meta, Google">
+      </div>
+
+      <div class="form-group">
+        <label for="roleTitle">Target Role Title (Optional)</label>
+        <input type="text" id="roleTitle" placeholder="e.g. Senior Agentic AI Systems Engineer">
+      </div>
+
+      <div class="form-group">
+        <label for="trackOverride">Archetype Track Override</label>
+        <select id="trackOverride">
+          <option value="">Auto-Detect from Job Description</option>
+          <option value="agentic_swe">Track 1: Agentic AI & Full-Stack SWE</option>
+          <option value="bioinformatics_ai">Track 2: Bioinformatics & Spatial Omics</option>
+          <option value="core_aiml">Track 3: Core AI/ML & Deep Learning</option>
+          <option value="forward_deployed_engineer">Track 4: Forward Deployed Engineer (FDE)</option>
+          <option value="data_analyst_ds">Track 5: Data Analyst & Decision Scientist</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="rawJd">Raw Job Description Text</label>
+        <textarea id="rawJd" placeholder="Paste the full job posting text here..."></textarea>
+      </div>
+
+      <button id="btnSubmit" class="btn-submit" onclick="submitGeneration()">
+        <span id="btnText">Synthesize & Compile 1-Page Resume</span>
+      </button>
+
+      <div id="statusMessage" style="font-size:12px; color:var(--text-muted); text-align:center; display:none;"></div>
+    </div>
+
+    <!-- Right Column: Verification & Preview -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>Deterministic Verification & Visual Preview</span>
+        <div class="action-row" id="downloadRow" style="display:none;">
+          <a id="btnDlPdf" class="action-btn" href="#" target="_blank">📄 Download PDF</a>
+          <a id="btnDlTex" class="action-btn" href="#" target="_blank">📝 Download .TEX</a>
+        </div>
+      </div>
+
+      <div id="resultsEmpty" class="results-empty">
+        <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        <div>Paste a Job Description on the left and click <strong>Synthesize & Compile</strong>.</div>
+        <div style="font-size:12px;">Your verified 1-page PDF and 150-DPI rasterized preview will render here in real time.</div>
+      </div>
+
+      <div id="resultsContent" style="display:none; flex-direction:column; gap:16px;">
+        <div class="metrics-bar">
+          <div class="metric-card">
+            <div id="mPages" class="metric-val" style="color:var(--green);">1 Page</div>
+            <div class="metric-label">Deterministic Page Count</div>
+          </div>
+          <div class="metric-card">
+            <div id="mFill" class="metric-val">--%</div>
+            <div class="metric-label">Vertical Fill Density</div>
+          </div>
+          <div class="metric-card">
+            <div id="mOverfull" class="metric-val">0.0 pt</div>
+            <div class="metric-label">Overfull \hbox Margin</div>
+          </div>
+          <div class="metric-card">
+            <div id="mScore" class="metric-val" style="color:var(--accent);">--/100</div>
+            <div class="metric-label">Target Role Fit Score</div>
+          </div>
+        </div>
+
+        <div style="background:#0F172A; border:1px solid var(--surface-border); border-radius:8px; padding:12px; font-size:12px;">
+          <div><strong style="color:var(--accent);">Archetype Classified:</strong> <span id="rTrack">--</span></div>
+          <div style="margin-top:4px;"><strong style="color:var(--accent);">Top JD Skills Proved:</strong> <span id="rSkills">--</span></div>
+          <div style="margin-top:4px;"><strong style="color:var(--accent);">Base Languages Paired:</strong> <span id="rLangs">--</span></div>
+        </div>
+
+        <div class="tabs">
+          <button id="tabPng" class="tab-btn active" onclick="switchTab('png')">150-DPI Rasterized PNG Preview</button>
+          <button id="tabPdf" class="tab-btn" onclick="switchTab('pdf')">Vector PDF Viewer</button>
+          <button id="tabAudit" class="tab-btn" onclick="switchTab('audit')">Fit Audit Breakdown</button>
+        </div>
+
+        <div id="previewPngContainer" class="preview-container">
+          <img id="previewImg" src="" alt="Rendered 1-Page Resume Preview">
+        </div>
+
+        <div id="previewPdfContainer" class="preview-container" style="display:none;">
+          <iframe id="previewIframe" src=""></iframe>
+        </div>
+
+        <div id="previewAuditContainer" style="display:none; background:#0F172A; border:1px solid var(--surface-border); border-radius:8px; padding:16px; font-size:13px; line-height:1.6; max-height:600px; overflow-y:auto;">
+          <pre id="auditPre" style="font-family:'JetBrains Mono', monospace; font-size:12px; white-space:pre-wrap;"></pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const samples = {
+      anthropic: {
+        company: "Anthropic",
+        title: "Senior Agentic AI Systems Engineer",
+        track: "agentic_swe",
+        jd: `Role: Senior Agentic AI Systems Engineer\\nCompany: Anthropic\\nLocation: San Francisco, CA (or Remote)\\n\\nAbout the Role:\\nWe are seeking an Agentic AI Systems Engineer to design and deploy autonomous multi-agent systems, Model Context Protocol (MCP) tool integrations, and low-latency REST APIs. In this role, you will architect agent-to-agent workflows, build high-throughput RAG pipelines over vector stores (PostgreSQL with pgvector, Pinecone), and implement rigorous automated evaluation harnesses (LLM-as-judge).\\n\\nRequirements:\\n- 2+ years of production experience building LLM pipelines and agentic workflows using Python, FastAPI, and frameworks like LangGraph or LangChain.\\n- Strong full-stack proficiency with TypeScript, React or Next.js, and modern web architectures.\\n- Deep expertise in knowledge retrieval, RAG, dense/sparse embeddings, and vector databases (PostgreSQL/pgvector, Pinecone, Neo4j).\\n- Experience engineering Model Context Protocol (MCP) servers and clients for dynamic tool routing.\\n- Familiarity with containerization (Docker, Kubernetes) and CI/CD automation.\\n- Proven ability to mentor junior engineers and collaborate with cross-functional product teams.`
+      },
+      nanostring: {
+        company: "NanoString / 10x Genomics",
+        title: "Senior Spatial Omics Scientist",
+        track: "bioinformatics_ai",
+        jd: `Role: Senior Computational Biologist / Spatial Omics Scientist\\nCompany: NanoString / 10x Genomics\\nLocation: Boston, MA (or Remote)\\n\\nAbout the Job:\\nWe are looking for a Computational Biologist / Spatial Omics Scientist to develop statistical models and analysis pipelines for high-plex single-cell spatial transcriptomics data. You will analyze CosMx and Xenium imaging datasets, perform cell segmentation, and conduct differential gene expression profiling.\\n\\nKey Responsibilities:\\n- Build analysis pipelines in Python and R using tools such as Scanpy, Seurat, and spatial statistical modeling.\\n- Perform cell typing and spatial clustering on high-dimensional single-cell datasets (100k+ cells across hundreds of genes).\\n- Implement deep learning computer vision models (CellPose, StarDist) on multi-gigabyte fluorescence microscopy TIFF images.\\n- Develop interactive visual analytics platforms (FastAPI, HTML5 Canvas) for biomedical collaborators.`
+      },
+      humana: {
+        company: "Humana Healthcare",
+        title: "Healthcare AI Fellow",
+        track: "agentic_swe",
+        jd: `Role: Healthcare AI Fellow\\nCompany: Humana Healthcare\\nLocation: Houston, TX / Remote\\n\\nSeeking a Healthcare AI Fellow to build patient-facing voice AI applications, adaptive memory architectures, and clinical AI workflows. Experience interviewing clinical RNs and physicians, rapid prototyping in TypeScript, Supabase, and Gemini API required.`
+      }
+    };
+
+    function loadSample(key) {
+      const s = samples[key];
+      if (!s) return;
+      document.getElementById('companyName').value = s.company;
+      document.getElementById('roleTitle').value = s.title;
+      document.getElementById('trackOverride').value = s.track;
+      document.getElementById('rawJd').value = s.jd.replace(/\\\\n/g, '\\n');
+      updateCharCount();
+    }
+
+    function updateCharCount() {
+      const text = document.getElementById('rawJd').value;
+      document.getElementById('charCount').textContent = `${text.length} chars`;
+    }
+    document.getElementById('rawJd').addEventListener('input', updateCharCount);
+
+    function switchTab(tab) {
+      document.getElementById('tabPng').classList.toggle('active', tab === 'png');
+      document.getElementById('tabPdf').classList.toggle('active', tab === 'pdf');
+      document.getElementById('tabAudit').classList.toggle('active', tab === 'audit');
+
+      document.getElementById('previewPngContainer').style.display = tab === 'png' ? 'flex' : 'none';
+      document.getElementById('previewPdfContainer').style.display = tab === 'pdf' ? 'flex' : 'none';
+      document.getElementById('previewAuditContainer').style.display = tab === 'audit' ? 'block' : 'none';
+    }
+
+    let lastResponse = null;
+
+    async function submitGeneration() {
+      const rawJd = document.getElementById('rawJd').value.trim();
+      if (!rawJd) {
+        alert('Please paste a job description or select one of the samples.');
+        return;
+      }
+
+      const btn = document.getElementById('btnSubmit');
+      const btnText = document.getElementById('btnText');
+      const statusMsg = document.getElementById('statusMessage');
+
+      btn.disabled = true;
+      btnText.innerHTML = '<span class="spinner"></span> Synthesizing & Verifying Single-Page Layout...';
+      statusMsg.style.display = 'block';
+      statusMsg.textContent = 'Running Stage 2 Deconstruction & Closed-Loop pdflatex (2 passes)...';
+
+      try {
+        const payload = {
+          raw_jd: rawJd,
+          company_name: document.getElementById('companyName').value.trim() || null,
+          role_title: document.getElementById('roleTitle').value.trim() || null,
+          track_override: document.getElementById('trackOverride').value || null
+        };
+
+        const res = await fetch('/api/generate-resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Compilation or validation error');
+        }
+
+        lastResponse = data;
+        renderResults(data);
+      } catch (err) {
+        alert('Error generating resume: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Synthesize & Compile 1-Page Resume';
+        statusMsg.style.display = 'none';
+      }
+    }
+
+    function renderResults(data) {
+      document.getElementById('resultsEmpty').style.display = 'none';
+      document.getElementById('resultsContent').style.display = 'flex';
+      document.getElementById('downloadRow').style.display = 'flex';
+
+      const comp = data.compilation_result;
+      const jd = data.deconstructed_jd;
+      const audit = data.fit_audit;
+
+      document.getElementById('mPages').textContent = `${comp.pages} Page`;
+      document.getElementById('mFill').textContent = `${comp.vertical_fill_pct}%`;
+      document.getElementById('mOverfull').textContent = `${comp.max_overfull_pt.toFixed(1)} pt`;
+      document.getElementById('mScore').textContent = `${audit ? audit.overall_fit_score : 85}/100`;
+
+      document.getElementById('rTrack').textContent = jd.selected_track.toUpperCase();
+      document.getElementById('rSkills').textContent = jd.top_hard_skills.slice(0, 8).join(', ');
+      document.getElementById('rLangs').textContent = jd.implied_base_languages.join(', ');
+
+      const stem = comp.tex_path.split('/').pop().replace('.tex', '');
+      const pdfUrl = `/api/download/${stem}.pdf`;
+      const texUrl = `/api/download/${stem}.tex`;
+      const pngUrl = `/api/download/${stem}.png?t=` + new Date().getTime();
+
+      document.getElementById('btnDlPdf').href = pdfUrl;
+      document.getElementById('btnDlTex').href = texUrl;
+
+      document.getElementById('previewImg').src = pngUrl;
+      document.getElementById('previewIframe').src = pdfUrl;
+
+      // Populate audit text
+      if (audit) {
+        let auditTxt = `CANDIDATE FIT & COMPLIANCE AUDIT\\n`;
+        auditTxt += `Target: ${audit.company_name} — ${audit.role_title} (${audit.selected_track})\\n`;
+        auditTxt += `Overall Fit Score: ${audit.overall_fit_score}/100\\n\\n`;
+        auditTxt += `STRONG MATCHES (${audit.strong_matches.length}):\\n  • ${audit.strong_matches.join('\\n  • ')}\\n\\n`;
+        if (audit.reframed_matches.length) {
+          auditTxt += `REFRAMED MATCHES:\\n  • ${audit.reframed_matches.join('\\n  • ')}\\n\\n`;
+        }
+        if (audit.true_gaps.length) {
+          auditTxt += `TRUE GAPS TO ADDRESS:\\n  • ${audit.true_gaps.join('\\n  • ')}\\n\\n`;
+        }
+        if (audit.notes) {
+          auditTxt += `ADVISORY NOTES:\\n${audit.notes}\\n`;
+        }
+        document.getElementById('auditPre').textContent = auditTxt;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -180,7 +180,7 @@ def test_queue_mark_applied_endpoint(client, dbs):
         "company": "Acme", "role": "ML Engineer", "status": STATUS_READY,
         "url": "https://boards.greenhouse.io/acme/jobs/1",
     })
-    r = client.post(f"/queue/{app['id']}/mark-applied")
+    r = client.post(f"/tracker/applications/{app['id']}/mark-applied")
     assert r.status_code == 200
     body = r.json()
     assert body["ok"] is True
