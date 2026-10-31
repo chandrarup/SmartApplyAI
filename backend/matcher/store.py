@@ -8,6 +8,11 @@ from pathlib import Path
 import sqlite3
 from typing import Any
 
+try:
+    from backend.matcher.attenuation import attenuate_match_score
+except ImportError:  # pragma: no cover - package-style import
+    from matcher.attenuation import attenuate_match_score  # type: ignore
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -106,13 +111,31 @@ def gate_and_store(
     with _connect(matches_db_path) as conn:
         for row in survivors:
             job = row["job"]
-            band = band_for(row.get("match_pct", 0), strong_threshold)
-            counts[band] += 1
             fit_obj = dict(row.get("fit") or {})
+            raw_match_pct = int(row.get("match_pct", 0) or 0)
+            match_pct = raw_match_pct
             if check_url:
                 try:
                     live = check_url(job.get("apply_url") or "")
                     fit_obj["liveness"] = live
+                    if live.get("result") == "expired":
+                        first_seen = job.get("first_seen")
+                        age_days = 0.0
+                        if first_seen:
+                            try:
+                                age_days = max(
+                                    0.0,
+                                    (datetime.now(timezone.utc) - datetime.fromisoformat(
+                                        str(first_seen).replace("Z", "+00:00")
+                                    )).total_seconds() / 86400.0,
+                                )
+                            except (TypeError, ValueError):
+                                age_days = 0.0
+                        match_pct = int(round(attenuate_match_score(
+                            raw_match_pct, "expired", age_days=age_days
+                        )))
+                        fit_obj["raw_match_pct"] = raw_match_pct
+                        fit_obj["liveness"]["age_days"] = round(age_days, 3)
                     # Also persist onto jobs row when identity is known
                     try:
                         from scraper.liveness import persist_job_liveness
@@ -126,6 +149,8 @@ def gate_and_store(
                         "code": "liveness_error",
                         "reason": type(exc).__name__,
                     }
+            band = band_for(match_pct, strong_threshold)
+            counts[band] += 1
             conn.execute(
                 """
                 INSERT INTO matches (
@@ -153,7 +178,7 @@ def gate_and_store(
                     job.get("apply_url", ""),
                     float(row.get("stage1_score", 0.0) or 0.0),
                     float(row.get("stage2_score", 0.0) or 0.0),
-                    int(row.get("match_pct", 0) or 0),
+                    match_pct,
                     band,
                     job.get("description_text", "") or "",
                     json.dumps(fit_obj, ensure_ascii=False),
@@ -314,4 +339,3 @@ def list_customized(
             (profile_id,),
         ).fetchall()
     return [_row_to_queue_item(r) for r in rows]
-

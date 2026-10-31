@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
 from scraper.normalize import lever_created_at_to_iso, normalize_lever, normalize_job  # noqa: E402
-from scraper.liveness import classify_liveness  # noqa: E402
+from scraper.liveness import check_url, classify_liveness  # noqa: E402
 from scraper.providers.registry import load_providers, resolve_provider  # noqa: E402
 from scraper.providers.base import CompanyEntry  # noqa: E402
 from scraper.providers.trackers import parse_markdown_tables, TrackerSchemaError  # noqa: E402
@@ -111,6 +111,52 @@ def test_tracker_schema_fail_loud_when_no_job_table():
 def test_liveness_expired_404():
     r = classify_liveness(status=404, requested_url="https://x", final_url="https://x", body_text="")
     assert r["result"] == "expired"
+
+
+def test_liveness_expired_410():
+    r = classify_liveness(status=410, requested_url="https://x", final_url="https://x", body_text="")
+    assert r["result"] == "expired"
+
+
+def test_liveness_closed_banner_is_expired():
+    r = classify_liveness(
+        status=200,
+        requested_url="https://x/jobs/123",
+        final_url="https://x/jobs/123",
+        body_text="Applications are closed for this position.",
+    )
+    assert r["result"] == "expired"
+
+
+def test_liveness_generic_redirect_is_uncertain():
+    r = classify_liveness(
+        status=200,
+        requested_url="https://x/careers",
+        final_url="https://x/home",
+        body_text="Apply now. " * 80,
+    )
+    assert r["result"] == "uncertain"
+    assert r["code"] == "generic_redirect"
+
+
+def test_check_url_uses_injected_http_client():
+    class Response:
+        status_code = 200
+        url = "https://x/jobs/123"
+        text = "<html><body>" + ("About this role. " * 40) + "Apply</body></html>"
+
+    class Client:
+        def __init__(self):
+            self.calls = []
+
+        def get(self, *args, **kwargs):
+            self.calls.append((args, kwargs))
+            return Response()
+
+    client = Client()
+    result = check_url("https://x/jobs/123", http_client=client)
+    assert result["result"] == "live"
+    assert client.calls[0][0] == ("https://x/jobs/123",)
 
 
 def test_liveness_bot_challenge_is_uncertain_never_expired():

@@ -137,6 +137,19 @@ def classify_liveness(
             "reason": f"pattern matched: {expired_body.pattern}",
         }
 
+    if (
+        requested_url
+        and final_url
+        and requested_url.rstrip("/") != final_url.rstrip("/")
+        and _job_id_token(requested_url) is None
+        and _job_id_token(final_url) is None
+    ):
+        return {
+            "result": "uncertain",
+            "code": "generic_redirect",
+            "reason": f"redirected to {final_url}",
+        }
+
     # Permalink that lost its job id after redirect → uncertain (portal migration
     # can 301 live postings too; false "expired" permanently filters a real job).
     job_id = _job_id_token(requested_url)
@@ -172,7 +185,12 @@ def classify_liveness(
     }
 
 
-def check_url(url: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
+def check_url(
+    url: str,
+    *,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    http_client: Any | None = None,
+) -> dict[str, Any]:
     if not url or not str(url).startswith("http"):
         return {
             "result": "uncertain",
@@ -181,7 +199,8 @@ def check_url(url: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> dict[str
             "checked_at": datetime.now(timezone.utc).isoformat(),
         }
     try:
-        resp = requests.get(
+        client = http_client or requests
+        resp = client.get(
             url,
             timeout=timeout,
             headers={"User-Agent": USER_AGENT},
@@ -191,6 +210,21 @@ def check_url(url: str, *, timeout: float = DEFAULT_TIMEOUT_SECONDS) -> dict[str
         body = re.sub(r"<script[\s\S]*?</script>", " ", resp.text or "", flags=re.I)
         body = re.sub(r"<style[\s\S]*?</style>", " ", body, flags=re.I)
         body = re.sub(r"<[^>]+>", " ", body)
+        requested_token = _job_id_token(url)
+        final_token = _job_id_token(str(resp.url))
+        if (
+            str(resp.url).rstrip("/") != url.rstrip("/")
+            and requested_token is None
+            and final_token is None
+        ):
+            result = {
+                "result": "uncertain",
+                "code": "generic_redirect",
+                "reason": f"redirected to {resp.url}",
+            }
+            result["checked_at"] = datetime.now(timezone.utc).isoformat()
+            result["url"] = url
+            return result
         result = classify_liveness(
             status=resp.status_code,
             requested_url=url,
