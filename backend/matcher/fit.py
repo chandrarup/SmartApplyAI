@@ -19,6 +19,12 @@ except ImportError:
     from knowledge import store as knowledge_store  # type: ignore
     import scoring  # type: ignore
     from matcher.legitimacy import assess_legitimacy  # type: ignore
+try:
+    from backend.matcher.evidence import ground_fit, retrieve_evidence
+    from backend.matcher.explanations import add_fit_explanation
+except ImportError:
+    from matcher.evidence import ground_fit, retrieve_evidence  # type: ignore
+    from matcher.explanations import add_fit_explanation  # type: ignore
 
 
 def fit_candidates(
@@ -30,6 +36,7 @@ def fit_candidates(
     strong_threshold: int = 85,
     enable_legitimacy_web: bool = True,
     web_search=None,
+    evidence_search=None,
 ) -> list[dict[str, Any]]:
     if not reranked:
         return []
@@ -39,12 +46,18 @@ def fit_candidates(
 
     for item in selected:
         job = item.get("job") or {}
+        evidence: list[dict[str, Any]] = []
         boost = int(item.get("search_boost") or 0)
         if not boost and search_boost:
             tags = job.get("matched_searches") or []
             if tags:
                 boost = int(search_boost)
         try:
+            evidence = retrieve_evidence(
+                profile_id,
+                job.get("description_text") or job.get("title") or "",
+                search=evidence_search,
+            )
             fit_obj = scoring.score_job(
                 job.get("description_text") or "",
                 profile,
@@ -52,6 +65,7 @@ def fit_candidates(
                 company=str(job.get("company") or ""),
                 llm=llm_prefer,
                 search_boost=boost,
+                evidence=evidence,
             )
         except Exception:  # noqa: BLE001 — one bad job never kills the run
             fit_obj = scoring.fallback_fit("Fit stage exception")
@@ -74,6 +88,8 @@ def fit_candidates(
                 "note": "Legitimacy check failed soft — treat as caution.",
             }
 
+        fit_obj = ground_fit(fit_obj, evidence)
+        fit_obj = add_fit_explanation(fit_obj)
         item["fit"] = fit_obj
         item["match_pct"] = int(fit_obj.get("match_pct", 0) or 0)
 

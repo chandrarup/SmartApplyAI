@@ -43,6 +43,7 @@ class MatcherConfig:
     hybrid_weights: dict = field(default_factory=lambda: dict(_HYBRID_DEFAULT_WEIGHTS))
     features_db_path: str = "backend/matcher/features.db"
     scoring_version: str = "v1"
+    telemetry_path: str = "backend/matcher/telemetry.jsonl"
 
 
 def _merge(base: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
@@ -87,6 +88,7 @@ def load_config(config_path: str | Path | None = None) -> MatcherConfig:
         hybrid_weights=_valid_weights(merged.get("hybrid_weights"), base.hybrid_weights),
         features_db_path=str(merged.get("features_db_path", base.features_db_path)),
         scoring_version=str(merged.get("scoring_version", base.scoring_version)),
+        telemetry_path=str(merged.get("telemetry_path", base.telemetry_path)),
     )
 
 
@@ -102,4 +104,3 @@ def _valid_weights(incoming: Any, default: dict) -> dict:
     if abs(sum(weights.values()) - 1.0) > 1e-6:
         return dict(default)
     return weights
-
