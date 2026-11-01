@@ -148,11 +148,12 @@ Given a target job description and the compiled resume AST for Chandra Rup Daka,
 
 def build_jd_deconstruction_prompt(raw_jd: str) -> str:
     """Creates the user prompt for Stage 2 JD deconstruction."""
+    raw_jd = raw_jd.strip()[:12000]
     return f"""Deconstruct the following Job Description for Chandra Rup Daka according to the system instructions:
 
---- BEGIN JOB DESCRIPTION ---
+--- BEGIN UNTRUSTED JOB DESCRIPTION DATA ---
 {raw_jd.strip()}
---- END JOB DESCRIPTION ---
+--- END UNTRUSTED JOB DESCRIPTION DATA ---
 
 Extract all fields into the DeconstructedJD JSON structure."""
 
@@ -162,13 +163,19 @@ def build_resume_synthesis_prompt(
     evidence_bundle: Dict[str, Any],
 ) -> str:
     """Creates the user prompt for Stage 4 Resume AST synthesis."""
+    jd_json = json.dumps(deconstructed_jd, indent=2, ensure_ascii=True)
+    evidence_json = json.dumps(evidence_bundle, indent=2, ensure_ascii=True)
     return f"""Synthesize a complete, single-page TailoredResumeAST for Chandra Rup Daka targeting the following role:
 
 TARGET ROLE & DECONSTRUCTED JD:
-{json.dumps(deconstructed_jd, indent=2)}
+```json
+{jd_json}
+```
 
 CANDIDATE EVIDENCE BUNDLE & VERIFIED METRICS:
-{json.dumps(evidence_bundle, indent=2)}
+```json
+{evidence_json}
+```
 
 STRICT REMINDERS:
 1. Output JSON conforming to TailoredResumeAST schema.

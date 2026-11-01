@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from PIL import Image
 
 from src.schemas import TailoredResumeAST, CompilationResult
+from src.validator import strip_latex_formatting, validate_resume_ast_input
 
 LAYOUT_LEVELS = [
     {
@@ -56,6 +57,30 @@ LAYOUT_LEVELS = [
         "item_v": "0.2pt",
     },
 ]
+
+MAX_COMPILE_RETRIES = len(LAYOUT_LEVELS)
+
+
+def validate_page_budget(ast: TailoredResumeAST) -> List[str]:
+    """Validate likely widow/orphan risks before invoking TeX."""
+    diagnostics = validate_resume_ast_input(ast)
+    summary_len = len(strip_latex_formatting(ast.summary_latex))
+    if summary_len > 460:
+        diagnostics.append(f"Summary exceeds page budget ({summary_len} plain characters; max 460).")
+    for entry in ast.experience_entries:
+        if not entry.bullets:
+            diagnostics.append(f"Experience entry '{entry.role_title}' has no bullets.")
+    for project in ast.project_entries:
+        header_len = len(strip_latex_formatting(
+            f"{project.title} | {project.tech_stack_short} {project.year}"
+        ))
+        # The renderer abbreviates common stacks; reserve a hard failure for
+        # headers that remain clearly unsafe even after those substitutions.
+        if header_len > 110:
+            diagnostics.append(
+                f"Project '{project.title}' header exceeds widow-safe width ({header_len} > 110 characters)."
+            )
+    return diagnostics
 
 
 def build_preamble(level: Dict[str, str]) -> str:
@@ -359,11 +384,25 @@ def compile_and_verify_single_page(
     os.makedirs(output_dir, exist_ok=True)
     tmp_dir = "/tmp"
 
+    preflight_errors = validate_page_budget(ast)
+    if preflight_errors:
+        return CompilationResult(
+            status="validation_error",
+            level_used=0,
+            pages=0,
+            vertical_fill_pct=0.0,
+            max_overfull_pt=0.0,
+            pdf_path="",
+            tex_path="",
+            png_preview_path=None,
+            errors=preflight_errors,
+        )
+
     last_error = ""
     spillover_sample = ""
     warnings: List[str] = []
 
-    for level_idx, level in enumerate(LAYOUT_LEVELS):
+    for level_idx, level in enumerate(LAYOUT_LEVELS[:MAX_COMPILE_RETRIES]):
         full_tex = render_ast_to_latex(ast, level)
 
         tmp_tex = os.path.join(tmp_dir, f"{stem}.tex")
@@ -433,7 +472,7 @@ def compile_and_verify_single_page(
     # If all 4 levels failed to keep it to 1 page
     return CompilationResult(
         status="spillover_error",
-        level_used=3,
+        level_used=MAX_COMPILE_RETRIES - 1,
         pages=2,
         vertical_fill_pct=100.0,
         max_overfull_pt=0.0,
@@ -442,5 +481,5 @@ def compile_and_verify_single_page(
         png_preview_path=None,
         spillover_text=spillover_sample,
         warnings=warnings,
-        errors=[last_error or "Exceeded 1 page even at Level 3 max compression."],
+        errors=[last_error or f"Exceeded 1 page after {MAX_COMPILE_RETRIES} bounded layout retries."],
     )

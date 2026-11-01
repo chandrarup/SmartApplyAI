@@ -5,7 +5,7 @@ compilation verification, and fit auditing.
 """
 
 from typing import List, Literal, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 ArchetypeTrack = Literal[
     "agentic_swe",
@@ -27,8 +27,8 @@ SectionName = Literal[
 
 class DeconstructedJD(BaseModel):
     """Structured extraction of requirements and metadata from a raw Job Description."""
-    company_name: str = Field(description="Name of the hiring organization")
-    role_title: str = Field(description="Official job title")
+    company_name: str = Field(min_length=1, max_length=200, description="Name of the hiring organization")
+    role_title: str = Field(min_length=1, max_length=200, description="Official job title")
     selected_track: ArchetypeTrack = Field(
         description="Best-fit archetype track based on JD trigger keywords and core responsibilities"
     )
@@ -53,9 +53,15 @@ class DeconstructedJD(BaseModel):
         description="Any hard knockout filters found in JD (e.g. US Citizenship Required, Active Secret Clearance)",
     )
     archetype_justification: str = Field(
+        max_length=1000,
         default="",
         description="Plain-English explanation of why the selected track was chosen",
     )
+
+    @field_validator("top_hard_skills", "implied_base_languages", "soft_skills_and_workflow", "true_gaps", "knockout_flags")
+    @classmethod
+    def normalize_lists(cls, values: List[str]) -> List[str]:
+        return list(dict.fromkeys(item.strip() for item in values if item and item.strip()))
 
 
 class RoleEntryAST(BaseModel):
@@ -95,6 +101,8 @@ class TailoredResumeAST(BaseModel):
         description="Output stem name for generated .tex, .pdf, and .png files",
     )
     summary_latex: str = Field(
+        min_length=1,
+        max_length=2500,
         description="3-line LaTeX summary (340-410 plain characters) echoing exact JD role title and top skills"
     )
     section_order: List[SectionName] = Field(
@@ -126,6 +134,13 @@ class TailoredResumeAST(BaseModel):
     skill_categories: List[SkillCategoryAST] = Field(
         description="Grouped technical skills with bijective grounding to bullet proofs"
     )
+
+    @field_validator("section_order")
+    @classmethod
+    def unique_sections(cls, value: List[SectionName]) -> List[SectionName]:
+        if len(value) != len(set(value)):
+            raise ValueError("section_order must not contain duplicate sections")
+        return value
 
 
 class QualificationProof(BaseModel):

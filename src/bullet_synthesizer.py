@@ -23,9 +23,21 @@ from src.prompt_templates import (
 )
 from src.validator import (
     validate_bullet_constraints,
+    validate_resume_ast_input,
     repair_banned_verbs,
     strip_latex_formatting,
 )
+
+
+def _order_bullets_by_jd_grounding(bullets: list[str], skills: list[str]) -> list[str]:
+    """Put exact JD-grounded proofs first while preserving stable source order."""
+    normalized_skills = [skill.lower() for skill in skills if skill]
+    ranked = []
+    for index, bullet in enumerate(bullets):
+        plain = strip_latex_formatting(bullet).lower()
+        score = sum(1 for skill in normalized_skills if skill in plain)
+        ranked.append((-score, index, bullet))
+    return [item[2] for item in sorted(ranked)]
 
 
 def synthesize_deterministic_ast(
@@ -50,6 +62,9 @@ def synthesize_deterministic_ast(
 
     for exp in evidence_bundle.get("selected_experience", []):
         raw_bullets = exp.get("bullets", [])
+        raw_bullets = _order_bullets_by_jd_grounding(
+            raw_bullets, deconstructed_jd.top_hard_skills
+        )
         clean_bullets = []
         for b in raw_bullets:
             repaired = repair_banned_verbs(b)
@@ -111,7 +126,7 @@ def synthesize_deterministic_ast(
     if not publication_entries and "Publications" in section_order:
         section_order.remove("Publications")
 
-    return TailoredResumeAST(
+    ast = TailoredResumeAST(
         target_filename_stem=stem,
         summary_latex=summary,
         section_order=section_order,
@@ -123,6 +138,10 @@ def synthesize_deterministic_ast(
         include_certifications_in_edu=True,
         skill_categories=skill_categories,
     )
+    diagnostics = validate_resume_ast_input(ast)
+    if diagnostics:
+        raise ValueError("Invalid deterministic resume AST: " + "; ".join(diagnostics))
+    return ast
 
 
 def synthesize_resume_ast(

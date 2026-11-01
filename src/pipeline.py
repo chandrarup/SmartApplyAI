@@ -19,7 +19,7 @@ from src.schemas import (
 )
 from src.jd_analyzer import deconstruct_jd
 from src.knowledge_graph import load_candidate_knowledge_graph, select_evidence_bundle
-from src.bullet_synthesizer import synthesize_resume_ast
+from src.bullet_synthesizer import synthesize_resume_ast, synthesize_deterministic_ast
 from src.validator import validate_bullet_constraints
 from src.latex_compiler import compile_and_verify_single_page
 from src.fit_auditor import audit_resume_fit, render_markdown_audit
@@ -82,6 +82,17 @@ def generate_tailored_resume(
         output_dir=output_dir,
         stem_override=output_stem,
     )
+
+    # LLM output is untrusted input: recover from structural/page-budget violations
+    # with the deterministic evidence-grounded assembler instead of returning a
+    # success-shaped response or an avoidable client error.
+    if compilation_res.status == "validation_error":
+        ast = synthesize_deterministic_ast(deconstructed, evidence_bundle, stem=output_stem)
+        compilation_res = compile_and_verify_single_page(
+            ast,
+            output_dir=output_dir,
+            stem_override=output_stem,
+        )
 
     # If compilation failed or produced >1 page, report details
     if compilation_res.status != "success":
