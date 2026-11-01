@@ -677,6 +677,7 @@ def score_job(
     llm_call: Callable[..., str] | None = None,
     search_boost: int = 0,
     knockouts: dict[str, str] | None = None,
+    evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Canonical five-dimension fit. Used by Analyze, Tailor, and matcher stage 3.
 
@@ -695,6 +696,12 @@ def score_job(
     llm_call = llm_call or call_llm
     profile_text = _profile_snapshot_for_fit(profile)
     prompt = _five_dim_prompt(jd_text, profile_text, title=title, company=company)
+    if evidence:
+        prompt += "\n\nPROFILE EVIDENCE REFERENCES (use only these for matched_skills):\n"
+        prompt += "\n".join(
+            f"- {item.get('evidence_ref', '')}: {str(item.get('text', ''))[:240]}"
+            for item in evidence[:8]
+        )
     try:
         raw = llm_call(
             [{"role": "user", "content": prompt}],

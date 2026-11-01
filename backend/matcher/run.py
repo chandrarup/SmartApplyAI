@@ -8,6 +8,8 @@ from pathlib import Path
 
 from .config import load_config
 from .fit import fit_candidates
+from .ingest import ingest_jobs
+from .telemetry import append_event
 from .prefilter import prefilter_jobs
 from .recall import recall_candidates
 from .rerank import rerank_candidates
@@ -115,12 +117,12 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
     matches_db = _resolve(root, cfg.matches_db_path)
     features_db = _resolve(root, cfg.features_db_path)
 
-    survivors = prefilter_jobs(
+    survivors = ingest_jobs(prefilter_jobs(
         jobs_db_path=jobs_db,
         role_mode=cfg.role_mode,
         filters_path=filters_path,
         search_bypass_internship=cfg.search_bypass_internship,
-    )
+    ))
     if not survivors:
         print("[done] no survivors after prefilter")
         return {"stored": 0, "strong": 0, "stretch": 0, "stage": "prefilter"}
@@ -196,6 +198,18 @@ def run_pipeline(profile_id: str = "default", config: str = "") -> dict:
             match_threshold=cfg.match_threshold,
             strong_threshold=cfg.strong_threshold,
         )
+        for item in fitted:
+            append_event(
+                _resolve(root, cfg.telemetry_path),
+                {
+                    "event": "match_scored",
+                    "profile_id": profile_id,
+                    "source_ats": (item.get("job") or {}).get("source_ats", ""),
+                    "external_id": (item.get("job") or {}).get("external_id", ""),
+                    "match_pct": int(item.get("match_pct", 0) or 0),
+                    "grounding": (item.get("fit") or {}).get("grounding", {}),
+                },
+            )
     else:
         stored = {"stored": 0, "strong": 0, "stretch": 0}
 
