@@ -170,6 +170,44 @@
   setTimeout(probeHydration, 1500);
   setTimeout(probeHydration, 4000);
 
+  // Workday keeps controlled values behind React Fiber props. The bridge is
+  // deliberately request/response based and never exposes arbitrary page data.
+  function getFiber(node) {
+    if (!node) return null;
+    const key = Object.keys(node).find(k => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$"));
+    return key ? node[key] : null;
+  }
+  function setWorkdayFiberValue(node, value) {
+    let fiber = getFiber(node);
+    for (let i = 0; fiber && i < 20; i++, fiber = fiber.return) {
+      const props = fiber.memoizedProps || fiber.pendingProps;
+      if (props && typeof props.onChange === "function") {
+        props.onChange({ target: node, currentTarget: node, type: "change", bubbles: true, value });
+        return true;
+      }
+    }
+    return false;
+  }
+  window.addEventListener("message", ev => {
+    if (ev.source !== window || ev.data?.source !== "__lh_workday_request__") return;
+    const node = ev.data.selector ? document.querySelector(ev.data.selector) : null;
+    const ok = node ? setWorkdayFiberValue(node, ev.data.value) : false;
+    window.postMessage({ source: "__lh_workday_response__", requestId: ev.data.requestId, ok }, "*");
+  });
+
+  function emitFinalize(url, status) {
+    if (!/finali[sz]e|submit|application/i.test(url || "")) return;
+    dispatch({ kind: "finalize", url, status, ts: Date.now() });
+  }
+  const originalFetch = window.fetch;
+  if (originalFetch) {
+    window.fetch = async function(resource, init) {
+      const response = await originalFetch.apply(this, arguments);
+      try { emitFinalize(typeof resource === "string" ? resource : resource?.url, response.status); } catch {}
+      return response;
+    };
+  }
+
   // Signal readiness
   dispatch({ kind: "ready", ts: Date.now() });
 })();

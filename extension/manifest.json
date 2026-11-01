@@ -42,6 +42,12 @@
     "*://*.paycom.com/*",
     "*://*.workable.com/*",
     "*://*.recruitee.com/*",
+    "*://*.brassring.com/*",
+    "*://*.kronos.com/*",
+    "*://*.oraclecloud.com/*",
+    "*://*.oracle.com/*",
+    "*://*.phenompeople.com/*",
+    "*://*.phenom.com/*",
     "*://*.greenhouse.io/*",
     "*://api.ashbyhq.com/*",
     "*://boards-api.greenhouse.io/*",
@@ -75,6 +81,12 @@
         "*://*.paycom.com/*",
         "*://*.workable.com/*",
         "*://*.recruitee.com/*"
+        ,"*://*.brassring.com/*"
+        ,"*://*.kronos.com/*"
+        ,"*://*.oraclecloud.com/*"
+        ,"*://*.oracle.com/*"
+        ,"*://*.phenompeople.com/*"
+        ,"*://*.phenom.com/*"
       ],
       "js": [
         "content.js"
@@ -114,6 +126,12 @@
         "*://*.paycom.com/*",
         "*://*.workable.com/*",
         "*://*.recruitee.com/*"
+        ,"*://*.brassring.com/*"
+        ,"*://*.kronos.com/*"
+        ,"*://*.oraclecloud.com/*"
+        ,"*://*.oracle.com/*"
+        ,"*://*.phenompeople.com/*"
+        ,"*://*.phenom.com/*"
       ]
     }
   ]
