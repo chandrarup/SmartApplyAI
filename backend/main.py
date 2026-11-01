@@ -1,3 +1,11 @@
+import os
+import sys
+
+# Ensure backend directory is in sys.path
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
@@ -85,6 +93,17 @@ import llm_provider
 import scoring
 PDF_OUTPUT_DIR = os.path.join(os.getcwd(), "generated_resumes")
 os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
+
+try:
+    import dashboard_api
+    app.include_router(dashboard_api.router)
+except ImportError:
+    try:
+        from backend import dashboard_api
+        app.include_router(dashboard_api.router)
+    except Exception as _e:
+        log.warning(f"Could not load pipeline dashboard router: {_e}")
+
 
 # ─────────────────────────────────────────────────────────────────
 # MULTI-PROFILE MANAGEMENT

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ashby React Controlled Mock Application</title>
+</head>
+<body>
+  <div id="ashby-react-root" class="_ashby_application_container">
+    <h1>Ravenna Systems — Agentic Software Engineer</h1>
+    <form id="ashby-form">
+      <input type="hidden" name="_ashby_signature" value="mock-sig-12345">
+
+      <div class="field-container">
+        <label for="ashby-name">Full Name</label>
+        <input type="text" id="ashby-name" name="name" value="">
+      </div>
+
+      <div class="field-container">
+        <label for="ashby-email">Email Address</label>
+        <input type="email" id="ashby-email" name="email" value="">
+      </div>
+
+      <div class="field-container">
+        <label for="ashby-phone">Phone Number</label>
+        <input type="tel" id="ashby-phone" name="phone" value="">
+      </div>
+
+      <div class="field-container">
+        <label for="ashby-user-field">Custom Project Note (Pre-edited by user)</label>
+        <!-- Pre-edited field with userEdited = "true" to verify NO OVERWRITE -->
+        <input type="text" id="ashby-user-field" name="user_note" value="My manual note must be preserved!" data-user-edited="true">
+      </div>
+
+      <div class="field-container">
+        <label for="ashby-resume">Resume Attachment</label>
+        <input type="file" id="ashby-resume" name="resume" accept=".pdf">
+      </div>
+
+      <button type="submit" id="ashby-submit-btn">Submit Application</button>
+    </form>
+  </div>
+</body>
+</html>

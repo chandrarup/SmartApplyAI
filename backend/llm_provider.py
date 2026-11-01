@@ -405,10 +405,17 @@ def call_llm(messages: list, temperature: float = 0.3, system: str = "",
     raise RuntimeError(f"All LLM providers failed. Last error: {last_err}")
 
 
+def _repair_json_string(s: str) -> str:
+    """Removes trailing commas and cleans common LLM JSON syntax defects."""
+    # Remove trailing commas before } or ]
+    s = re.sub(r",\s*([\]}])", r"\1", s)
+    return s.strip()
+
+
 def clean_json(raw: str) -> str:
     """Robustly extract the first valid JSON object or array from LLM output.
     Handles: fenced blocks (```json / ```JSON / ```), preamble text, postamble text,
-    multiple code blocks, and truncated JSON gracefully.
+    multiple code blocks, trailing commas, and truncated JSON gracefully.
     """
     if not raw:
         return raw
@@ -420,7 +427,13 @@ def clean_json(raw: str) -> str:
             json.loads(candidate)
             return candidate
         except (json.JSONDecodeError, ValueError):
-            continue
+            repaired = _repair_json_string(candidate)
+            try:
+                json.loads(repaired)
+                return repaired
+            except (json.JSONDecodeError, ValueError):
+                continue
+
     # 2. Depth-track to find the first balanced { or [ — handles preamble/postamble.
     # Try whichever opener appears FIRST in the text, so a root array like [{"x":1}]
     # returns the whole array instead of the inner object.
@@ -456,5 +469,17 @@ def clean_json(raw: str) -> str:
                         json.loads(candidate)
                         return candidate
                     except (json.JSONDecodeError, ValueError):
-                        break
-    return raw_s  # last resort — let caller handle json.loads error
+                        repaired = _repair_json_string(candidate)
+                        try:
+                            json.loads(repaired)
+                            return repaired
+                        except (json.JSONDecodeError, ValueError):
+                            break
+    # Last resort: try repairing raw_s directly
+    repaired_raw = _repair_json_string(raw_s)
+    try:
+        json.loads(repaired_raw)
+        return repaired_raw
+    except Exception:
+        pass
+    return raw_s  # let caller handle json.loads error

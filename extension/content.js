@@ -725,11 +725,52 @@ const STATE_ABBREVIATIONS = {
   "district of columbia":"DC",
 };
 
+// Track user-typed interactions so automation never overwrites human edits
+if (typeof document !== "undefined") {
+  document.addEventListener("input", (e) => {
+    if (e.isTrusted && e.target && e.target.dataset) {
+      e.target.dataset.userEdited = "true";
+    }
+  }, true);
+}
+
 // ─────────────────────────────────────────────
-// NATIVE INPUT SETTER (React/Angular/Vue compatible)
+// RECURSIVE SHADOW DOM SELECTOR (Workday / Web Components)
+// ─────────────────────────────────────────────
+function queryAllDeep(selector, root = (typeof document !== "undefined" ? document : null)) {
+  if (!root) return [];
+  const results = [];
+  function traverse(node) {
+    if (!node) return;
+    if (node.querySelectorAll) {
+      try {
+        const matches = node.querySelectorAll(selector);
+        for (const el of matches) results.push(el);
+      } catch (e) {}
+    }
+    if (node.shadowRoot) {
+      traverse(node.shadowRoot);
+    }
+    const children = node.children || node.childNodes || [];
+    for (const child of children) {
+      if (child.nodeType === 1) {
+        traverse(child);
+      }
+    }
+  }
+  traverse(root);
+  return Array.from(new Set(results));
+}
+
+// ─────────────────────────────────────────────
+// NATIVE INPUT SETTER (React 18/19 / Angular / Vue compatible)
 // ─────────────────────────────────────────────
 function setNativeValue(element, value) {
-  // BUG 4: Handle contenteditable divs (SmartRecruiters, newer Lever, BambooHR)
+  if (!element) return false;
+  if (element.value && element.dataset && element.dataset.userEdited === "true") {
+    return false; // Never overwrite user edits
+  }
+  // Handle contenteditable divs (SmartRecruiters, newer Lever, BambooHR)
   if (element.contentEditable === "true" || element.getAttribute("role") === "textbox") {
     element.focus();
     try {
@@ -742,7 +783,7 @@ function setNativeValue(element, value) {
       element.innerText = String(value);
     }
     dispatchComposedInputEvents(element);
-    return;
+    return true;
   }
   const proto = element.tagName === "TEXTAREA"
     ? window.HTMLTextAreaElement.prototype
@@ -757,6 +798,7 @@ function setNativeValue(element, value) {
     if (tracker) tracker.setValue(String(value));
   } catch (e) {}
   dispatchComposedInputEvents(element);
+  return true;
 }
 
 function dispatchComposedInputEvents(element) {
@@ -781,6 +823,37 @@ function workdayFiberSet(element, value) {
   setTimeout(() => window.removeEventListener("message", onMessage), 0);
   return handled;
 }
+}
+
+// ─────────────────────────────────────────────
+// TAILORED PDF ATTACHMENT VIA DATATRANSFER
+// ─────────────────────────────────────────────
+async function attachTailoredPdf(fileInput, jobId, apiUrl = "http://localhost:8000") {
+  if (!fileInput) return false;
+  try {
+    const res = await fetch(`${apiUrl}/api/jobs/${jobId}/pdf-base64`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    const byteCharacters = atob(data.pdf_base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: "application/pdf" });
+    const file = new File([blob], "Chandra_Rup_Daka_Resume.pdf", { type: "application/pdf" });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event("input", { bubbles: true }));
+    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  } catch (err) {
+    console.error("attachTailoredPdf error:", err);
+    return false;
+  }
+}
+
 
 function setSelectValue(element, value) {
   if (!value) return false;

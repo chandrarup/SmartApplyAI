@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Workday Shadow DOM Mock Application</title>
+</head>
+<body>
+  <div id="workday-app">
+    <h1>Workday Candidate Portal — Humana Institute</h1>
+    
+    <!-- Outer Custom Component -->
+    <workday-application-panel id="app-panel"></workday-application-panel>
+  </div>
+
+  <script>
+    // Custom element with open shadowRoot
+    class WorkdayApplicationPanel extends HTMLElement {
+      connectedCallback() {
+        const shadow = this.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+          <style>
+            .panel { padding: 16px; border: 1px solid #ccc; font-family: sans-serif; }
+            .row { margin-bottom: 12px; }
+            label { display: block; font-weight: bold; margin-bottom: 4px; }
+            input { padding: 8px; width: 300px; }
+          </style>
+          <div class="panel">
+            <h3>Candidate Identification (Inside Shadow DOM)</h3>
+            <div class="row">
+              <label for="wd-first-name">Legal First Name</label>
+              <input type="text" id="wd-first-name" data-automation-id="legalNameSection_firstName">
+            </div>
+            <div class="row">
+              <label for="wd-last-name">Legal Last Name</label>
+              <input type="text" id="wd-last-name" data-automation-id="legalNameSection_lastName">
+            </div>
+            <div class="row">
+              <label for="wd-email">Primary Email</label>
+              <input type="email" id="wd-email" data-automation-id="email">
+            </div>
+            <div class="row">
+              <label for="wd-phone">Mobile Phone</label>
+              <input type="tel" id="wd-phone" data-automation-id="phone-number">
+            </div>
+            <!-- Nested custom element -->
+            <workday-resume-section id="resume-section"></workday-resume-section>
+          </div>
+        `;
+      }
+    }
+    customElements.define('workday-application-panel', WorkdayApplicationPanel);
+
+    class WorkdayResumeSection extends HTMLElement {
+      connectedCallback() {
+        const shadow = this.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+          <div style="margin-top: 16px; padding: 12px; background: #f9f9f9; border: 1px dashed #999;">
+            <label style="font-weight: bold;">Attach Tailored Resume (Nested Shadow DOM)</label>
+            <input type="file" id="wd-resume-file" data-automation-id="file-upload-input" accept=".pdf">
+          </div>
+        `;
+      }
+    }
+    customElements.define('workday-resume-section', WorkdayResumeSection);
+  </script>
+</body>
+</html>

@@ -69,6 +69,7 @@ backend/knowledge/knowledge.db
 backend/scraper/jobs.db
 backend/matcher/matches.db
 backend/teach/reviews.db
+smartapply.db
 
 # Test harness artifacts
 test-results/

@@ -103,8 +103,8 @@
         ],
         "framing_vectors": {
           "agentic_swe": [
-            "Built production \\textbf{REST APIs} and \\textbf{agent-to-agent (A2A)} workflows in \\textbf{Python} using \\textbf{FastAPI} and \\textbf{LangGraph}, validating schemas and handling retry fallbacks across \\textbf{30,000+ files}.",
-            "Architected \\textbf{Model Context Protocol (MCP)} connectors and multi-agent coordination pipelines (LangChain, AutoGen) for automated code translation and test generation, achieving \\textbf{89\\% diagnostic coverage}.",
+            "Built production \\textbf{REST APIs} and \\textbf{agent-to-agent (A2A)} workflows in \\textbf{Python} using \\textbf{FastAPI} and \\textbf{LangGraph}, validating schemas and handling retry fallbacks across \\textbf{30,000+ files} and \\textbf{15+ languages}.",
+            "Architected \\textbf{Model Context Protocol (MCP)} connectors and multi-agent coordination pipelines (\\textbf{LangChain, AutoGen}) for automated code translation and test generation, achieving \\textbf{89\\% diagnostic coverage}.",
             "Implemented enterprise \\textbf{RAG} with \\textbf{PostgreSQL (pgvector)}, \\textbf{Pinecone}, and \\textbf{Neo4j} knowledge graphs using \\textbf{BERTopic} and sentence transformers, cutting review cycles from weeks to hours.",
             "Mentored \\textbf{30+ engineers} on \\textbf{Python} agentic frameworks and \\textbf{Docker} CI/CD standards, earning the \\textbf{Wall of Fame (Q4 FY24)} and \\textbf{Client Recognition Award} for enterprise delivery."
           ],
@@ -115,13 +115,13 @@
             "Led client enablement workshops and mentored \\textbf{30+ engineers} on production GenAI deployment, establishing reusable platform SDKs that drove zero-defect enterprise rollouts."
           ],
           "core_aiml": [
-            "Trained and evaluated dense and sparse semantic retrieval models using \\textbf{Sentence Transformers}, \\textbf{BERTopic}, and \\textbf{Neo4j} knowledge graphs across \\textbf{30,000+ multi-language files}.",
+            "Trained and evaluated dense and sparse semantic retrieval models using \\textbf{Sentence Transformers}, \\textbf{BERTopic}, and \\textbf{Neo4j} knowledge graphs across \\textbf{30,000+ multi-language files} and \\textbf{15+ languages}.",
             "Constructed offline evaluation harnesses for \\textbf{RAG} and LLM agent outputs, measuring precision, recall, and hallucination rates to secure \\textbf{89\\% diagnostic coverage} in production.",
             "Engineered cross-encoder reranking pipelines over \\textbf{PostgreSQL (pgvector)}, \\textbf{ChromaDB}, and \\textbf{Pinecone}, optimizing similarity search latency across high-dimensional code embeddings.",
             "Mentored \\textbf{30+ engineers} on fine-tuning strategies, prompt optimization, and \\textbf{PyTorch} ML workflows, earning the \\textbf{Wall of Fame (Q4 FY24)} and \\textbf{Best Team Award}."
           ],
           "bioinformatics_ai": [
-            "Constructed enterprise-scale \\textbf{Neo4j} entity-relationship knowledge graphs and \\textbf{Python} semantic parsers processing unstructured records across \\textbf{30,000+ files} with \\textbf{89\\% coverage}.",
+            "Constructed enterprise-scale \\textbf{Neo4j} entity-relationship knowledge graphs and \\textbf{Python} semantic parsers processing unstructured records across \\textbf{30,000+ files} and \\textbf{15+ languages} with \\textbf{89\\% coverage}.",
             "Engineered multi-vector embedding stores in \\textbf{PostgreSQL (pgvector)} and \\textbf{Pinecone} with \\textbf{BERTopic} clustering, accelerating complex semantic querying from days to hours.",
             "Architected modular microservices using \\textbf{Python (FastAPI)} and \\textbf{Docker} containers to automate multi-stage data extraction and relational indexing for cross-functional teams."
           ],
@@ -332,7 +332,7 @@
         "url": "https://github.com/chandrarup/eds6352-sft-dpo-grpo",
         "tech_stack_short": "PyTorch, Hugging Face, LoRA, Qwen2.5",
         "year": "2026",
-        "bullet": "Benchmarked \\textbf{SFT}, \\textbf{DPO}, and \\textbf{GRPO} alignment in \\textbf{Python (PyTorch, LoRA)} on Qwen2.5-1.5B, analyzing mathematical reasoning stability and KL-divergence across \\textbf{GSM8K} and \\textbf{SVAMP}.",
+        "bullet": "Benchmarked \\textbf{SFT}, \\textbf{DPO}, and \\textbf{GRPO} alignment in \\textbf{Python (PyTorch, DeepSpeed, LoRA)} on Qwen2.5-1.5B, analyzing mathematical reasoning stability and KL-divergence across \\textbf{GSM8K} and \\textbf{SVAMP}.",
         "tracks": ["core_aiml", "agentic_swe", "forward_deployed_engineer"]
       },
       {
@@ -361,6 +361,42 @@
         "year": "2023",
         "bullet": "Trained \\textbf{Multi-Agent Reinforcement Learning} policy in \\textbf{Python (PyTorch)} with Double DQN and CNN pixel encoders, ensuring collision-free autonomous on-ramp vehicle merging.",
         "tracks": ["core_aiml"]
+      },
+      {
+        "id": "proj_cost_of_winning",
+        "title": "The Cost of Winning — Multi-Agent Executive Simulation",
+        "url": "https://github.com/chandrarup/TheCostOfWinning",
+        "tech_stack_short": "TypeScript, React 19, Next.js, Supabase, Claude API",
+        "year": "2026",
+        "bullet": "Architected real-time AI simulation in \\textbf{TypeScript (React 19, Next.js)} and \\textbf{PostgreSQL (Supabase)}, orchestrating multi-agent LLM routing across \\textbf{60+ MBA students}.",
+        "tracks": ["agentic_swe", "forward_deployed_engineer", "data_analyst_ds"]
+      },
+      {
+        "id": "proj_companion_care",
+        "title": "Companion Care — Voice-First Agentic Dementia Assistant",
+        "url": "https://github.com/chandrarup/CompanionCare",
+        "tech_stack_short": "TypeScript, TanStack Start, Supabase, Gemini, ElevenLabs",
+        "year": "2026",
+        "bullet": "Engineered voice-first agentic web application using \\textbf{TypeScript (TanStack Start)}, \\textbf{PostgreSQL (Supabase)}, and \\textbf{Google Gemini API} for dementia patients.",
+        "tracks": ["agentic_swe", "forward_deployed_engineer"]
+      },
+      {
+        "id": "proj_gene_viewer",
+        "title": "Gene-Viewer — High-Throughput Spatial Omics Platform",
+        "url": "https://github.com/chandrarup/Gene-Viewer",
+        "tech_stack_short": "Python, FastAPI, Canvas, Single-Cell, Spatial Omics",
+        "year": "2026",
+        "bullet": "Developed visual analytics platform using \\textbf{Python (FastAPI)} and \\textbf{JavaScript (HTML5 Canvas)} streaming \\textbf{532,392 single cells $\\times$ 960 genes} with sub-second latency.",
+        "tracks": ["bioinformatics_ai", "agentic_swe", "data_analyst_ds"]
+      },
+      {
+        "id": "proj_enterprise_rag",
+        "title": "Enterprise Knowledge Graph & Hybrid Vector RAG",
+        "url": "https://github.com/chandrarup/enterprise-rag-engine",
+        "tech_stack_short": "Python, FastAPI, Neo4j, pgvector, Pinecone, LangGraph",
+        "year": "2025",
+        "bullet": "Built production hybrid search engine in \\textbf{Python} combining \\textbf{Neo4j} cypher graph queries with \\textbf{PostgreSQL (pgvector)} and \\textbf{Pinecone} embeddings for code translation.",
+        "tracks": ["agentic_swe", "core_aiml", "forward_deployed_engineer"]
       }
     ],
     "publications": [

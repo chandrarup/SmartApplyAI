@@ -73,6 +73,10 @@ class RoleEntryAST(BaseModel):
     bullets: List[str] = Field(
         description="List of LaTeX-formatted bullets (165-230 characters each) proving WHAT+HOW+WHY with selective \\textbf{}"
     )
+    entry_skills: Optional[str] = Field(
+        default=None,
+        description="Contextual Skills & Tools line rendered directly beneath bullets via \\entryskills{}"
+    )
 
 
 class ProjectEntryAST(BaseModel):
@@ -85,6 +89,10 @@ class ProjectEntryAST(BaseModel):
     year: str = Field(description="Year or date, e.g. 2026")
     bullets: List[str] = Field(
         description="1-2 LaTeX-formatted bullets (165-230 chars each) proving WHAT+HOW+WHY"
+    )
+    entry_skills: Optional[str] = Field(
+        default=None,
+        description="Contextual Skills & Tools line rendered directly beneath bullets via \\entryskills{}"
     )
 
 

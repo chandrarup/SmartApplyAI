@@ -125,6 +125,12 @@ def build_preamble(level: Dict[str, str]) -> str:
   \vspace{{0.3pt}}%
 }}
 
+\newcommand{{\entryskills}}[1]{{%
+  \vspace{{0.4pt}}%
+  {{\footnotesize\noindent\hspace{{1.1em}}\textbf{{Skills \& Tools:}} #1\par}}%
+  \vspace{{1.0pt}}%
+}}
+
 \newenvironment{{reslist}}{{%
   \begin{{list}}{{--}}{{%
     \setlength{{\leftmargin}}{{1.1em}}%
@@ -160,6 +166,26 @@ def escape_latex(text: str) -> str:
     text = re.sub(r"(?<!\\)%", r"\%", text)
     text = re.sub(r"(?<!\\)#", r"\#", text)
     return text
+
+
+def escape_latex_safe(plain_text: str) -> str:
+    """Deterministic escaper for plain text before wrapping in LaTeX macros."""
+    replacements = [
+        ("\\", r"\textbackslash{}"),
+        ("&", r"\&"),
+        ("%", r"\%"),
+        ("$", r"\$"),
+        ("#", r"\#"),
+        ("_", r"\_"),
+        ("{", r"\{"),
+        ("}", r"\}"),
+        ("~", r"\textasciitilde{}"),
+        ("^", r"\textasciicircum{}"),
+    ]
+    out = plain_text
+    for old, new in replacements:
+        out = out.replace(old, new)
+    return out
 
 
 def sanitize_project_header(title: str, url: str, tech_stack: str, year: str) -> Tuple[str, str]:
@@ -238,6 +264,8 @@ def render_ast_to_latex(ast: TailoredResumeAST, level: Dict[str, str]) -> str:
                     b_esc = clean(b)
                     lines.append(rf"  \item {b_esc}")
                 lines.append(r"\end{reslist}")
+                if entry.entry_skills:
+                    lines.append(rf"\entryskills{{{clean(entry.entry_skills)}}}")
 
         elif sec == "Selected Projects":
             proj_title = clean(ast.projects_section_title)
@@ -252,6 +280,8 @@ def render_ast_to_latex(ast: TailoredResumeAST, level: Dict[str, str]) -> str:
                     b_esc = clean(b)
                     lines.append(rf"  \item {b_esc}")
                 lines.append(r"\end{reslist}")
+                if proj.entry_skills:
+                    lines.append(rf"\entryskills{{{clean(proj.entry_skills)}}}")
 
         elif sec == "Publications" and ast.publication_entries:
             lines.append(r"\ressection{Publications}")
@@ -265,6 +295,8 @@ def render_ast_to_latex(ast: TailoredResumeAST, level: Dict[str, str]) -> str:
                     b_esc = clean(b)
                     lines.append(rf"  \item {b_esc}")
                 lines.append(r"\end{reslist}")
+                if pub.entry_skills:
+                    lines.append(rf"\entryskills{{{clean(pub.entry_skills)}}}")
 
         elif sec == "Skills":
             lines.append(r"\ressection{Skills}")

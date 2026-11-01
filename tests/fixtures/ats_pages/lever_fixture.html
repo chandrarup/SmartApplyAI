@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lever Job Application Mock</title>
+</head>
+<body>
+  <div class="application-page">
+    <h1>Apply for Machine Learning Engineer — Cohere</h1>
+    <form class="application-form" action="/submit-lever" method="post" enctype="multipart/form-data">
+      <ul class="application-questions">
+        <li class="application-question">
+          <label>Resume/CV <span>✱</span></label>
+          <input type="file" name="resume" accept=".pdf,.doc,.docx" required>
+        </li>
+        <li class="application-question">
+          <label>Full name <span>✱</span></label>
+          <input type="text" name="name" required>
+        </li>
+        <li class="application-question">
+          <label>Email <span>✱</span></label>
+          <input type="email" name="email" required>
+        </li>
+        <li class="application-question">
+          <label>Phone <span>✱</span></label>
+          <input type="tel" name="phone" required>
+        </li>
+        <li class="application-question">
+          <label>Current company</label>
+          <input type="text" name="org">
+        </li>
+        <li class="application-question">
+          <label>LinkedIn URL</label>
+          <input type="text" name="urls[LinkedIn]">
+        </li>
+        <li class="application-question">
+          <label>GitHub URL</label>
+          <input type="text" name="urls[GitHub]">
+        </li>
+        <li class="application-question">
+          <label>Portfolio URL</label>
+          <input type="text" name="urls[Portfolio]">
+        </li>
+      </ul>
+      <button type="submit" class="template-btn-submit">Submit application</button>
+    </form>
+  </div>
+</body>
+</html>
