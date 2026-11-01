@@ -15,6 +15,36 @@ from src.prompt_templates import (
 )
 
 
+def expand_base_languages(skills: List[str]) -> List[str]:
+    """Return deterministic language/query-language dependencies for framework names."""
+    expanded = []
+    seen = set()
+    normalized = [skill.strip().lower() for skill in skills if skill and skill.strip()]
+    for skill in normalized:
+        for framework, base_langs in BASE_LANGUAGE_DEPENDENCY_TABLE.items():
+            if framework.lower() in skill:
+                for language in base_langs:
+                    key = language.lower()
+                    if key not in seen:
+                        seen.add(key)
+                        expanded.append(language)
+    return expanded
+
+
+def validate_resume_ast_input(resume_ast: TailoredResumeAST) -> List[str]:
+    """Return explicit structural diagnostics before synthesis or compilation."""
+    errors = []
+    if not resume_ast.experience_entries and not resume_ast.project_entries:
+        errors.append("Resume AST must contain at least one experience or project entry.")
+    if "Summary" not in resume_ast.section_order:
+        errors.append("Resume AST section_order must include Summary.")
+    if "Skills" not in resume_ast.section_order:
+        errors.append("Resume AST section_order must include Skills.")
+    if not resume_ast.skill_categories:
+        errors.append("Resume AST must include at least one skill category.")
+    return errors
+
+
 def strip_latex_formatting(text: str) -> str:
     """Removes LaTeX command wrappers to measure rendered plain-text character length."""
     # Replace \ulhref{url}{anchor} with anchor

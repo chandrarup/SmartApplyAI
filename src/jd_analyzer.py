@@ -15,6 +15,7 @@ from src.prompt_templates import (
     build_jd_deconstruction_prompt,
     BASE_LANGUAGE_DEPENDENCY_TABLE,
 )
+from src.validator import expand_base_languages
 from src.knowledge_graph import load_candidate_knowledge_graph
 
 
@@ -72,11 +73,7 @@ def rule_based_jd_deconstruction(raw_jd: str, company_name: Optional[str] = None
             found_skills.append(skill)
 
     # 4. Implied Base Languages
-    implied_languages = set()
-    for skill in found_skills:
-        for framework, base_langs in BASE_LANGUAGE_DEPENDENCY_TABLE.items():
-            if framework.lower() in skill.lower():
-                implied_languages.update(base_langs)
+    implied_languages = set(expand_base_languages(found_skills))
 
     # 5. Knockout Checks
     knockout_flags = []
