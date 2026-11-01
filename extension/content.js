@@ -202,6 +202,9 @@ function isLhActivePage() {
     if (/successfactors\.com$|jobvite\.com$|rippling\.com$|paycom\.com$|workable\.com$|recruitee\.com$|paylocity\.com$/.test(h)) {
       return /job|apply|application|career|position|requisition/.test(p + " " + q);
     }
+    if (/brassring\.com$|kronos\.com$|oraclecloud\.com$|oracle\.com$|phenompeople\.com$|phenom\.com$/.test(h)) {
+      return /job|apply|career|position|requisition/.test(p + " " + q);
+    }
   } catch (e) {}
   return false;
 }
@@ -394,6 +397,57 @@ ADAPTERS.ashby = {
     return job;
   },
 };
+
+function makeDomAdapter(id, hostPattern, selectors = {}) {
+  return {
+    id,
+    detect() {
+      const h = location.hostname.toLowerCase();
+      const confidence = hostPattern.test(h) ? 0.92 : 0;
+      return { confidence };
+    },
+    async extract() {
+      const job = emptyNormalizedJob();
+      job.source.adapter = id;
+      job.source.method = "dom";
+      const titleEl = document.querySelector(
+        selectors.title || "h1, h2, [data-automation-id='jobPostingHeader'], [class*='job-title' i]"
+      );
+      const root = document.querySelector(
+        selectors.root || "[data-automation-id='jobPostingDescription'], [class*='job-description' i], main, article"
+      ) || document.body;
+      job.title.raw = (titleEl?.innerText || titleEl?.textContent || "").trim();
+      job.company.raw = (document.querySelector("meta[property='og:site_name']")?.content || "").trim();
+      job.location.raw = (document.querySelector(selectors.location || "[class*='location' i]")?.innerText || "").trim();
+      job.sections = parseSections(root);
+      if (!Object.keys(job.sections).length) {
+        const text = (root.innerText || root.textContent || "").replace(/\s+/g, " ").trim();
+        if (text) job.sections.responsibilities = { text, bullets: [] };
+      }
+      job.extraction.confidence = {
+        title: titleEl ? 0.8 : 0.2,
+        sections: Object.keys(job.sections).length ? 0.7 : 0.2,
+      };
+      return job;
+    },
+  };
+}
+
+ADAPTERS.brassring = makeDomAdapter(
+  "brassring",
+  /(^|\.)brassring\.com$|(^|\.)kronos\.com$/,
+  { root: "#job-description, .job-description, [id*='jobDescription' i]" },
+);
+ADAPTERS.oracle_hcm = makeDomAdapter(
+  "oracle_hcm",
+  /(^|\.)oraclecloud\.com$|(^|\.)oracle\.com$/,
+  { root: "[data-automation-id*='jobDescription' i], [class*='job-description' i]" },
+);
+ADAPTERS.phenom = makeDomAdapter(
+  "phenom",
+  /(^|\.)phenompeople\.com$|(^|\.)phenom\.com$/,
+  { root: "[data-testid*='description' i], [class*='job-description' i]" },
+);
 
 ADAPTERS.generic = {
   id: "generic",
@@ -687,9 +741,7 @@ function setNativeValue(element, value) {
     } catch (e) {
       element.innerText = String(value);
     }
-    element.dispatchEvent(new Event("input",  { bubbles: true }));
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-    element.dispatchEvent(new Event("blur",   { bubbles: true }));
+    dispatchComposedInputEvents(element);
     return;
   }
   const proto = element.tagName === "TEXTAREA"
@@ -698,9 +750,36 @@ function setNativeValue(element, value) {
   const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
   if (setter) setter.call(element, value);
   else element.value = value;
-  element.dispatchEvent(new Event("input",  { bubbles: true }));
-  element.dispatchEvent(new Event("change", { bubbles: true }));
-  element.dispatchEvent(new Event("blur",   { bubbles: true }));
+  // React tracks controlled values through a private valueTracker. Resetting
+  // it before dispatch makes the synthetic input observable in React 16-18.
+  try {
+    const tracker = element._valueTracker;
+    if (tracker) tracker.setValue(String(value));
+  } catch (e) {}
+  dispatchComposedInputEvents(element);
+}
+
+function dispatchComposedInputEvents(element) {
+  for (const type of ["input", "change", "blur"]) {
+    element.dispatchEvent(new Event(type, { bubbles: true, composed: true }));
+  }
+}
+
+function workdayFiberSet(element, value) {
+  if (!element || !window.postMessage) return false;
+  const requestId = `lh-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let handled = false;
+  const onMessage = event => {
+    if (event.source === window && event.data?.source === "__lh_workday_response__" &&
+        event.data.requestId === requestId) handled = !!event.data.ok;
+  };
+  window.addEventListener("message", onMessage);
+  try {
+    const selector = element.id ? `#${CSS.escape(element.id)}` : null;
+    window.postMessage({ source: "__lh_workday_request__", requestId, selector, value }, "*");
+  } catch (e) {}
+  setTimeout(() => window.removeEventListener("message", onMessage), 0);
+  return handled;
 }
 
 function setSelectValue(element, value) {
@@ -747,7 +826,7 @@ function setRadioGroup(container, value) {
     const val = (input.value || "").toLowerCase();
     if (lbl.includes(valLower) || val === valLower || (valLower.includes("yes") && val === "yes") || (valLower.includes("no") && val === "no")) {
       input.checked = true;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
       return true;
     }
   }
@@ -773,6 +852,57 @@ function formDocuments(platform = detectPlatform()) {
 
 function queryFormDocuments(selector, platform = detectPlatform()) {
   return formDocuments(platform).flatMap(doc => Array.from(doc.querySelectorAll(selector)));
+}
+
+function composedChildren(node) {
+  const children = [];
+  if (!node) return children;
+  if (node.childNodes) children.push(...Array.from(node.childNodes));
+  if (node.shadowRoot) children.push(...Array.from(node.shadowRoot.childNodes));
+  return children;
+}
+
+function walkComposedTree(root = document, visitor, maxNodes = 10000) {
+  const stack = [root];
+  const seen = new Set();
+  let count = 0;
+  while (stack.length && count++ < maxNodes) {
+    const node = stack.pop();
+    if (!node || seen.has(node)) continue;
+    seen.add(node);
+    visitor(node);
+    const children = composedChildren(node);
+    for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+  }
+  return count;
+}
+
+function composedQueryAll(root, selector) {
+  const found = [];
+  walkComposedTree(root, node => {
+    if (node.nodeType === Node.ELEMENT_NODE && node.matches(selector)) found.push(node);
+  });
+  return found;
+}
+
+function cleanFieldLabel(text) {
+  return String(text || "").replace(/[\s*✱:]+$/, "").replace(/\s+/g, " ").trim();
+}
+
+function getFieldIdentity(input, label, index = 0) {
+  const scope = input.closest?.(
+    "[data-automation-id], [data-field], [data-qa], fieldset, form, " +
+    ".application-field, .form-group, .iCIMS_TableFields, .wd-field"
+  );
+  const scopeId = scope?.getAttribute("data-automation-id") ||
+    scope?.getAttribute("data-field") || scope?.getAttribute("data-qa") ||
+    scope?.id || scope?.name || "";
+  const path = [];
+  let node = input;
+  for (let i = 0; node && i < 5; i++, node = node.parentElement) {
+    path.push(node.id || node.getAttribute?.("data-automation-id") || node.tagName || "");
+  }
+  return `${cleanFieldLabel(label) || input.name || input.id || "field"}::${scopeId || path.join("/") || index}`;
 }
 
 function getLabelForInput(input, platform) {
@@ -881,6 +1011,9 @@ function detectPlatform() {
   if (/ashbyhq\.com/.test(h)) return "ashby";
   if (/rippling\.com|ripplinghris\.com/.test(h)) return "rippling";
   if (/paycom\.com/.test(h)) return "paycom";
+  if (/brassring\.com|kronos\.com/.test(h)) return "brassring";
+  if (/oraclecloud\.com|oracle\.com/.test(h)) return "oracle_hcm";
+  if (/phenompeople\.com|phenom\.com/.test(h)) return "phenom";
   if (/careers\.google\.com/.test(h)) return "greenhouse";
   // Test pages
   if (/test\/lever/.test(path)) return "lever";
@@ -906,6 +1039,7 @@ function getPlatformName(key) {
     linkedin: "LinkedIn Easy Apply", taleo: "Taleo",
     successfactors: "SAP SuccessFactors", jobvite: "Jobvite",
     ashby: "Ashby", rippling: "Rippling", paycom: "Paycom", generic: "Generic",
+    brassring: "BrassRing", oracle_hcm: "Oracle HCM", phenom: "Phenom",
   };
   return names[key] || "Unknown";
 }
@@ -915,32 +1049,33 @@ function getPlatformName(key) {
 // ─────────────────────────────────────────────
 function getFormFields(platform) {
   let rawInputs = [];
+  const query = selector => composedQueryAll(document, selector);
 
   if (platform === "workday") {
     // Workday: inputs inside [data-automation-id] wrappers OR inputs that themselves have the attribute
-    rawInputs = Array.from(document.querySelectorAll(
+    rawInputs = query(
       '[data-automation-id] input:not([type="hidden"]):not([type="submit"]):not([type="file"]),' +
       '[data-automation-id] textarea,' +
       '[data-automation-id] select,' +
       'input[data-automation-id]:not([type="hidden"]):not([type="submit"]):not([type="file"]),' +
       'textarea[data-automation-id],' +
       'select[data-automation-id]'
-    ));
+    );
   } else if (platform === "linkedin") {
     // LinkedIn: everything inside the Easy Apply modal
     const modal = document.querySelector('.jobs-easy-apply-modal, [data-test-modal-id="easy-apply-modal"]');
     if (modal) {
-      rawInputs = Array.from(modal.querySelectorAll(
+      rawInputs = composedQueryAll(modal,
         'input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]),' +
         'textarea, select'
-      ));
+      );
     }
   } else if (platform === "ashby" || platform === "rippling" || platform === "paycom") {
     // Generic React form fields for newer ATS platforms
-    rawInputs = Array.from(document.querySelectorAll(
+    rawInputs = query(
       'input:not([type="hidden"]):not([type="submit"]):not([type="file"]),' +
       'textarea, select'
-    ));
+    );
   } else if (platform === "icims") {
     // iCIMS: elements with class iCIMS_Input
     rawInputs = queryFormDocuments(
@@ -949,35 +1084,35 @@ function getFormFields(platform) {
     );
   } else if (platform === "smartrecruiters") {
     // SmartRecruiters: data-test-id attributes or generic
-    rawInputs = Array.from(document.querySelectorAll(
+    rawInputs = query(
       'input[data-test-id]:not([type="hidden"]):not([type="file"]),' +
       'select[data-test-id], textarea[data-test-id],' +
       'input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]),' +
       'textarea, select'
-    ));
+    );
     // Deduplicate
     rawInputs = [...new Set(rawInputs)];
   } else if (platform === "taleo") {
     // Taleo: ftlField class or ftl-prefixed IDs
-    rawInputs = Array.from(document.querySelectorAll(
+    rawInputs = query(
       'input.ftlField:not([type="hidden"]):not([type="submit"]),' +
       'select.ftlField, textarea.ftlField,' +
       'input[id^="ftl"]:not([type="hidden"]),' +
       'select[id^="ftl"], textarea[id^="ftl"]'
-    ));
+    );
     rawInputs = [...new Set(rawInputs)];
   } else if (platform === "greenhouse") {
     // Greenhouse: standard inputs, exclude resume/file uploads
-    rawInputs = Array.from(document.querySelectorAll(
+    rawInputs = query(
       'input:not([type="hidden"]):not([type="submit"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]),' +
       'textarea, select'
-    ));
+    );
   } else {
     // Generic, Lever, BambooHR, and everything else
-    rawInputs = Array.from(document.querySelectorAll(
+    rawInputs = query(
       'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="file"]):not([type="image"]),' +
       'textarea, select'
-    ));
+    );
   }
 
   // Build field descriptor array
@@ -986,16 +1121,13 @@ function getFormFields(platform) {
   for (const el of rawInputs) {
     if (el.type === "radio" || el.type === "checkbox") continue;
     const label = getLabelForInput(el, platform);
-    // BUG 2: scoped identity — include nearest section container ID
-    // so "Job Title" in Work Exp #1 ≠ "Job Title" in Work Exp #2
-    const scopeEl = el.closest('[data-automation-id], [data-field], fieldset, .application-field, .iCIMS_TableFields, .wd-field');
-    const scopeId = scopeEl?.getAttribute("data-automation-id") || scopeEl?.id || "";
-    const identity = `${label || el.name || el.id}::${scopeId}`;
+    const identity = getFieldIdentity(el, label, fields.length);
     if (!identity.replace(/::/g, "") || seen.has(identity)) continue;
     seen.add(identity);
     fields.push({
       element: el,
       label: label || el.name || el.id || "",
+      identity,
       type: el.type || el.tagName.toLowerCase(),
       name: el.name || el.id || "",
       options: el.tagName === "SELECT"
@@ -1078,6 +1210,10 @@ function fillField(platform, field, value) {
   const finalVal = normalizeValue(field.label, value);
   if (!finalVal) return false;
   try {
+    if (/date|birth/i.test(field.label || "")) {
+      const container = el.closest(".date, [class*='date' i], [data-automation-id*='date' i]");
+      if (container && fillThreePartDate(container, finalVal)) return true;
+    }
     if (el.tagName === "SELECT") return setSelectValue(el, finalVal);
     el.focus();
     setNativeValue(el, String(finalVal));
@@ -2424,6 +2560,12 @@ function fillThreePartDate(container, dateStr) {
   }
   if (!month || !year) return false;
   const selects = Array.from(container.querySelectorAll("select"));
+  const inputs = Array.from(container.querySelectorAll("input"));
+  if (!selects.length && inputs.length >= 3 && day) {
+    const parts = [month, day, year];
+    inputs.slice(0, 3).forEach((el, i) => setNativeValue(el, parts[i]));
+    return true;
+  }
   let filled = 0;
   for (const sel of selects) {
     const lbl = (getLabelForInput(sel, "icims") || sel.name || "").toLowerCase();
@@ -2432,6 +2574,32 @@ function fillThreePartDate(container, dateStr) {
     else if (/year/.test(lbl)) { if (setSelectValue(sel, year)) filled++; }
   }
   return filled > 0;
+}
+
+function attachFileToInput(input, file) {
+  if (!input || !file) return false;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  try { input.files = dt.files; } catch (e) { return false; }
+  dispatchComposedInputEvents(input);
+  return true;
+}
+
+function attachFileToDropzone(file) {
+  const zones = composedQueryAll(document,
+    "[data-dropzone], .dropzone, [class*='dropzone' i], [role='button'][aria-label*='upload' i]"
+  );
+  for (const zone of zones) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      for (const type of ["dragenter", "dragover", "drop"]) {
+        zone.dispatchEvent(new DragEvent(type, { bubbles: true, composed: true, dataTransfer: dt }));
+      }
+      return true;
+    } catch (e) {}
+  }
+  return false;
 }
 
 /**
@@ -2449,6 +2617,44 @@ async function retryCascadingField(fieldKey, value, platform, waitMs = 1200) {
   return false;
 }
 
+async function settleConditionalFields(ms = 1200) {
+  await new Promise(resolve => {
+    let done = false;
+    let timer = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      observer?.disconnect();
+      clearTimeout(timer);
+      resolve();
+    };
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(finish, Math.min(ms, 450));
+    });
+    try { observer.observe(document.body, { childList: true, subtree: true }); } catch (e) {}
+    timer = setTimeout(finish, ms);
+  });
+}
+
+async function fillCascadingLocation(answers, platform) {
+  const keys = [
+    ["country", answers["Country"] || answers["country"]],
+    ["state", answers["State"] || answers["State / Province"] || answers["state"]],
+    ["city", answers["City"] || answers["city"]],
+  ];
+  let filled = 0;
+  for (const [key, value] of keys) {
+    if (!value) continue;
+    const target = getFormFields(platform).find(f => matchFieldKey(f.label) === key);
+    if (target && fillField(platform, target, value)) {
+      filled++;
+      await settleConditionalFields(900);
+    }
+  }
+  return filled;
+}
+
 async function fillResumeUpload(userData) {
   // Find file inputs labeled Resume/CV
   const inputs = queryFormDocuments('input[type="file"]', detectPlatform());
@@ -2458,7 +2664,7 @@ async function fillResumeUpload(userData) {
                 " " + (i.id || "").toLowerCase();
     return /resume|cv\b/.test(lbl);
   }) || inputs[0];
-  if (!resumeInput) return false;
+  if (!resumeInput && !composedQueryAll(document, "[data-dropzone], .dropzone, [class*='dropzone' i]").length) return false;
 
   // Try to fetch the most recent generated resume PDF from backend
   try {
@@ -2467,11 +2673,7 @@ async function fillResumeUpload(userData) {
     if (!r.ok) return false;
     const blob = await r.blob();
     const file = new File([blob], "resume.pdf", { type: "application/pdf" });
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    resumeInput.files = dt.files;
-    resumeInput.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
+    return attachFileToInput(resumeInput, file) || attachFileToDropzone(file);
   } catch (e) { return false; }
 }
 
@@ -2632,6 +2834,13 @@ async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
   }
 
   // Cascading-dropdown retry (State after Country gets repopulated by AJAX)
+  try {
+    const cascadeFilled = await fillCascadingLocation(answers, platform);
+    if (cascadeFilled) filled += cascadeFilled;
+  } catch (e) {
+    panelLog(`Location cascade failed: ${e.message}`);
+  }
+  await settleConditionalFields(500);
   const stateAnswer = answers["State"] || answers["State / Province"] || answers["state"];
   if (stateAnswer) {
     try {
@@ -2694,6 +2903,21 @@ async function _runAutoFillInner(preferredLlm, profileOverrideRaw = null) {
     }
   }
 
+  // Conditional questions and SPA sections can mount after the first pass.
+  // Re-scan twice rather than guessing at fields that were not present yet.
+  for (let round = 0; round < 2; round++) {
+    await settleConditionalFields(350);
+    for (const field of getFormFields(platform)) {
+      const answer = answers[field.label] || answers[field.name];
+      if (!answer || answer === "SKIP" || field.element?.value) continue;
+      if (fillField(platform, field, answer)) {
+        filled++;
+        registerFilled(field, answer, platform);
+        panelAddFilled(field.label, answer);
+      }
+    }
+  }
+
   sendProgress({
     status: "done",
     message: `Done! Filled ${filled} of ${totalFields} fields on ${platformName}`,
@@ -2719,6 +2943,32 @@ function sendProgress(data) {
   if (!isExtensionAlive()) return;
   try { chrome.runtime.sendMessage({ action: "autofill_progress", data }); }
   catch (e) { /* popup may be closed or context invalidated */ }
+}
+
+function discoverFormFields(platform = detectPlatform()) {
+  const fields = getFormFields(platform).slice(0, 150);
+  const radios = Object.values(getRadioGroups(platform)).slice(0, 75);
+  return {
+    platform,
+    url: location.href.slice(0, 2000),
+    fields: fields.map((f, index) => ({
+      index,
+      identity: f.identity,
+      label: String(f.label || "").slice(0, 300),
+      name: String(f.name || "").slice(0, 200),
+      type: f.type,
+      options: (f.options || []).slice(0, 50).map(v => String(v).slice(0, 200)),
+      required: !!f.element?.required || f.element?.getAttribute("aria-required") === "true",
+      sensitive: isSensitiveField(f.label),
+    })),
+    radioGroups: radios.map((g, index) => ({
+      index,
+      name: String(Object.keys(getRadioGroups(platform))[index] || "").slice(0, 200),
+      label: String(g.label || "").slice(0, 300),
+      options: (g.inputs || []).slice(0, 30).map(r => String(r.value || "").slice(0, 200)),
+      sensitive: isSensitiveField(g.label),
+    })),
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -2853,18 +3103,14 @@ async function fillResumeUploadVersioned(variantId) {
                 (i.name || "").toLowerCase() + " " + (i.id || "").toLowerCase();
     return /resume|cv\b/.test(lbl);
   }) || inputs[0];
-  if (!resumeInput) return false;
+  if (!resumeInput && !composedQueryAll(document, "[data-dropzone], .dropzone, [class*='dropzone' i]").length) return false;
   try {
     const { apiUrl } = await getSettings();
     const r = await fetch(`${apiUrl}/resume/versions/${encodeURIComponent(variantId)}/pdf`);
     if (!r.ok) return false;
     const blob = await r.blob();
     const file = new File([blob], `resume_${variantId}.pdf`, { type: "application/pdf" });
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    resumeInput.files = dt.files;
-    resumeInput.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
+    return attachFileToInput(resumeInput, file) || attachFileToDropzone(file);
   } catch (e) { return false; }
 }
 
@@ -3014,6 +3260,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.action === "get_job_context") {
     getBestJobContext().then(ctx => sendResponse(ctx)).catch(() => sendResponse(null));
+    return true;
+  }
+  if (message.action === "discover_fields") {
+    try { sendResponse({ ok: true, data: discoverFormFields(message.platform || detectPlatform()) }); }
+    catch (e) { sendResponse({ ok: false, error: e?.message || String(e) }); }
     return true;
   }
   if (message.action === "start_autofill") {
