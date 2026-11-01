@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import uuid, hashlib
 import contextlib
 import threading as _threading
@@ -36,6 +37,9 @@ from teach import lesson as teach_lesson
 from teach import store as teach_store
 import tailor_edits
 import style_lint
+from infra_auth import verify_token, new_extension_challenge, verify_extension_proof
+from infra_workers import JobSandbox
+from llm_resilience import CircuitBreaker, call_with_resilience
 
 # M6 review queue + application tracker
 from matcher import store as matcher_store
@@ -410,7 +414,12 @@ async def _run_llm(messages, temperature: float = 0.3, system: str = "",
                                        prefer, timeout, model)
 
 # Security
-origins = ["chrome-extension://*", "http://localhost", "http://127.0.0.1", "*"]
+origins = [
+    item.strip() for item in os.getenv(
+        "SMARTAPPLY_CORS_ORIGINS",
+        "http://localhost,http://127.0.0.1,chrome-extension://"
+    ).split(",") if item.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -418,6 +427,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> str:
+    """Resolve the authenticated tenant for v2 routes.
+
+    The legacy API intentionally keeps its local profile-header behavior. New
+    v2 routes are always bearer-authenticated and cannot be cross-tenant by
+    changing ``X-Profile-ID``.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Bearer token required")
+    try:
+        return str(verify_token(credentials.credentials)["sub"])
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=401, detail="Invalid bearer token") from exc
 
 @app.middleware("http")
 async def private_network_access_headers(request: Request, call_next):
@@ -441,6 +469,58 @@ class AutofillRequest(BaseModel):
     jd_text: str = ""
     company: str = ""
     llm: str = "ollama"
+
+
+class ExtensionHandshakeRequest(BaseModel):
+    extension_id: str
+    nonce: str
+    proof: str
+
+
+@app.get("/api/v2/auth/extension-challenge")
+def extension_challenge(user_id: str = Depends(current_user)):
+    challenge = new_extension_challenge()
+    extension_handshake._challenge = challenge
+    return {"user_id": user_id, "nonce": challenge.nonce, "expires_at": challenge.expires_at}
+
+
+@app.post("/api/v2/auth/extension-handshake")
+def extension_handshake(
+    req: ExtensionHandshakeRequest,
+    user_id: str = Depends(current_user),
+):
+    secret = os.getenv("SMARTAPPLY_EXTENSION_SECRET") or os.getenv("SMARTAPPLY_JWT_SECRET") or ""
+    challenge = getattr(extension_handshake, "_challenge", None)
+    if not challenge or req.nonce != challenge.nonce or not verify_extension_proof(
+        challenge, req.proof, req.extension_id, secret
+    ):
+        raise HTTPException(status_code=401, detail="Invalid extension proof")
+    return {"ok": True, "user_id": user_id, "extension_id": req.extension_id}
+
+
+@app.get("/api/v2/autofill/stream")
+@app.post("/api/v2/autofill/stream")
+async def autofill_stream(req: AutofillRequest, user_id: str = Depends(current_user)):
+    """Emit progress and a deterministic answer payload as server-sent events."""
+    async def events():
+        yield "event: started\ndata: {\"user_id\": " + json.dumps(user_id) + "}\n\n"
+        try:
+            profile = load_pdata(user_id)
+            autofill = profile.get("autofill") if isinstance(profile.get("autofill"), dict) else {}
+            answers = build_rule_based_answers(req.fields, autofill, profile)
+            payload = {"answers": answers, "unanswered": [
+                {"label": field.get("label", ""), "type": field.get("type", "text")}
+                for field in req.fields if field.get("label", "") not in answers
+            ]}
+            yield "event: result\ndata: " + json.dumps(payload) + "\n\n"
+        except Exception as exc:
+            log.warning("autofill stream degraded: %s", exc)
+            yield "event: result\ndata: " + json.dumps(
+                {"answers": {}, "unanswered": req.fields, "degraded": True}
+            ) + "\n\n"
+        yield "event: done\ndata: {}\n\n"
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 class QuestionRequest(BaseModel):
     question: str
@@ -4178,4 +4258,3 @@ def api_verify_latex(req: VerifyLatexRequest):
             "fill_optimal": 90.0 <= fill_pct <= 98.5,
             "logs": logs[:1000],
         }
-
